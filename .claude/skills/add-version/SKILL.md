@@ -126,7 +126,8 @@ docker rm -f oo-extract
 
 - **default.json 不是原样复制**：它把 FileConverter 体积上限调大了 10 倍，必须套 patch（apply 脚本已处理）。直接用原版会导致大文件打不开/转换失败。
 - **docker cp 出来是只读(444)**：copy-resources.sh 已统一 chmod 644，否则 apply 追加 CSS 会 Permission denied。
-- **mobile chunk 号变了**：按内容标记 `navbar-with-logo` 定位，已规避硬编码 526/923/611。若脚本报"未找到含 navbar-with-logo 的 chunk"，说明该版改了移动端结构，进容器人工排查：`docker exec oo-extract sh -c 'grep -rl navbar-with-logo .../apps/<editor>/mobile/css/'`。
+- **mobile chunk 一号多变体（9.4.0 起）**：新版同一 chunk 号（如 526）会有多个 hash 变体，只有 `dist/js/app.js` 的 `miniCssF` 指向的那个才真正被加载。copy-resources.sh 已先按 miniCssF 取 hash、再用 `navbar-with-logo` 二次确认；旧版（9.2.0）只有一个变体也兼容。若脚本仍报多候选且取不到 miniCssF，按提示进容器人工确认。
+- **require.js 不再压缩（9.4.0 起）**：RequireJS 升到 2.3.8 且是未压缩源码，主体标记带空格 `var requirejs, require, define;`（9.2.0 压缩版无空格）。apply 用正则 `var requirejs, *require, *define;` 兼容两者；注入块本身与 requirejs 版本无关，插在该标记前即可。
 - **忘了换 mobile 哈希名**：docker-compose 左侧文件不存在 → 挂载成空目录/容器报错；第 7 步自检的 MISS 能抓到。
 - **用了 9.4 / latest 拉镜像**：哈希不可复现。务必 4 段具体号。
 - **三段 CSS 一致是基于历史版本的假设**：若新版某编辑器结构大改导致不再一致，apply 仍会无脑追加同一段——自检只验证"有没有追加上"，不验证"是否适配新结构"，所以务必肉眼实跑复核一次。

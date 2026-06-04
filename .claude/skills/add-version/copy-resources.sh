@@ -64,6 +64,35 @@ copy_fixed() {
     docker cp "$CONTAINER_ID:$1" "$2" && echo "✅" || echo "❌ 失败: $1"
 }
 
+# 定位某编辑器「真正被运行时加载」的 mobile chunk css（容器内绝对路径）。
+# 新版（如 9.4.0）同一 chunk 号会有多个 hash 变体，只有 dist/js/app.js 的 miniCssF
+# 指向的那个才会被加载；旧版（9.2.0）只有一个变体。策略：
+#   1) 从 app.js 的 miniCssF 取实际 hash，匹配 *.<hash>.css 且含 navbar-with-logo 者；
+#   2) 取不到则回退到「按内容 grep navbar-with-logo」，若仍有多个候选则报警。
+find_mobile_css() {
+    local e="$1"
+    local cssdir="$CONTAINER_BASE/apps/$e/mobile/css"
+    local appjs="$CONTAINER_BASE/apps/$e/mobile/dist/js/app.js"
+    local hash f
+    hash=$(docker exec "$CONTAINER_ID" sh -c \
+        "grep -oE 'miniCssF=function\([a-z]\)\{return\"css/\"\+[a-z]\+\"\.[0-9a-f]+\.css\"' '$appjs' 2>/dev/null" \
+        | grep -oE '[0-9a-f]{16,}' | head -n 1)
+    if [ -n "$hash" ]; then
+        f=$(docker exec "$CONTAINER_ID" sh -c \
+            "for x in $cssdir/*.$hash.css; do grep -lq '$MOBILE_MARKER' \"\$x\" 2>/dev/null && { echo \"\$x\"; break; }; done")
+        [ -n "$f" ] && { echo "$f"; return; }
+        echo "（$e: miniCssF hash=$hash 未匹配到含 $MOBILE_MARKER 的 css，回退 grep）" >&2
+    fi
+    # 回退：按内容定位
+    local hits
+    hits=$(docker exec "$CONTAINER_ID" sh -c "grep -l '$MOBILE_MARKER' $cssdir/*.css 2>/dev/null")
+    local n; n=$(printf '%s\n' "$hits" | grep -c .)
+    if [ "$n" -gt 1 ]; then
+        echo "⚠️  $e: 含 $MOBILE_MARKER 的 css 有 $n 个候选，miniCssF 又取不到 hash —— 请人工确认运行时加载的是哪个" >&2
+    fi
+    printf '%s\n' "$hits" | head -n 1
+}
+
 # default.json
 copy_fixed "/etc/onlyoffice/documentserver/default.json" "$LOCAL_BASE/etc/documentserver/default.json"
 # require.js
@@ -81,10 +110,9 @@ for e in documenteditor presentationeditor spreadsheeteditor; do
     copy_fixed "$CONTAINER_BASE/apps/$e/main/resources/css/app.css" \
                "$LOCAL_BASE/resources/$e/main/resources/css/app.css"
 
-    mobile_file=$(docker exec "$CONTAINER_ID" sh -c \
-        "grep -l '$MOBILE_MARKER' $CONTAINER_BASE/apps/$e/mobile/css/*.css 2>/dev/null | head -n 1")
+    mobile_file=$(find_mobile_css "$e")
     if [ -z "$mobile_file" ]; then
-        echo "❌ 未找到含 '$MOBILE_MARKER' 的 mobile chunk（$e）—— 该版本结构可能变化，需人工排查"
+        echo "❌ 未能定位 $e 的 mobile chunk —— 该版本结构可能变化，需人工排查"
     else
         echo "mobile chunk: $mobile_file"
         copy_fixed "$mobile_file" "$LOCAL_BASE/resources/$e/mobile/css/"

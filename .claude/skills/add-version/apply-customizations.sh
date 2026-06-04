@@ -26,9 +26,10 @@ req="$RES/require.js"
 if grep -q "_toolbarClick" "$req"; then
     echo "require.js 已注入，跳过"
 else
-    off=$(grep -abo 'var requirejs,require,define;' "$req" | head -1 | cut -d: -f1)
+    # 标记兼容压缩(9.2.0: 'var requirejs,require,define;')与未压缩(9.4.0: 'var requirejs, require, define;')两种写法
+    off=$(grep -aboE 'var requirejs, *require, *define;' "$req" | head -1 | cut -d: -f1 || true)
     if [ -z "${off:-}" ]; then
-        echo "❌ require.js 未找到 'var requirejs,require,define;' 标记，该版本结构可能变化，需人工排查"; exit 1
+        echo "❌ require.js 未找到 'var requirejs, require, define;' 标记，该版本结构可能变化，需人工排查"; exit 1
     fi
     { head -c "$off" "$req"; cat "$P/require-head.js"; tail -c +"$((off+1))" "$req"; } > "$req.tmp"
     mv "$req.tmp" "$req"
