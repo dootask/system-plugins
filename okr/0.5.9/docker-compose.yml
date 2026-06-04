@@ -1,0 +1,15 @@
+services:
+  okr:
+    image: "kuaifan/doookr:${PLUGIN_VERSION}"
+    restart: unless-stopped
+    environment:
+      TZ: "${TIMEZONE:-PRC}"
+      DOO_TASK_URL: "http://nginx"
+      MYSQL_HOST: "mariadb"
+      MYSQL_PORT: "${DB_PORT}"
+      MYSQL_DBNAME: "${DB_DATABASE}"
+      MYSQL_USERNAME: "${DB_USERNAME}"
+      MYSQL_PASSWORD: "${DB_PASSWORD}"
+      MYSQL_PREFIX: "${DB_PREFIX}"
+      DEMO_DATA: true
+      KEY: "${APP_KEY}"

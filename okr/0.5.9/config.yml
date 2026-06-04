@@ -1,0 +1,28 @@
+require_version:
+  version: "> 1.4.88"
+  reason:
+    en: "Requires new API features"
+    zh: "需要新的API功能"
+menu_items:
+  - location: application
+    label:
+      en: OKR Management
+      zh: OKR 管理
+    url: apps/okr/list
+    type: inline
+    icon: ./logo.svg
+    capsule:
+      top: 20
+      right: 20
+
+  - location: application/admin
+    label:
+      en: OKR Analysis
+      zh: OKR 结果
+    url: apps/okr/analysis
+    type: inline
+    icon: ./icon/analysis.svg
+    visible_to: admin
+    capsule:
+      top: 20
+      right: 20

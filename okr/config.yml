@@ -1,0 +1,27 @@
+name: OKR
+description:
+  en: Set and track team objectives and key results.
+  zh: 设定和跟踪团队目标与关键结果的工具。
+author: DooTask
+website: https://www.dootask.com
+github: https://github.com/hitosea/dootask-okr
+tags:
+  - 目标管理
+menu_items:
+  - location: application
+    label:
+      en: OKR Management
+      zh: OKR 管理
+    url: apps/okr/list
+    url_type: inline
+    icon: ./logo.svg
+
+  - location: application/admin
+    label:
+      en: OKR Analysis
+      zh: OKR 结果
+    url: apps/okr/analysis
+    url_type: inline
+    icon: ./icon/analysis.svg
+    visible_to: admin
+

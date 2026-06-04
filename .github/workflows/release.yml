@@ -107,12 +107,19 @@ jobs:
           PLUGIN="${{ steps.parse.outputs.plugin }}"
           VERSION="${{ steps.parse.outputs.version }}"
           rm -rf pkg && mkdir -p pkg
-          # 插件元信息（应用名/描述/tags/logo/README）
-          cp "$PLUGIN/config.yml" pkg/
-          cp "$PLUGIN"/logo.* pkg/ 2>/dev/null || true
-          cp "$PLUGIN"/README*.md pkg/ 2>/dev/null || true
-          # 只打包本次发布的版本目录（源码、.build.yml 等不入包；AppStore 不允许重复版本号）
+          # 顶层文件全收（config.yml/logo*/README* 等；排除 .build.yml/.gitignore 等点文件）
+          find "$PLUGIN" -maxdepth 1 -type f ! -name '.*' -exec cp {} pkg/ \;
+          # 目标版本目录
           cp -r "$PLUGIN/$VERSION" "pkg/$VERSION"
+          # 其余顶层目录：含 docker-compose.yml 的是「别的版本目录」→跳过；src/→跳过；
+          # 其余（如 icon/ 等被 config 引用的资源目录）→入包。AppStore 不允许重复版本号，故只带本版本。
+          for d in "$PLUGIN"/*/; do
+            base=$(basename "$d")
+            [ "$base" = "$VERSION" ] && continue
+            [ "$base" = "src" ] && continue
+            [ -f "$d/docker-compose.yml" ] && continue
+            cp -r "$d" "pkg/$base"
+          done
           (cd pkg && tar -czf ../dootask-plugin.tar.gz .)
           echo "Package for $PLUGIN/$VERSION:"
           tar -tzf dootask-plugin.tar.gz | head -50
