@@ -69,6 +69,11 @@ copy_fixed "/etc/onlyoffice/documentserver/default.json" "$LOCAL_BASE/etc/docume
 # require.js
 copy_fixed "$CONTAINER_BASE/vendor/requirejs/require.js" "$LOCAL_BASE/resources/require.js"
 
+# header logo 目录（原版，含真 logo + icons.svg；apply 步骤会把两个 logo 换成空白 svg）
+mkdir -p "$LOCAL_BASE/resources/common/main/resources/img/header"
+copy_fixed "$CONTAINER_BASE/apps/common/main/resources/img/header/." \
+           "$LOCAL_BASE/resources/common/main/resources/img/header/"
+
 # 各编辑器：main app.css（固定路径） + mobile chunk（按内容定位）
 for e in documenteditor presentationeditor spreadsheeteditor; do
     echo ""
@@ -85,6 +90,11 @@ for e in documenteditor presentationeditor spreadsheeteditor; do
         copy_fixed "$mobile_file" "$LOCAL_BASE/resources/$e/mobile/css/"
     fi
 done
+
+# docker cp 出来的文件权限是只读(444)，规范化为 644/755，否则 apply 步骤追加 CSS 会 Permission denied
+# （插件 config.yml 的 install/upgrade 钩子也会再 chmod 644，这里保持一致）
+find "$LOCAL_BASE/etc" "$LOCAL_BASE/resources" -type d -exec chmod 755 {} + 2>/dev/null || true
+find "$LOCAL_BASE/etc" "$LOCAL_BASE/resources" -type f -exec chmod 644 {} + 2>/dev/null || true
 
 echo ""
 echo "原始资源复制完成。下一步运行 apply-customizations.sh 套用定制，再更新 docker-compose.yml 的挂载哈希名。"
