@@ -77,6 +77,20 @@ if gb_old24 != gb_old:
 gb_done = gb_new[: gb_new.index("display: none;") + len("display: none;")]
 add(IDX, ".geBlock display:none", gb_variants, done=gb_done)
 
+# 隐藏 30.x 起底部标签栏右下角的 jgraph/drawio GitHub 角标（Pages.js 无条件创建、无 urlParam）。
+# 在 <style> 开头注入一条 CSS（属性选择器精确命中该链接，不误伤 /discussions 帮助链接）。
+# 24.7.x 无此角标，规则无害（命不中任何元素）。
+gh_rule = '\t\ta[href="https://github.com/jgraph/drawio"]{display:none !important}\n'
+def style_open(orig):
+    s = rd(orig, IDX)
+    m = re.search(r'\t<style type="text/css">\n', s)
+    return m.group(0)
+so30 = style_open(O30); so24 = style_open(O24)
+gh_variants = [{"old": so30, "new": so30 + gh_rule}]
+if so24 != so30:
+    gh_variants.append({"old": so24, "new": so24 + gh_rule})
+add(IDX, "hide jgraph/drawio github corner icon", gh_variants, done=gh_rule.strip("\t\n"))
+
 # ---------- ElectronApp.js ----------
 # 1) 注释掉「移除已有 CSP + 注入严格 CSP」整块。块内 mxmeta 行随版本变，故按版本存候选。
 def csp_block(text):

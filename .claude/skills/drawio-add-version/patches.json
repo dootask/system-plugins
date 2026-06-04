@@ -26,6 +26,17 @@
     "done": ".geBlock {\n\t\t\tdisplay: none;"
   },
   {
+    "file": "index.html",
+    "name": "hide jgraph/drawio github corner icon",
+    "variants": [
+      {
+        "old": "\t<style type=\"text/css\">\n",
+        "new": "\t<style type=\"text/css\">\n\t\ta[href=\"https://github.com/jgraph/drawio\"]{display:none !important}\n"
+      }
+    ],
+    "done": "a[href=\"https://github.com/jgraph/drawio\"]{display:none !important}"
+  },
+  {
     "file": "js/diagramly/ElectronApp.js",
     "name": "comment out CSP override block",
     "variants": [
