@@ -1,0 +1,58 @@
+name: Release
+
+# 需要配置的 Repository Secrets（Settings → Secrets and variables → Actions）：
+#   DOOTASK_USERNAME  DooTask 应用商店用户名
+#   DOOTASK_PASSWORD  DooTask 应用商店密码
+#
+# 本插件直接使用官方 onlyoffice/documentserver 镜像，不自建/推送 Docker 镜像，
+# 因此无需 DOCKER_USERNAME / DOCKER_PASSWORD。
+#
+# 触发：推送 tag。tag 名必须等于要发布的版本目录名（如 9.4.0，对应 dootask-plugin/9.4.0/）。
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Verify version directory exists
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [ ! -d "dootask-plugin/$TAG" ]; then
+            echo "::error::tag '$TAG' 没有对应的版本目录 dootask-plugin/$TAG/。tag 名必须等于版本目录名。"
+            ls -1 dootask-plugin/
+            exit 1
+          fi
+
+      - name: Create dootask-plugin tar.gz package
+        run: |
+          TAG="${{ github.ref_name }}"
+          rm -rf pkg && mkdir -p pkg
+          # 根级元信息（应用名/描述/tags/logo/README）
+          cp dootask-plugin/config.yml pkg/
+          cp dootask-plugin/logo.* pkg/ 2>/dev/null || true
+          cp dootask-plugin/README*.md pkg/ 2>/dev/null || true
+          # 只打包本次发布的版本目录（AppStore 不允许重复版本号，不能把旧版一起塞进去）
+          cp -r "dootask-plugin/$TAG" "pkg/$TAG"
+          cd pkg
+          tar -czf ../dootask-plugin.tar.gz .
+          cd ..
+          echo "Package created for version $TAG:"
+          tar -tzf dootask-plugin.tar.gz | head -50
+
+      - name: Publish to DooTask App Store
+        id: publish
+        uses: dootask/appstore-action@v3
+        with:
+          username: ${{ secrets.DOOTASK_USERNAME }}
+          password: ${{ secrets.DOOTASK_PASSWORD }}
+          appid: 'office'
+          package_file: './dootask-plugin.tar.gz'
+          draft: false
+          is_system_app: true

@@ -1,0 +1,5 @@
+hooks:
+  install: |
+    chmod 644 -R ./*
+  upgrade: |
+    chmod 644 -R ./*
