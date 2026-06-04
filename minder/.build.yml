@@ -1,4 +1,4 @@
 # 发布时构建并推送 Docker 镜像。源码来自 kuaifan/minder。
-image: kuaifan/minder
+image: dootask/minder
 context: src
 dockerfile: src/Dockerfile

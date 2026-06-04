@@ -1,5 +1,5 @@
 # 本插件发布前需构建并推送 Docker 镜像（通用 release 工作流会读取本文件）。
 # 路径均相对本插件目录。okr 源码来自上游 hitosea/dootask-okr。
-image: kuaifan/doookr
+image: dootask/okr
 context: src
 dockerfile: src/Dockerfile

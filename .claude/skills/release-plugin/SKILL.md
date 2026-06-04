@@ -27,7 +27,7 @@ OnlyOffice(office) 新版本资源的制作不在这里 —— 那是 [[office-a
 ## 前置
 
 - 仓库已配好远程并能推送。
-- Repository Secrets：`DOOTASK_USERNAME` / `DOOTASK_PASSWORD`（所有发布都需要）。发布需构建镜像的插件（含 `.build.yml`，如 ai/approval）还需 `DOCKER_USERNAME` / `DOCKER_PASSWORD`。均由管理员一次性配置，本技能不负责设置。
+- Repository Secrets：`DOOTASK_USERNAME` / `DOOTASK_PASSWORD`（所有发布都需要）。发布需构建镜像的插件（含 `.build.yml`，如 ai/approve）还需 `DOCKER_USERNAME` / `DOCKER_PASSWORD`。均由管理员一次性配置，本技能不负责设置。
 
 ## 发布流程
 

@@ -1,6 +1,6 @@
 services:
   approve:
-    image: "kuaifan/dooapprove:${PLUGIN_VERSION}"
+    image: "dootask/approve:${PLUGIN_VERSION}"
     restart: unless-stopped
     environment:
       TZ: "${TIMEZONE:-PRC}"

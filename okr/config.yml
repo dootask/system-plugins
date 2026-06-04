@@ -4,7 +4,7 @@ description:
   zh: 设定和跟踪团队目标与关键结果的工具。
 author: DooTask
 website: https://www.dootask.com
-github: https://github.com/hitosea/dootask-okr
+github: https://github.com/dootask/system-plugins/tree/main/okr
 tags:
   - 目标管理
 menu_items:

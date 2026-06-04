@@ -1,5 +1,5 @@
 # 本插件发布前需构建并推送 Docker 镜像（通用 release 工作流会读取本文件）。
 # 路径均相对本插件目录。无本文件的插件（office/drawio…）发布时不构建镜像。
-image: kuaifan/dootask-ai
+image: dootask/ai
 context: src
 dockerfile: src/Dockerfile

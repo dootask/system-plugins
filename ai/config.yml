@@ -6,8 +6,8 @@ description:
   zh: 支持多种 AI 模型的强大工具，支持自定义模型。
 author: DooTask
 website: https://www.dootask.com/
-github: https://github.com/kuaifan/dootask-ai
-document: https://github.com/kuaifan/dootask-ai
+github: https://github.com/dootask/system-plugins/tree/main/ai
+document: https://github.com/dootask/system-plugins/tree/main/ai
 tags:
   - AI
   - 助手

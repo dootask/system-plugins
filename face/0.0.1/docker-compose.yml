@@ -1,6 +1,6 @@
 services:
   face:
-    image: "kuaifan/dooface:${PLUGIN_VERSION}"
+    image: "dootask/face:${PLUGIN_VERSION}"
     restart: unless-stopped
     ports:
       - "${SERVER_PORT}:7788"

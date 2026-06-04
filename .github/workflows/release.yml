@@ -3,7 +3,7 @@ name: Release
 # 系统插件统一发布工作流（通用、零硬编码）。
 #
 # 触发：推送 `<插件>/<版本>` 形式的 tag，例如：
-#   office/9.4.0   drawio/24.7.17   ai/0.5.4   approval/0.2.0
+#   office/9.4.0   drawio/24.7.17   ai/0.5.4   approve/0.2.0
 # 工作流从 tag 解析出插件名与版本，按目录约定打包并发布，**不含任何按插件写死的配置**：
 #   - appid           = 插件目录名（与 DooTask AppStore 的 appid 一致）
 #   - is_system_app   = true（本仓库全是系统插件）
