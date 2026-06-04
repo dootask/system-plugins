@@ -1,6 +1,6 @@
 services:
   face:
-    image: "hitosea2020/dooface:0.0.1"
+    image: "kuaifan/dooface:${PLUGIN_VERSION}"
     restart: unless-stopped
     ports:
       - "${SERVER_PORT}:7788"

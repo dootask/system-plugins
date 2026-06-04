@@ -1,4 +1,4 @@
 services:
   minder:
-    image: "kuaifan/minder:0.1.3"
+    image: "kuaifan/minder:${PLUGIN_VERSION}"
     restart: unless-stopped
