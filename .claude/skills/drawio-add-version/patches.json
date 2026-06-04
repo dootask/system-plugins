@@ -1,0 +1,126 @@
+[
+  {
+    "file": "index.html",
+    "name": "inject EXPORT_URL/LIGHTBOX/ICONSEARCH",
+    "variants": [
+      {
+        "old": "\t<script id=\"geBootstrap\" type=\"text/javascript\">\n",
+        "new": "\t<script id=\"geBootstrap\" type=\"text/javascript\">\n\t\twindow.EXPORT_URL = window.location.origin + \"/drawio/export/\";\n\t\twindow.DRAWIO_LIGHTBOX_URL = window.location.origin + \"/drawio/webapp\";\n\t\tsetInterval(function() {window.ICONSEARCH_PATH = window.location.origin + \"/drawio/iconsearch\";}, 1000)\n\n"
+      },
+      {
+        "old": "\t<script src=\"js/bootstrap.js\"></script>\n",
+        "new": "\t<script type=\"text/javascript\">\n\t\twindow.EXPORT_URL = window.location.origin + \"/drawio/export/\";\n\t\twindow.DRAWIO_LIGHTBOX_URL = window.location.origin + \"/drawio/webapp\";\n\t\tsetInterval(function() {window.ICONSEARCH_PATH = window.location.origin + \"/drawio/iconsearch\";}, 1000)\n\t</script>\n\t<script src=\"js/bootstrap.js\"></script>\n"
+      }
+    ],
+    "done": "window.EXPORT_URL = window.location.origin + \"/drawio/export/\";"
+  },
+  {
+    "file": "index.html",
+    "name": ".geBlock display:none",
+    "variants": [
+      {
+        "old": ".geBlock {\n\t\t\t",
+        "new": ".geBlock {\n\t\t\tdisplay: none;\n\t\t\t"
+      }
+    ],
+    "done": ".geBlock {\n\t\t\tdisplay: none;"
+  },
+  {
+    "file": "js/diagramly/ElectronApp.js",
+    "name": "comment out CSP override block",
+    "variants": [
+      {
+        "old": "\t\tvar allMeta = document.getElementsByTagName('meta');\n\n\t\tfor (var i = 0; i < allMeta.length; i++)\n\t\t{\n\t\t\tif (allMeta[i].getAttribute('http-equiv') == 'Content-Security-Policy')\n\t\t\t{\n\t\t\t\tallMeta[i].parentNode.removeChild(allMeta[i]);\n\t\t\t}\n\n\t\t\tbreak;\n\t\t}\n\n\t\tmxmeta(null, 'default-src \\'self\\'; connect-src \\'self\\' https://fonts.googleapis.com https://fonts.gstatic.com; img-src * data:; media-src *; font-src *; style-src \\'self\\' \\'unsafe-inline\\' https://fonts.googleapis.com', 'Content-Security-Policy');\n",
+        "new": "\t\t// var allMeta = document.getElementsByTagName('meta');\n\t\t//\n\t\t// for (var i = 0; i < allMeta.length; i++)\n\t\t// {\n\t\t// \tif (allMeta[i].getAttribute('http-equiv') == 'Content-Security-Policy')\n\t\t// \t{\n\t\t// \t\tallMeta[i].parentNode.removeChild(allMeta[i]);\n\t\t// \t}\n\t\t//\n\t\t// \tbreak;\n\t\t// }\n\t\t//\n\t\t// mxmeta(null, 'default-src \\'self\\'; connect-src \\'self\\' https://fonts.googleapis.com https://fonts.gstatic.com; img-src * data:; media-src *; font-src *; style-src \\'self\\' \\'unsafe-inline\\' https://fonts.googleapis.com', 'Content-Security-Policy');\n"
+      },
+      {
+        "old": "\t\tvar allMeta = document.getElementsByTagName('meta');\n\n\t\tfor (var i = 0; i < allMeta.length; i++)\n\t\t{\n\t\t\tif (allMeta[i].getAttribute('http-equiv') == 'Content-Security-Policy')\n\t\t\t{\n\t\t\t\tallMeta[i].parentNode.removeChild(allMeta[i]);\n\t\t\t}\n\n\t\t\tbreak;\n\t\t}\n\n\t\tmxmeta(null, 'default-src \\'self\\'; connect-src \\'self\\' https://fonts.googleapis.com https://fonts.gstatic.com; img-src * data:; ' +\n\t\t\t'media-src *; font-src * data:; frame-src \\'self\\'; style-src \\'self\\' \\'unsafe-inline\\' https://fonts.googleapis.com', 'Content-Security-Policy');\n",
+        "new": "\t\t// var allMeta = document.getElementsByTagName('meta');\n//\n\t\t// for (var i = 0; i < allMeta.length; i++)\n\t\t// {\n\t\t\t// if (allMeta[i].getAttribute('http-equiv') == 'Content-Security-Policy')\n\t\t\t// {\n\t\t\t\t// allMeta[i].parentNode.removeChild(allMeta[i]);\n\t\t\t// }\n//\n\t\t\t// break;\n\t\t// }\n//\n\t\t// mxmeta(null, 'default-src \\'self\\'; connect-src \\'self\\' https://fonts.googleapis.com https://fonts.gstatic.com; img-src * data:; ' +\n\t\t\t// 'media-src *; font-src * data:; frame-src \\'self\\'; style-src \\'self\\' \\'unsafe-inline\\' https://fonts.googleapis.com', 'Content-Security-Policy');\n"
+      }
+    ],
+    "done": "// var allMeta = document.getElementsByTagName('meta');"
+  },
+  {
+    "file": "js/diagramly/ElectronApp.js",
+    "name": "trim File menu (new/open/save...) -> import only",
+    "variants": [
+      {
+        "old": "\t\t\tthis.addMenuItems(menu, ['new', 'open'], parent);\n\t\t\tthis.addSubmenu('openRecent', menu, parent);\n\t\t\tthis.addMenuItems(menu, ['-', 'synchronize', '-', 'save', 'saveAs', '-', 'import'], parent);\n",
+        "new": "\t\t\tthis.addMenuItems(menu, ['import'], parent);\n"
+      }
+    ],
+    "done": "this.addMenuItems(menu, ['import'], parent);"
+  },
+  {
+    "file": "js/diagramly/ElectronApp.js",
+    "name": "trim File menu tail (remove close/exit)",
+    "variants": [
+      {
+        "old": "\t\t\tthis.addMenuItems(menu, ['-', 'pageSetup', 'print', '-', 'close', '-', 'exit'], parent);\n",
+        "new": "\t\t\tthis.addMenuItems(menu, ['-', 'pageSetup', 'print'], parent);\n"
+      }
+    ],
+    "done": "this.addMenuItems(menu, ['-', 'pageSetup', 'print'], parent);"
+  },
+  {
+    "file": "js/app.min.js",
+    "name": "disable addBeforeUnloadListener",
+    "variants": [
+      {
+        "old": "addBeforeUnloadListener=function(){window.onbeforeunload=mxUtils.bind(this,function(){if(!this.editor.isChromelessView())return this.onBeforeUnload()})}",
+        "new": "addBeforeUnloadListener=function(){}"
+      }
+    ]
+  },
+  {
+    "file": "js/app.min.js",
+    "name": "remove help from defaultMenuItems",
+    "variants": [
+      {
+        "old": "defaultMenuItems=\"file edit view arrange extras help\".split(\" \")",
+        "new": "defaultMenuItems=\"file edit view arrange extras\".split(\" \")"
+      }
+    ],
+    "done": "defaultMenuItems=\"file edit view arrange extras\".split(\" \")"
+  },
+  {
+    "file": "js/app.min.js",
+    "name": "EmbedFile.getTitle support urlParams.title",
+    "variants": [
+      {
+        "old": "EmbedFile.prototype.getTitle=function(){return this.desc.title||\"\"}",
+        "new": "EmbedFile.prototype.getTitle=function(){return this.desc.title||(urlParams.title?decodeURIComponent(urlParams.title):\"\")}"
+      }
+    ],
+    "done": "EmbedFile.prototype.getTitle=function(){return this.desc.title||(urlParams.title?decodeURIComponent(urlParams.title):\"\")}"
+  },
+  {
+    "file": "js/app.min.js",
+    "name": "iconsearch: drop isOffline guard",
+    "variants": [
+      {
+        "old": "function(v,w,r,x){!this.editorUi.isOffline()&&",
+        "new": "function(v,w,r,x){"
+      },
+      {
+        "old": "function(t,u,v,w){!this.editorUi.isOffline()&&",
+        "new": "function(t,u,v,w){"
+      }
+    ]
+  },
+  {
+    "file": "js/app.min.js",
+    "name": "insertTemplate: drop isOffline guard",
+    "variants": [
+      {
+        "old": "insertTemplateEnabled&&!d.isOffline()&&",
+        "new": "insertTemplateEnabled&&"
+      },
+      {
+        "old": "insertTemplateEnabled&&!c.isOffline()&&",
+        "new": "insertTemplateEnabled&&"
+      }
+    ],
+    "all": true
+  }
+]
