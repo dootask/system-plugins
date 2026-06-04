@@ -1,5 +1,5 @@
 ---
-name: add-version
+name: office-add-version
 description: 为 DooTask OnlyOffice(office) 插件新增一个 OnlyOffice 版本目录：pull 指定版镜像→启容器→复制官方资源→套用 DooTask 定制（JS 注入/CSS 追加/调大体积上限/去 logo）→生成版本目录与正确的 docker-compose 挂载。用户要「升级/适配 OnlyOffice 新版本」「加一个 9.x 版本」时使用。
 ---
 
@@ -66,14 +66,14 @@ cp office/9.2.0/config.yml office/9.4.0/config.yml   # 仅 chmod 钩子，跨版
 ### 4. 复制官方原始资源
 
 ```bash
-.claude/skills/add-version/copy-resources.sh office/9.4.0
+.claude/skills/office-add-version/copy-resources.sh office/9.4.0
 ```
 脚本会从运行中的 onlyoffice 容器复制：`default.json`、`require.js`、header 目录、三个编辑器的 `main app.css` 与 **mobile chunk**（按内容标记 `navbar-with-logo` 自动定位，不依赖固定 chunk 号），并把只读权限规范化为 644。结束时打印各 mobile chunk 的实际哈希名 —— 记下，第 6 步要用。
 
 ### 5. 套用 DooTask 定制（幂等）
 
 ```bash
-.claude/skills/add-version/apply-customizations.sh office/9.4.0
+.claude/skills/office-add-version/apply-customizations.sh office/9.4.0
 ```
 套用上面「定制清单」5 类。脚本对每类都做了幂等判断和「未命中预警」：
 - default.json 若某条旧值找不到、新值也不在 → 说明该版官方默认值变了，会打 ⚠️ 让你人工核对。
