@@ -1,0 +1,20 @@
+menu_items:
+  - location: application
+    label:
+      en: AI Assistants
+      zh: AI 助手
+    url: "ai/?theme={system_theme}&lang={system_lang}"
+    url_type: iframe
+    immersive: true
+    capsule:
+      visible: true
+      top: 18
+      right: 18
+require_version:
+  version: ">= 1.4.81"
+  reason:
+    en: "Requires new API features"
+    zh: "需要新的API功能"
+hooks:
+  upgrade: |
+    exit 0

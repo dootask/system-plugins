@@ -1,0 +1,10 @@
+name:
+  en: Approval
+  zh: 审批中心
+description:
+  en: Support various leave, overtime, and business trip requests.
+  zh: 支持各类请假、加班、外出等申请。
+author: DooTask
+website: https://www.dootask.com/
+tags:
+  - 审批

@@ -1,0 +1,327 @@
+openapi: 3.0.0
+info:
+  title: DooTask AI API
+  version: 1.0.0
+  description: DooTask AI API documentation
+
+tags:
+  - name: Chat
+    description: Chat related endpoints with context support
+  - name: Direct Invoke
+    description: Direct invoke endpoint without context
+
+servers:
+  - url: http://localhost:5001
+    description: Local development server
+
+paths:
+  /invoke:
+    get:
+      tags:
+        - Direct Invoke
+      summary: Direct invoke endpoint
+      description: Directly invoke AI model without chat context
+      parameters:
+        - name: text
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Message text
+        - name: api_key
+          in: query
+          required: true
+          schema:
+            type: string
+          description: API key for authentication
+        - name: model_type
+          in: query
+          required: false
+          schema:
+            type: string
+            default: openai
+          description: AI model type (openai, claude, gemini, etc.)
+        - name: model_name
+          in: query
+          required: false
+          schema:
+            type: string
+            default: gpt-3.5-turbo
+          description: Model name (e.g., gpt-3.5-turbo)
+        - name: system_message
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional system prompt to set AI behavior
+        - name: base_url
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional base URL
+        - name: agency
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional proxy server URL
+        - name: temperature
+          in: query
+          required: false
+          schema:
+            type: number
+          description: Optional temperature for AI response (default: 0.7)
+        - name: context_key
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Context key for context support
+        - name: before_text
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional context to be prepended after the system prompt
+        - name: context_limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Optional context limit (in tokens, e.g., 32000)
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: object
+                    properties:
+                      content:
+                        type: string
+                        description: AI response content
+                      usage:
+                        type: object
+                        properties:
+                          total_tokens:
+                            type: integer
+                            description: Total number of tokens used
+                          prompt_tokens:
+                            type: integer
+                            description: Number of tokens in the prompt
+                          completion_tokens:
+                            type: integer
+                            description: Number of tokens in the completion
+        '400':
+          description: Bad request
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 400
+                  error:
+                    type: string
+                    example: Parameter error
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 500
+                  error:
+                    type: string
+                    example: Internal server error
+
+  /chat:
+    get:
+      tags:
+        - Chat
+      summary: Start a chat conversation
+      description: Send a message to start or continue a chat conversation
+      parameters:
+        - name: text
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Message text
+        - name: token
+          in: query
+          required: true
+          schema:
+            type: string
+          description: Authentication token
+        - name: dialog_id
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Dialog identifier
+        - name: dialog_type
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [group]
+          description: Type of dialog (e.g., group)
+        - name: msg_id
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
+          description: Message identifier for replies in group chats
+        - name: msg_uid
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Message user identifier
+        - name: mention
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+            default: 0
+          description: Mention information
+        - name: bot_uid
+          in: query
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Bot user identifier
+        - name: version
+          in: query
+          required: true
+          schema:
+            type: string
+          description: API version
+        - name: extras
+          in: query
+          required: true
+          schema:
+            type: string
+            format: json
+            example: '{"model_type":"openai","model_name":"gpt-3.5-turbo","system_message":"You are a helpful assistant","server_url":"https://api.example.com","api_key":"your-api-key","agency":"optional-agency","context_key":"","before_text":"","context_limit":32000}'
+          description: |
+            JSON string containing additional parameters:
+            - model_type: AI model type (openai, claude, gemini, etc.)
+            - model_name: Model name (e.g., gpt-3.5-turbo)
+            - system_message: Optional system prompt to set AI behavior
+            - server_url: Server URL for API calls (required)
+            - api_key: API key for authentication (required)
+            - base_url: Optional base URL
+            - agency: Optional proxy server URL
+            - temperature: Optional temperature for AI response (default: 0.7)
+            - context_key: Custom context key (optional, auto-generated if empty)
+            - before_text: Context to be prepended after the system prompt (optional, not saved in next context, context priority: custom context (message text) > system_message > before_text)
+            - context_limit: Optional context limit (in tokens, e.g., 32000)
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 200
+                  data:
+                    type: object
+                    properties:
+                      id:
+                        type: integer
+                        description: Message ID for tracking the response
+                      key:
+                        type: string
+                        description: Stream key for accessing the response stream
+        '400':
+          description: Parameter error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 400
+                  error:
+                    type: string
+                    example: "Parameter error"
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 500
+                  error:
+                    type: string
+                    example: "Failed to create model instance"
+
+  /stream/{msg_id}/{stream_key}:
+    get:
+      tags:
+        - Chat
+      summary: Get streaming response
+      description: Get streaming response for a chat message
+      parameters:
+        - name: msg_id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Message identifier
+        - name: stream_key
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Stream key for authentication
+      responses:
+        '200':
+          description: Successful response
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  SSE stream with format:
+                  id: {msg_id}
+                  event: {event_type}
+                  data: {content}
+              example: |
+                id: 123456
+                event: append
+                data: {"content": "Hello, world!"}
+
+                id: 123456
+                event: replace
+                data: {"content": "Here's the complete response..."}
+
+components:
+  schemas: {}
+  securitySchemes: {}

@@ -3,14 +3,19 @@ name: Release
 # 系统插件统一发布工作流（通用、零硬编码）。
 #
 # 触发：推送 `<插件>/<版本>` 形式的 tag，例如：
-#   office/9.4.0   drawio/24.7.17   mysql-expose-port/1.0.0
+#   office/9.4.0   drawio/24.7.17   ai/0.5.4   approval/0.2.0
 # 工作流从 tag 解析出插件名与版本，按目录约定打包并发布，**不含任何按插件写死的配置**：
 #   - appid           = 插件目录名（与 DooTask AppStore 的 appid 一致）
 #   - is_system_app   = true（本仓库全是系统插件）
-#   - 打包内容        = <插件>/{config.yml,logo*,README*} + 仅 <插件>/<版本>/
-# 因此新增/维护插件只需动它自己的目录，无需改本工作流。
+#   - 打包内容        = <插件>/{config.yml,logo*,README*} + 仅 <插件>/<版本>/（源码等其余文件不入包）
 #
-# 需要的 Repository Secrets：DOOTASK_USERNAME、DOOTASK_PASSWORD（不构建镜像，无需 Docker secrets）。
+# 可选构建镜像：若 <插件>/.build.yml 存在，则先构建并推送 Docker 镜像（image:<版本> 和 :latest）
+# 再发布；没有该文件的插件（office/drawio…）跳过构建。构建信息（镜像名/上下文/Dockerfile）
+# 全在插件目录的 .build.yml 里，因此新增/维护插件都无需改本工作流。
+#
+# Repository Secrets：
+#   DOOTASK_USERNAME、DOOTASK_PASSWORD          —— 所有插件发布都需要
+#   DOCKER_USERNAME、DOCKER_PASSWORD            —— 仅含 .build.yml 的插件（构建镜像）需要
 
 on:
   push:
@@ -48,6 +53,55 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "::notice::将发布插件 $PLUGIN 版本 $VERSION（appid=$PLUGIN）"
 
+      - name: Read build descriptor
+        id: build
+        run: |
+          PLUGIN="${{ steps.parse.outputs.plugin }}"
+          BF="$PLUGIN/.build.yml"
+          if [ -f "$BF" ]; then
+            img=$(grep -E '^image:'      "$BF" | head -1 | sed -E 's/^image:[[:space:]]*//; s/[[:space:]]*$//; s/^"//; s/"$//')
+            ctx=$(grep -E '^context:'    "$BF" | head -1 | sed -E 's/^context:[[:space:]]*//; s/[[:space:]]*$//'); ctx="${ctx:-.}"
+            df=$(grep  -E '^dockerfile:' "$BF" | head -1 | sed -E 's/^dockerfile:[[:space:]]*//; s/[[:space:]]*$//'); df="${df:-Dockerfile}"
+            if [ -z "$img" ]; then echo "::error::$BF 缺少 image 字段"; exit 1; fi
+            echo "needs_build=true" >> "$GITHUB_OUTPUT"
+            echo "image=$img" >> "$GITHUB_OUTPUT"
+            echo "context=$PLUGIN/$ctx" >> "$GITHUB_OUTPUT"
+            echo "dockerfile=$PLUGIN/$df" >> "$GITHUB_OUTPUT"
+            echo "::notice::$PLUGIN 需构建镜像 $img（context=$PLUGIN/$ctx）"
+          else
+            echo "needs_build=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::$PLUGIN 无 .build.yml，跳过镜像构建"
+          fi
+
+      - name: Set up QEMU
+        if: steps.build.outputs.needs_build == 'true'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        if: steps.build.outputs.needs_build == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        if: steps.build.outputs.needs_build == 'true'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Build & push image
+        if: steps.build.outputs.needs_build == 'true'
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ steps.build.outputs.context }}
+          file: ${{ steps.build.outputs.dockerfile }}
+          push: true
+          tags: |
+            ${{ steps.build.outputs.image }}:${{ steps.parse.outputs.version }}
+            ${{ steps.build.outputs.image }}:latest
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       - name: Create package
         run: |
           PLUGIN="${{ steps.parse.outputs.plugin }}"
@@ -57,7 +111,7 @@ jobs:
           cp "$PLUGIN/config.yml" pkg/
           cp "$PLUGIN"/logo.* pkg/ 2>/dev/null || true
           cp "$PLUGIN"/README*.md pkg/ 2>/dev/null || true
-          # 只打包本次发布的版本目录（AppStore 不允许重复版本号）
+          # 只打包本次发布的版本目录（源码、.build.yml 等不入包；AppStore 不允许重复版本号）
           cp -r "$PLUGIN/$VERSION" "pkg/$VERSION"
           (cd pkg && tar -czf ../dootask-plugin.tar.gz .)
           echo "Package for $PLUGIN/$VERSION:"

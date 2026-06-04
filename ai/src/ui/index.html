@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI</title>
+    <script>
+      (() => {
+        const params = new URLSearchParams(window.location.search);
+        const themeParam = params.get('theme');
+        const resolvedTheme = themeParam === 'dark' ? 'dark' : 'light';
+        const root = document.documentElement;
+        if (resolvedTheme === 'dark') {
+          root.classList.add('dark');
+        } else {
+          root.classList.remove('dark');
+        }
+        root.setAttribute('data-theme', resolvedTheme);
+      })();
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

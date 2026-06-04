@@ -1,0 +1,29 @@
+fields:
+  - name: DEMO_DATA
+    label:
+      en: Demo data
+      zh: 演示数据
+    description:
+      en: Insert demo approval flows on first install (only takes effect when the database is empty)
+      zh: 首次安装时写入演示审批流程（仅在数据库为空时生效）
+    type: select
+    default: "true"
+    options:
+      - label:
+          en: "Yes"
+          zh: 是
+        value: "true"
+      - label:
+          en: "No"
+          zh: 否
+        value: "false"
+
+hooks:
+  uninstall:
+    before:
+      cmd: |
+        # 卸载时若用户选择删除数据，则调用插件接口清空所有审批数据
+        if [ "$DELETE_DATA" = "true" ]; then
+          curl -sS -m 30 -X POST "http://approve:8700/api/v1/workflow/system/clear" || true
+        fi
+      timeout: 120
