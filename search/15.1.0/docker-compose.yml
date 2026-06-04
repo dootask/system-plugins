@@ -1,0 +1,18 @@
+services:
+  search:
+    image: "manticoresearch/manticore:15.1.0"
+    volumes:
+      - search_data:/var/lib/manticore
+      - ./init.sh:/docker-entrypoint-init.sh:ro
+    entrypoint: ["/bin/sh", "/docker-entrypoint-init.sh"]
+    command: ["docker-entrypoint.sh", "searchd", "-c", "/etc/manticoresearch/manticore.conf.sh", "--nodetach"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mysql", "-h", "127.0.0.1", "-P", "9306", "-e", "SHOW STATUS"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  search_data:

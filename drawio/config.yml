@@ -1,0 +1,10 @@
+name: Drawio
+description:
+  en: A powerful diagramming tool.
+  zh: 一款功能强大的流程图绘制工具。
+author: Community
+website: https://www.drawio.com/
+github: https://github.com/jgraph/drawio
+document: https://www.drawio.com/doc/
+tags:
+  - 流程图

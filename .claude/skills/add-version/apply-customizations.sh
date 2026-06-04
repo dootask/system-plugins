@@ -10,7 +10,7 @@
 #   4. etc/documentserver/default.json —— 把 FileConverter 的体积上限调大 10 倍（patches/default-json-edits.tsv）
 #   5. header logo  —— header-logo_s.svg / dark-logo_s.svg 换成空白 svg（patches/blank-*.svg）；icons.svg 不动
 #
-# 用法： ./apply-customizations.sh <目标版本目录，如 ../dootask-plugin/9.4.0>
+# 用法： ./apply-customizations.sh <目标版本目录，如 ../office/9.4.0>
 
 set -euo pipefail
 

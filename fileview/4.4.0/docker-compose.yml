@@ -1,0 +1,9 @@
+services:
+  fileview:
+    image: "kuaifan/fileview:4.4.0-4"
+    restart: unless-stopped
+    privileged: true
+    environment:
+      KK_CONTEXT_PATH: "/fileview"
+      KK_OFFICE_PREVIEW_SWITCH_DISABLED: true
+      KK_MEDIA_CONVERT_DISABLE: true

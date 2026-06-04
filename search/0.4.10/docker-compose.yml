@@ -1,0 +1,13 @@
+services:
+  search:
+    image: "public.ecr.aws/zinclabs/zincsearch:0.4.10"
+    volumes:
+      - search_data:/data
+    environment:
+      ZINC_DATA_PATH: "/data"
+      ZINC_FIRST_ADMIN_USER: "${DB_USERNAME}"
+      ZINC_FIRST_ADMIN_PASSWORD: "${DB_PASSWORD}"
+    restart: unless-stopped
+
+volumes:
+  search_data:

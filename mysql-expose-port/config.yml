@@ -1,0 +1,22 @@
+name: MysqlExposePort
+description: 
+  en: Expose MySQL database port.
+  zh: 用于暴露 MySQL 数据库端口的插件
+author: DooTask
+website: https://www.dootask.com
+tags:
+  - 数据库
+fields:
+  - name: PROXY_PORT
+    label: 
+      en: Proxy port
+      zh: 代理端口
+    placeholder: 
+      en: Proxy port
+      zh: 代理端口
+    type: number
+    default: 3306
+
+
+
+

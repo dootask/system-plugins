@@ -1,18 +1,21 @@
 name: Release
 
-# 需要配置的 Repository Secrets（Settings → Secrets and variables → Actions）：
-#   DOOTASK_USERNAME  DooTask 应用商店用户名
-#   DOOTASK_PASSWORD  DooTask 应用商店密码
+# 系统插件统一发布工作流（通用、零硬编码）。
 #
-# 本插件直接使用官方 onlyoffice/documentserver 镜像，不自建/推送 Docker 镜像，
-# 因此无需 DOCKER_USERNAME / DOCKER_PASSWORD。
+# 触发：推送 `<插件>/<版本>` 形式的 tag，例如：
+#   office/9.4.0   drawio/24.7.17   mysql-expose-port/1.0.0
+# 工作流从 tag 解析出插件名与版本，按目录约定打包并发布，**不含任何按插件写死的配置**：
+#   - appid           = 插件目录名（与 DooTask AppStore 的 appid 一致）
+#   - is_system_app   = true（本仓库全是系统插件）
+#   - 打包内容        = <插件>/{config.yml,logo*,README*} + 仅 <插件>/<版本>/
+# 因此新增/维护插件只需动它自己的目录，无需改本工作流。
 #
-# 触发：推送 tag。tag 名必须等于要发布的版本目录名（如 9.4.0，对应 dootask-plugin/9.4.0/）。
+# 需要的 Repository Secrets：DOOTASK_USERNAME、DOOTASK_PASSWORD（不构建镜像，无需 Docker secrets）。
 
 on:
   push:
     tags:
-      - '*'
+      - '*/*'        # 仅匹配含一个斜杠的 tag（<插件>/<版本>）；纯版本号 tag 不会触发
 
 jobs:
   publish:
@@ -21,38 +24,51 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Verify version directory exists
+      - name: Parse & validate tag
+        id: parse
         run: |
           TAG="${{ github.ref_name }}"
-          if [ ! -d "dootask-plugin/$TAG" ]; then
-            echo "::error::tag '$TAG' 没有对应的版本目录 dootask-plugin/$TAG/。tag 名必须等于版本目录名。"
-            ls -1 dootask-plugin/
+          PLUGIN="${TAG%/*}"
+          VERSION="${TAG##*/}"
+          if [ -z "$PLUGIN" ] || [ -z "$VERSION" ] || [ "$PLUGIN" = "$TAG" ]; then
+            echo "::error::tag 必须是 <插件>/<版本> 形式，如 office/9.4.0（当前: $TAG）"
             exit 1
           fi
+          if [ ! -f "$PLUGIN/config.yml" ]; then
+            echo "::error::缺少 $PLUGIN/config.yml —— 插件目录不存在或不合规"
+            echo "可用插件目录："; ls -1d */ 2>/dev/null
+            exit 1
+          fi
+          if [ ! -d "$PLUGIN/$VERSION" ]; then
+            echo "::error::缺少版本目录 $PLUGIN/$VERSION/"
+            echo "$PLUGIN 现有版本："; ls -1d "$PLUGIN"/*/ 2>/dev/null
+            exit 1
+          fi
+          echo "plugin=$PLUGIN" >> "$GITHUB_OUTPUT"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "::notice::将发布插件 $PLUGIN 版本 $VERSION（appid=$PLUGIN）"
 
-      - name: Create dootask-plugin tar.gz package
+      - name: Create package
         run: |
-          TAG="${{ github.ref_name }}"
+          PLUGIN="${{ steps.parse.outputs.plugin }}"
+          VERSION="${{ steps.parse.outputs.version }}"
           rm -rf pkg && mkdir -p pkg
-          # 根级元信息（应用名/描述/tags/logo/README）
-          cp dootask-plugin/config.yml pkg/
-          cp dootask-plugin/logo.* pkg/ 2>/dev/null || true
-          cp dootask-plugin/README*.md pkg/ 2>/dev/null || true
-          # 只打包本次发布的版本目录（AppStore 不允许重复版本号，不能把旧版一起塞进去）
-          cp -r "dootask-plugin/$TAG" "pkg/$TAG"
-          cd pkg
-          tar -czf ../dootask-plugin.tar.gz .
-          cd ..
-          echo "Package created for version $TAG:"
+          # 插件元信息（应用名/描述/tags/logo/README）
+          cp "$PLUGIN/config.yml" pkg/
+          cp "$PLUGIN"/logo.* pkg/ 2>/dev/null || true
+          cp "$PLUGIN"/README*.md pkg/ 2>/dev/null || true
+          # 只打包本次发布的版本目录（AppStore 不允许重复版本号）
+          cp -r "$PLUGIN/$VERSION" "pkg/$VERSION"
+          (cd pkg && tar -czf ../dootask-plugin.tar.gz .)
+          echo "Package for $PLUGIN/$VERSION:"
           tar -tzf dootask-plugin.tar.gz | head -50
 
       - name: Publish to DooTask App Store
-        id: publish
         uses: dootask/appstore-action@v3
         with:
           username: ${{ secrets.DOOTASK_USERNAME }}
           password: ${{ secrets.DOOTASK_PASSWORD }}
-          appid: 'office'
-          package_file: './dootask-plugin.tar.gz'
+          appid: ${{ steps.parse.outputs.plugin }}
+          package_file: ./dootask-plugin.tar.gz
           draft: false
           is_system_app: true

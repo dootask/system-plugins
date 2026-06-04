@@ -5,7 +5,7 @@ description: 为 DooTask OnlyOffice(office) 插件新增一个 OnlyOffice 版本
 
 # 新增 OnlyOffice 版本
 
-DooTask 的 OnlyOffice 插件**不自建镜像**，而是直接用官方 `onlyoffice/documentserver` 镜像，再通过 volume 挂载把少量定制资源覆盖进去。每个 OnlyOffice 版本一个目录（如 `dootask-plugin/9.2.0/`），因为定制文件里有**每版都变的 webpack 哈希**，所以新版必须重新提取资源并改挂载。
+DooTask 的 OnlyOffice 插件**不自建镜像**，而是直接用官方 `onlyoffice/documentserver` 镜像，再通过 volume 挂载把少量定制资源覆盖进去。每个 OnlyOffice 版本一个目录（如 `office/9.2.0/`），因为定制文件里有**每版都变的 webpack 哈希**，所以新版必须重新提取资源并改挂载。
 
 本技能把整套流程脚本化。**定制内容是用「干净容器 vs 现有插件目录」逐文件 diff 实测固化的**，存在 `patches/` 下，已验证能字节级复现 9.2.0（CSS 仅差装饰性空行）。
 
@@ -57,23 +57,23 @@ docker exec oo-extract ls /var/www/onlyoffice/documentserver/web-apps/vendor/req
 ### 3. 创建新版本目录骨架
 
 ```bash
-mkdir -p dootask-plugin/9.4.0
-cp dootask-plugin/9.2.0/nginx.conf dootask-plugin/9.4.0/nginx.conf
-cp dootask-plugin/9.2.0/config.yml dootask-plugin/9.4.0/config.yml   # 仅 chmod 钩子，跨版本通用
+mkdir -p office/9.4.0
+cp office/9.2.0/nginx.conf office/9.4.0/nginx.conf
+cp office/9.2.0/config.yml office/9.4.0/config.yml   # 仅 chmod 钩子，跨版本通用
 ```
 > 不用从旧版 cp resources —— 下一步 copy-resources.sh 会把含 header 在内的所有资源都从容器里取新鲜的。
 
 ### 4. 复制官方原始资源
 
 ```bash
-.claude/skills/add-version/copy-resources.sh dootask-plugin/9.4.0
+.claude/skills/add-version/copy-resources.sh office/9.4.0
 ```
 脚本会从运行中的 onlyoffice 容器复制：`default.json`、`require.js`、header 目录、三个编辑器的 `main app.css` 与 **mobile chunk**（按内容标记 `navbar-with-logo` 自动定位，不依赖固定 chunk 号），并把只读权限规范化为 644。结束时打印各 mobile chunk 的实际哈希名 —— 记下，第 6 步要用。
 
 ### 5. 套用 DooTask 定制（幂等）
 
 ```bash
-.claude/skills/add-version/apply-customizations.sh dootask-plugin/9.4.0
+.claude/skills/add-version/apply-customizations.sh office/9.4.0
 ```
 套用上面「定制清单」5 类。脚本对每类都做了幂等判断和「未命中预警」：
 - default.json 若某条旧值找不到、新值也不在 → 说明该版官方默认值变了，会打 ⚠️ 让你人工核对。
@@ -82,14 +82,14 @@ cp dootask-plugin/9.2.0/config.yml dootask-plugin/9.4.0/config.yml   # 仅 chmod
 ### 6. 更新 docker-compose.yml（每版必改两处）
 
 ```bash
-cp dootask-plugin/9.2.0/docker-compose.yml dootask-plugin/9.4.0/docker-compose.yml
+cp office/9.2.0/docker-compose.yml office/9.4.0/docker-compose.yml
 ```
 
 **(a) 镜像 tag**：`onlyoffice/documentserver:9.2.0.1` → `:9.4.0.1`。
 
 **(b) 三个 mobile css 挂载**：把旧哈希名换成第 4 步打印的新哈希名（**左右两侧路径都要换**）。当前新哈希名：
 ```bash
-ls -1 dootask-plugin/9.4.0/resources/*/mobile/css/
+ls -1 office/9.4.0/resources/*/mobile/css/
 ```
 其余挂载（`require.js`、三个 main `app.css`、`default.json`、`header/`）是固定路径，**不用动**。
 
@@ -98,7 +98,7 @@ ls -1 dootask-plugin/9.4.0/resources/*/mobile/css/
 ### 7. 自检
 
 ```bash
-D=dootask-plugin/9.4.0
+D=office/9.4.0
 grep -q _toolbarClick $D/resources/require.js && echo "require.js OK"
 grep -rl "left-btn-about{display:none}" $D/resources/*/main/resources/css/app.css | wc -l   # 应为 3
 grep -rl "navbar-with-logo{height:0px}" $D/resources/*/mobile/css/ | wc -l                  # 应为 3
@@ -112,7 +112,7 @@ grep -oE '\./[^:]+' $D/docker-compose.yml | while read p; do [ -e "$D/$p" ] && e
 
 ### 8. 补充 CHANGELOG
 
-新增 `dootask-plugin/9.4.0/CHANGELOG.md` 和 `CHANGELOG_zh.md`（AppStore 更新说明）——写法见 release-plugin 技能。典型："Updated/更新：升级 OnlyOffice 文档服务器至 9.4.0"。
+新增 `office/9.4.0/CHANGELOG.md` 和 `CHANGELOG_zh.md`（AppStore 更新说明）——写法见 release-plugin 技能。典型："Updated/更新：升级 OnlyOffice 文档服务器至 9.4.0"。
 
 ### 9. 清理
 

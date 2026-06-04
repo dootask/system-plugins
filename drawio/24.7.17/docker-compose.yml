@@ -1,0 +1,18 @@
+services:
+  drawio-webapp:
+    image: "jgraph/drawio:24.7.17"
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - ./webapp/index.html:/usr/local/tomcat/webapps/draw/index.html
+      - ./webapp/stencils:/usr/local/tomcat/webapps/draw/stencils
+      - ./webapp/js/app.min.js:/usr/local/tomcat/webapps/draw/js/app.min.js
+      - ./webapp/js/croppie/croppie.min.css:/usr/local/tomcat/webapps/draw/js/croppie/croppie.min.css
+      - ./webapp/js/diagramly/ElectronApp.js:/usr/local/tomcat/webapps/draw/js/diagramly/ElectronApp.js
+
+  drawio-export:
+    image: "kuaifan/export-server:0.0.1"
+    restart: unless-stopped
+    privileged: true
+    volumes:
+      - ./export/fonts:/usr/share/fonts/drawio

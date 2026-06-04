@@ -1,0 +1,8 @@
+name: FileView
+description:
+  en: A plugin that provides a file viewer for viewing various file formats.
+  zh: 一个用于查看多种文件格式的插件。
+author: Community
+website: https://kkview.cn/
+tags:
+  - 文件预览

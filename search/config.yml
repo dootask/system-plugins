@@ -1,0 +1,14 @@
+name:
+  en: Manticore Search
+  zh: Manticore 智能搜索
+description:
+  en: High-performance search engine with full-text and vector search, enabling intelligent file content search.
+  zh: 高性能搜索引擎，支持全文搜索和向量搜索，实现智能文件内容搜索。
+author: Manticore Software
+website: https://manticoresearch.com/
+github: https://github.com/manticoresoftware/manticoresearch
+document: https://manual.manticoresearch.com/
+tags:
+  - AI
+  - 搜索增强
+  - 向量数据库

@@ -1,0 +1,15 @@
+name: Face check-in
+description:
+  en: A face recognition check-in tool.
+  zh: 一款支持人脸识别的签到打卡工具。
+author: DooTask
+website: https://www.dootask.com/
+tags:
+  - 签到打卡
+fields:                        
+  - name: SERVER_PORT
+    label:
+      en: Server Port
+      zh: 服务端口
+    type: number
+    default: 7788

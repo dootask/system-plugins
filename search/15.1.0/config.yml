@@ -1,0 +1,5 @@
+require_version:
+  version: "> 1.5.18"
+  reason:
+    en: "Requires new API features"
+    zh: "需要新的API功能"
