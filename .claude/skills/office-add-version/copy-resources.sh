@@ -4,17 +4,20 @@
 # 复制出来的是未改动的官方文件，定制（JS 注入 / CSS 追加 / logo）由 apply-customizations.sh 再套用。
 #
 # 用法：
-#   ./copy-resources.sh [目标版本目录]
-#   不传参数时，默认使用脚本所在目录（沿用旧约定，可把本脚本拷进版本目录后直接运行）。
+#   ./copy-resources.sh <office 版本目录，如 office/9.4.0>
+#   必须显式传入目标版本目录（避免在 mono-repo 里把资源倒错地方）。
 #
 # 相比旧版的改进：mobile CSS 的 webpack chunk 号每个 OnlyOffice 版本都会变（旧版硬编码
 # 526/923/611），这里改成按内容标记 `navbar-with-logo` 自动定位目标 chunk。
 
 set -u
 
-# 目标版本目录
-LOCAL_BASE="${1:-$(cd "$(dirname "$0")" && pwd)}"
-LOCAL_BASE="$(cd "$LOCAL_BASE" && pwd)"
+# 目标版本目录（必须显式传入；缺参数直接报错，与 apply-customizations.sh 一致）
+if [ $# -lt 1 ]; then
+    echo "用法: $0 <office 版本目录，如 office/9.4.0>"
+    exit 1
+fi
+LOCAL_BASE="$(cd "$1" && pwd)"
 
 CONTAINER_BASE="/var/www/onlyoffice/documentserver/web-apps"
 MOBILE_MARKER="navbar-with-logo"   # 用来定位每个编辑器需要打补丁的 mobile chunk
