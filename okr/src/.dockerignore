@@ -1,0 +1,11 @@
+.git
+.gitignore
+
+**/node_modules
+web/dist
+.cache
+
+*.log
+output.log
+
+docker-compose*.yml

@@ -1,0 +1,3386 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "DooTask是一款轻量级的开源在线项目任务管理工具，提供各类文档协作工具、在线思维导图、在线流程图、项目管理、任务分发、即时IM，文件管理等工具。",
+        "title": "DooTask",
+        "termsOfService": "https://www.hitosea.com/",
+        "contact": {},
+        "license": {
+            "name": "AGPL-3.0 license",
+            "url": "http://www.gnu.org/licenses/"
+        },
+        "version": "1.0"
+    },
+    "host": "http://localhost",
+    "basePath": "/api/v1",
+    "paths": {
+        "/okr/align/cancel": {
+            "get": {
+                "description": "取消对齐目标",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "取消对齐目标",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "对齐目标okr id",
+                        "name": "align_okr_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "okr id",
+                        "name": "okr_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/interfaces.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/align/detail": {
+            "get": {
+                "description": "获取对齐目标by目标id",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "获取对齐目标by目标id",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "okr id",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/interfaces.OkrAlignResp"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/align/list": {
+            "get": {
+                "description": "获取对齐目标列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "获取对齐目标列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "目标（O）",
+                        "name": "objective",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "当前页，默认:1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页显示数量，默认:50，最大:100",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/interfaces.Pagination"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "data": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.Okr"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/align/update": {
+            "post": {
+                "description": "更新对齐目标",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "更新对齐目标",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "对齐目标",
+                        "name": "align_objective",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "okr id",
+                        "name": "id",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Okr"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/analyze/complete": {
+            "get": {
+                "description": "OKR整体平均完成度",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OkrAnalyze"
+                ],
+                "summary": "OKR整体平均完成度",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "description": "部门id",
+                        "name": "department",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/interfaces.OkrAnalyzeOverall"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/analyze/department": {
+            "get": {
+                "description": "OKR整体平均完成度",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OkrAnalyze"
+                ],
+                "summary": "OKR整体平均完成度",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/interfaces.OkrAnalyzeDepartment"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/analyze/dept/complete": {
+            "get": {
+                "description": "OKR各部门平均完成度",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OkrAnalyze"
+                ],
+                "summary": "OKR各部门平均完成度",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "description": "部门id",
+                        "name": "department",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/interfaces.OkrAnalyzeDept"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/analyze/dept/score": {
+            "get": {
+                "description": "OKR各部门评分分布",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OkrAnalyze"
+                ],
+                "summary": "OKR各部门评分分布",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "description": "部门id",
+                        "name": "department",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/interfaces.OkrAnalyzeScoreDept"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/analyze/dept/score/proportion": {
+            "get": {
+                "description": "OKR部门评分占比",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OkrAnalyze"
+                ],
+                "summary": "OKR各部门评分占比",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/definitions/interfaces.OkrAnalyzeDeptScoreProportion"
+                                            }
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/analyze/personnel/score/rate": {
+            "get": {
+                "description": "OKR人员评分率",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OkrAnalyze"
+                ],
+                "summary": "OKR人员评分率",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "description": "部门id",
+                        "name": "department",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/interfaces.OkrAnalyzePersonnelScoreRate"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/analyze/score": {
+            "get": {
+                "description": "OKR评分分布",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "OkrAnalyze"
+                ],
+                "summary": "OKR评分分布",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "description": "部门id",
+                        "name": "department",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/interfaces.OkrAnalyzeScore"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/archive": {
+            "get": {
+                "description": "OKR归档目标",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "OKR归档目标",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "okr id",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/interfaces.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/archive/list": {
+            "get": {
+                "description": "OKR归档列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "OKR归档列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "目标（O）",
+                        "name": "objective",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "当前页，默认:1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页显示数量，默认:50，最大:100",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/interfaces.Pagination"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "data": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.Okr"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/archive/restore": {
+            "get": {
+                "description": "OKR还原归档目标",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "OKR还原归档目标",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "okr id",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/interfaces.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/cancel": {
+            "get": {
+                "description": "取消/重启目标",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "取消/重启目标",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "okr id",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Okr"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/confidence/update": {
+            "post": {
+                "description": "更新信心指数",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "更新信心指数",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "信心指数 0-100",
+                        "name": "confidence",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "okr id",
+                        "name": "id",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Okr"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/create": {
+            "post": {
+                "description": "创建OKR",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "创建OKR",
+                "parameters": [
+                    {
+                        "description": "request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/interfaces.OkrCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Okr"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/delete": {
+            "get": {
+                "description": "删除OKR",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "删除OKR",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "okr id",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/interfaces.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/department/list": {
+            "get": {
+                "description": "获取部门OKR列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "获取部门OKR列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "是否已完成未评分 0-未完成 1-已完成",
+                        "name": "completed",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "部门id",
+                        "name": "department_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "结束时间",
+                        "name": "end_at",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "目标（O）",
+                        "name": "objective",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "当前页，默认:1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页显示数量，默认:50，最大:100",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "开始时间",
+                        "name": "start_at",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "类型 1-承诺型 2-挑战型",
+                        "name": "type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "用户id",
+                        "name": "userid",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/interfaces.Pagination"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "data": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/interfaces.OkrResp"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/department/search": {
+            "get": {
+                "description": "获取部门列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "获取部门列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "当前页，默认:1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页显示数量，默认:50，最大:100",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/interfaces.Pagination"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "data": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.UserDepartment"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/detail": {
+            "get": {
+                "description": "获取OKR详情",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "获取OKR详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "okr id",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/interfaces.OkrResp"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/follow": {
+            "get": {
+                "description": "关注或取消关注目标",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "关注或取消关注目标",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "okr id",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.OkrFollow"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/follow/list": {
+            "get": {
+                "description": "获取关注的OKR列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "获取关注的OKR列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "目标（O）",
+                        "name": "objective",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "当前页，默认:1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页显示数量，默认:50，最大:100",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/interfaces.Pagination"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "data": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/interfaces.OkrResp"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/leave/list": {
+            "get": {
+                "description": "离职/删除人员OKR列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "离职/删除人员OKR列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "目标（O）",
+                        "name": "objective",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "当前页，默认:1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页显示数量，默认:50，最大:100",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "用户id",
+                        "name": "userid",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/interfaces.Pagination"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "data": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.Okr"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/leave/update": {
+            "post": {
+                "description": "分配离职/删除人员OKR负责人",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "分配离职/删除人员OKR负责人",
+                "parameters": [
+                    {
+                        "type": "array",
+                        "items": {
+                            "type": "integer"
+                        },
+                        "collectionFormat": "csv",
+                        "description": "okr ids",
+                        "name": "okr_ids",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "新负责人id",
+                        "name": "userid",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/interfaces.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/log/list": {
+            "get": {
+                "description": "获取动态列表by目标id",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "获取动态列表by目标id",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "okr id",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "当前页，默认:1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页显示数量，默认:50，最大:100",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/interfaces.Pagination"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "data": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.OkrLog"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/my/list": {
+            "get": {
+                "description": "获取我的OKR列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "获取我的OKR列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "目标（O）",
+                        "name": "objective",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "当前页，默认:1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页显示数量，默认:50，最大:100",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/interfaces.Pagination"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "data": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/interfaces.OkrResp"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/owner/list": {
+            "get": {
+                "description": "OKR负责人列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "OKR负责人列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "关键词",
+                        "name": "keyword",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "当前页，默认:1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页显示数量，默认:50，最大:100",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "状态 0-正常 1-已归档 2-离职/删除人员",
+                        "name": "status",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/interfaces.Pagination"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "data": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.User"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/participant/list": {
+            "get": {
+                "description": "获取参与的OKR列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "获取参与的OKR列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "目标（O）",
+                        "name": "objective",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "当前页，默认:1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页显示数量，默认:50，最大:100",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/interfaces.Pagination"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "data": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/interfaces.OkrResp"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/participant/update": {
+            "post": {
+                "description": "更新参与人",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "更新参与人",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "okr id",
+                        "name": "id",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "参与人,多个用逗号隔开",
+                        "name": "participant",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Okr"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/project/list": {
+            "get": {
+                "description": "获取项目列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Dootask"
+                ],
+                "summary": "获取项目列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "当前页，默认:1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页显示数量，默认:50，最大:100",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/interfaces.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/replay/create": {
+            "post": {
+                "description": "添加复盘",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "添加复盘",
+                "parameters": [
+                    {
+                        "description": "request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/interfaces.OkrReplayCreateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.OkrReplay"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/replay/detail": {
+            "get": {
+                "description": "复盘详情",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "复盘详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "复盘 id",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.OkrReplay"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/replay/list": {
+            "get": {
+                "description": "获取OKR复盘列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "获取OKR复盘列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "部门id",
+                        "name": "department_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "结束时间",
+                        "name": "end_at",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "目标（O）",
+                        "name": "objective",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "目标id(兼容手机端详情)",
+                        "name": "okr_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "当前页，默认:1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页显示数量，默认:50，最大:100",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "选中已评分未复盘 true-选中 false-未选中",
+                        "name": "select_replayed",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "开始时间",
+                        "name": "start_at",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "用户id",
+                        "name": "userid",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/interfaces.Pagination"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "data": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.OkrReplay"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/replay/okr/list": {
+            "get": {
+                "description": "获取复盘列表by目标id",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "获取复盘列表by目标id",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "okr id",
+                        "name": "id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "当前页，默认:1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页显示数量，默认:50，最大:100",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "allOf": [
+                                                {
+                                                    "$ref": "#/definitions/interfaces.Pagination"
+                                                },
+                                                {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "data": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "$ref": "#/definitions/model.OkrReplay"
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            ]
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/score": {
+            "post": {
+                "description": "OKR评分",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "OKR评分",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "okr id",
+                        "name": "id",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "number",
+                        "description": "个人评分 0-10",
+                        "name": "score",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "评分类型 1-个人评分 2-上级评分",
+                        "name": "type",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Okr"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/setting": {
+            "post": {
+                "description": "获取/保存okr设置",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "获取/保存okr设置",
+                "parameters": [
+                    {
+                        "description": "request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/interfaces.OkrSettingReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/interfaces.OkrSettingReq"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/statistics/completes": {
+            "get": {
+                "description": "获取/未完成、已完成/已取消目标数量",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "StatisticsAll"
+                ],
+                "summary": "获取/未完成、已完成/已取消目标数量",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/interfaces.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/statistics/overall": {
+            "get": {
+                "description": "查询个人OKR整体完成度和评分",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "获取个人OKR整体完成度和与评分和",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/interfaces.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/update": {
+            "post": {
+                "description": "更新OKR",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "更新OKR",
+                "parameters": [
+                    {
+                        "description": "request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/interfaces.OkrUpdateReq"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Okr"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/update/progress": {
+            "post": {
+                "description": "更新进度和进度状态",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Okr"
+                ],
+                "summary": "更新进度和进度状态",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "okr id",
+                        "name": "id",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "进度 0-100",
+                        "name": "progress",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "进度状态 0-默认 1-正常 2-有风险 3-延期",
+                        "name": "status",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/interfaces.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/model.Okr"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/user/basic": {
+            "get": {
+                "description": "获取指定会员基础信息",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Dootask"
+                ],
+                "summary": "获取指定会员基础信息",
+                "parameters": [
+                    {
+                        "type": "number",
+                        "description": "用户id",
+                        "name": "userid",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/interfaces.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/user/info": {
+            "get": {
+                "description": "获取用户信息",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Dootask"
+                ],
+                "summary": "获取用户信息",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/interfaces.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/okr/user/list": {
+            "get": {
+                "description": "获取用户列表",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Dootask"
+                ],
+                "summary": "获取用户列表",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "description": "是否只获取部门用户",
+                        "name": "dept_only",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "关键词",
+                        "name": "keyword",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "当前页，默认:1",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "每页显示数量，默认:50，最大:100",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/interfaces.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/ws": {
+            "get": {
+                "description": "请使用ws连接",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Websocket"
+                ],
+                "summary": "Websocket ws",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "name": "language",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "name": "token",
+                        "in": "query"
+                    }
+                ],
+                "responses": {}
+            }
+        }
+    },
+    "definitions": {
+        "interfaces.OkrAlignResp": {
+            "type": "object",
+            "properties": {
+                "alias": {
+                    "description": "目标别名",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "align_objective": {
+                    "description": "对齐目标",
+                    "type": "string"
+                },
+                "archive_at": {
+                    "type": "string"
+                },
+                "archive_user": {
+                    "$ref": "#/definitions/model.UserBasic"
+                },
+                "archive_userid": {
+                    "type": "integer"
+                },
+                "ascription": {
+                    "type": "integer"
+                },
+                "can_owner_update_score": {
+                    "description": "KR负责人是否能修改评分",
+                    "type": "boolean"
+                },
+                "can_superior_update_score": {
+                    "description": "KR上级是否能修改评分",
+                    "type": "boolean"
+                },
+                "canceled": {
+                    "type": "integer"
+                },
+                "completed": {
+                    "type": "integer"
+                },
+                "confidence": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "department_id": {
+                    "type": "string"
+                },
+                "dialog_id": {
+                    "type": "integer"
+                },
+                "end_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "key_results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.Okr"
+                    }
+                },
+                "kr_score": {
+                    "description": "KR总评分",
+                    "type": "number"
+                },
+                "objective_num": {
+                    "description": "O的数字编号",
+                    "type": "string"
+                },
+                "parent_id": {
+                    "type": "integer"
+                },
+                "parent_okr": {
+                    "$ref": "#/definitions/model.Okr"
+                },
+                "parent_title": {
+                    "description": "父级目标标题",
+                    "type": "string"
+                },
+                "participant": {
+                    "type": "string"
+                },
+                "prefix": {
+                    "description": "前缀",
+                    "type": "string"
+                },
+                "priority": {
+                    "type": "string"
+                },
+                "progress": {
+                    "type": "integer"
+                },
+                "progress_status": {
+                    "type": "integer"
+                },
+                "project_id": {
+                    "type": "integer"
+                },
+                "score": {
+                    "description": "个人评分和O总评分",
+                    "type": "number"
+                },
+                "score_completed_at": {
+                    "type": "string"
+                },
+                "score_num": {
+                    "type": "integer"
+                },
+                "start_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "superior_score": {
+                    "description": "上级评分",
+                    "type": "number"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/model.UserBasic"
+                },
+                "userid": {
+                    "type": "integer"
+                },
+                "visible_range": {
+                    "type": "integer"
+                }
+            }
+        },
+        "interfaces.OkrAnalyzeDepartment": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "部门id",
+                    "type": "integer"
+                },
+                "name": {
+                    "description": "部门名称",
+                    "type": "string"
+                },
+                "owner": {
+                    "description": "是否部门负责人",
+                    "type": "boolean"
+                }
+            }
+        },
+        "interfaces.OkrAnalyzeDept": {
+            "type": "object",
+            "properties": {
+                "complete": {
+                    "description": "okr 完成数",
+                    "type": "integer"
+                },
+                "department_id": {
+                    "description": "部门id",
+                    "type": "integer"
+                },
+                "department_name": {
+                    "description": "部门名称",
+                    "type": "string"
+                },
+                "total": {
+                    "description": "okr 总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "interfaces.OkrAnalyzeDeptScoreProportion": {
+            "type": "object",
+            "properties": {
+                "already_reviewed": {
+                    "description": "已评分",
+                    "type": "integer"
+                },
+                "department_id": {
+                    "description": "部门id",
+                    "type": "integer"
+                },
+                "department_name": {
+                    "description": "部门名称",
+                    "type": "string"
+                },
+                "total": {
+                    "description": "okr 总数",
+                    "type": "integer"
+                },
+                "unscored": {
+                    "description": "未评分",
+                    "type": "integer"
+                }
+            }
+        },
+        "interfaces.OkrAnalyzeOverall": {
+            "type": "object",
+            "properties": {
+                "complete": {
+                    "description": "okr 完成数",
+                    "type": "integer"
+                },
+                "total": {
+                    "description": "okr 总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "interfaces.OkrAnalyzePersonnelScoreRate": {
+            "type": "object",
+            "properties": {
+                "complete": {
+                    "description": "okr 完成数",
+                    "type": "integer"
+                },
+                "total": {
+                    "description": "okr 总数",
+                    "type": "integer"
+                }
+            }
+        },
+        "interfaces.OkrAnalyzeScore": {
+            "type": "object",
+            "properties": {
+                "seven_to_ten": {
+                    "description": "7-10分",
+                    "type": "integer"
+                },
+                "three_to_seven": {
+                    "description": "3-7分",
+                    "type": "integer"
+                },
+                "total": {
+                    "description": "okr 总数",
+                    "type": "integer"
+                },
+                "unscored": {
+                    "description": "未评分",
+                    "type": "integer"
+                },
+                "zero_to_three": {
+                    "description": "0-3分",
+                    "type": "integer"
+                }
+            }
+        },
+        "interfaces.OkrAnalyzeScoreDept": {
+            "type": "object",
+            "properties": {
+                "department_id": {
+                    "description": "部门id",
+                    "type": "integer"
+                },
+                "department_name": {
+                    "description": "部门名称",
+                    "type": "string"
+                },
+                "seven_to_ten": {
+                    "description": "7-10分",
+                    "type": "integer"
+                },
+                "three_to_seven": {
+                    "description": "3-7分",
+                    "type": "integer"
+                },
+                "total": {
+                    "description": "okr 总数",
+                    "type": "integer"
+                },
+                "unscored": {
+                    "description": "未评分",
+                    "type": "integer"
+                },
+                "zero_to_three": {
+                    "description": "0-3分",
+                    "type": "integer"
+                }
+            }
+        },
+        "interfaces.OkrCreateReq": {
+            "type": "object",
+            "required": [
+                "ascription",
+                "end_at",
+                "key_results",
+                "priority",
+                "start_at",
+                "title",
+                "type"
+            ],
+            "properties": {
+                "align_objective": {
+                    "description": "对齐目标",
+                    "type": "string"
+                },
+                "ascription": {
+                    "description": "归属 1-部门 2-个人",
+                    "type": "integer"
+                },
+                "end_at": {
+                    "description": "结束时间",
+                    "type": "string"
+                },
+                "key_results": {
+                    "description": "关键结果",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/interfaces.OkrKeyResultCreateReq"
+                    }
+                },
+                "priority": {
+                    "description": "优先级 （必填）",
+                    "type": "string"
+                },
+                "project_id": {
+                    "description": "项目id",
+                    "type": "integer"
+                },
+                "start_at": {
+                    "description": "开始时间",
+                    "type": "string"
+                },
+                "title": {
+                    "description": "目标 （必填）",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "类型 1-承诺型 2-挑战型 （必填）",
+                    "type": "integer"
+                },
+                "visible_range": {
+                    "description": "可见范围  1-全公司 2-仅相关成员 3-仅部门成员",
+                    "type": "integer"
+                }
+            }
+        },
+        "interfaces.OkrKeyResultCreateReq": {
+            "type": "object",
+            "required": [
+                "end_at",
+                "start_at",
+                "title"
+            ],
+            "properties": {
+                "confidence": {
+                    "description": "信心指数 0-100",
+                    "type": "integer"
+                },
+                "end_at": {
+                    "description": "结束时间 （必填）",
+                    "type": "string"
+                },
+                "participant": {
+                    "description": "参与人,多个用逗号隔开",
+                    "type": "string"
+                },
+                "start_at": {
+                    "description": "开始时间 （必填）",
+                    "type": "string"
+                },
+                "title": {
+                    "description": "关键结果 （必填）",
+                    "type": "string"
+                }
+            }
+        },
+        "interfaces.OkrKeyResultUpdateReq": {
+            "type": "object",
+            "required": [
+                "end_at",
+                "id",
+                "is_delete",
+                "start_at",
+                "title"
+            ],
+            "properties": {
+                "confidence": {
+                    "description": "信心指数 0-100",
+                    "type": "integer"
+                },
+                "end_at": {
+                    "description": "结束时间 （必填）",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "okr id",
+                    "type": "integer"
+                },
+                "is_delete": {
+                    "description": "是否删除 true-删除 false-不删除",
+                    "type": "boolean"
+                },
+                "participant": {
+                    "description": "参与人,多个用逗号隔开",
+                    "type": "string"
+                },
+                "start_at": {
+                    "description": "开始时间 （必填）",
+                    "type": "string"
+                },
+                "title": {
+                    "description": "关键结果 （必填）",
+                    "type": "string"
+                }
+            }
+        },
+        "interfaces.OkrReplayComment": {
+            "type": "object",
+            "required": [
+                "comment",
+                "okr_id"
+            ],
+            "properties": {
+                "comment": {
+                    "description": "评价 1-做得好的 2-可提升的",
+                    "type": "integer"
+                },
+                "okr_id": {
+                    "description": "okr id",
+                    "type": "integer"
+                }
+            }
+        },
+        "interfaces.OkrReplayCreateReq": {
+            "type": "object",
+            "required": [
+                "comments",
+                "okr_id"
+            ],
+            "properties": {
+                "comments": {
+                    "description": "复盘评价",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/interfaces.OkrReplayComment"
+                    }
+                },
+                "okr_id": {
+                    "description": "okr id",
+                    "type": "integer"
+                },
+                "problem": {
+                    "description": "问题与不足",
+                    "type": "string"
+                },
+                "review": {
+                    "description": "价值与收获",
+                    "type": "string"
+                }
+            }
+        },
+        "interfaces.OkrResp": {
+            "type": "object",
+            "properties": {
+                "alias": {
+                    "description": "目标别名",
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "align_count": {
+                    "description": "对齐目标数量",
+                    "type": "integer"
+                },
+                "align_objective": {
+                    "description": "对齐目标ids",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "archive_at": {
+                    "type": "string"
+                },
+                "archive_user": {
+                    "$ref": "#/definitions/model.UserBasic"
+                },
+                "archive_userid": {
+                    "type": "integer"
+                },
+                "ascription": {
+                    "type": "integer"
+                },
+                "can_owner_update_score": {
+                    "description": "KR负责人是否能修改评分",
+                    "type": "boolean"
+                },
+                "can_superior_update_score": {
+                    "description": "KR上级是否能修改评分",
+                    "type": "boolean"
+                },
+                "canceled": {
+                    "type": "integer"
+                },
+                "completed": {
+                    "type": "integer"
+                },
+                "confidence": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "department_id": {
+                    "type": "string"
+                },
+                "dialog_id": {
+                    "type": "integer"
+                },
+                "end_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "is_follow": {
+                    "description": "是否被关注",
+                    "type": "boolean"
+                },
+                "key_results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.Okr"
+                    }
+                },
+                "kr_count": {
+                    "description": "kr总数量",
+                    "type": "integer"
+                },
+                "kr_finish_count": {
+                    "description": "kr完成数量",
+                    "type": "integer"
+                },
+                "kr_score": {
+                    "description": "KR总评分",
+                    "type": "number"
+                },
+                "objective_num": {
+                    "description": "O的数字编号",
+                    "type": "string"
+                },
+                "parent_id": {
+                    "type": "integer"
+                },
+                "parent_okr": {
+                    "$ref": "#/definitions/model.Okr"
+                },
+                "parent_title": {
+                    "description": "父级目标标题",
+                    "type": "string"
+                },
+                "participant": {
+                    "type": "string"
+                },
+                "priority": {
+                    "type": "string"
+                },
+                "progress": {
+                    "type": "integer"
+                },
+                "progress_status": {
+                    "type": "integer"
+                },
+                "project_id": {
+                    "type": "integer"
+                },
+                "score": {
+                    "description": "个人评分和O总评分",
+                    "type": "number"
+                },
+                "score_completed_at": {
+                    "type": "string"
+                },
+                "score_num": {
+                    "type": "integer"
+                },
+                "start_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "superior_score": {
+                    "description": "上级评分",
+                    "type": "number"
+                },
+                "superior_user": {
+                    "description": "上级用户",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/model.UserBasic"
+                },
+                "user_avatar": {
+                    "description": "用户头像",
+                    "type": "string"
+                },
+                "userid": {
+                    "type": "integer"
+                },
+                "visible_range": {
+                    "type": "integer"
+                }
+            }
+        },
+        "interfaces.OkrSettingReq": {
+            "type": "object",
+            "properties": {
+                "score_department_user": {
+                    "description": "单选：指定可评分部门及部分负责人OKR的人员",
+                    "type": "integer"
+                },
+                "self_score_weight": {
+                    "description": "自评权重",
+                    "type": "integer"
+                },
+                "superior_score_weight": {
+                    "description": "上级评分权重",
+                    "type": "integer"
+                },
+                "type": {
+                    "description": "类型 get: 获取 (默认)，save: 保存，all: 获取所有",
+                    "type": "string"
+                }
+            }
+        },
+        "interfaces.OkrUpdateReq": {
+            "type": "object",
+            "required": [
+                "end_at",
+                "id",
+                "key_results",
+                "priority",
+                "start_at",
+                "title",
+                "type"
+            ],
+            "properties": {
+                "align_objective": {
+                    "description": "对齐目标",
+                    "type": "string"
+                },
+                "end_at": {
+                    "description": "结束时间",
+                    "type": "string"
+                },
+                "id": {
+                    "description": "okr id",
+                    "type": "integer"
+                },
+                "key_results": {
+                    "description": "关键结果",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/interfaces.OkrKeyResultUpdateReq"
+                    }
+                },
+                "priority": {
+                    "description": "优先级 （必填）",
+                    "type": "string"
+                },
+                "project_id": {
+                    "description": "项目id",
+                    "type": "integer"
+                },
+                "start_at": {
+                    "description": "开始时间",
+                    "type": "string"
+                },
+                "title": {
+                    "description": "目标 （必填）",
+                    "type": "string"
+                },
+                "type": {
+                    "description": "类型 1-承诺型 2-挑战型 （必填）",
+                    "type": "integer"
+                },
+                "visible_range": {
+                    "description": "可见范围  1-全公司 2-仅相关成员 3-仅部门成员",
+                    "type": "integer"
+                }
+            }
+        },
+        "interfaces.Pagination": {
+            "type": "object",
+            "properties": {
+                "count": {
+                    "description": "总数",
+                    "type": "integer"
+                },
+                "data": {
+                    "description": "数据"
+                },
+                "last_page": {
+                    "description": "最后一页",
+                    "type": "integer"
+                },
+                "page": {
+                    "description": "当前页，默认:1",
+                    "type": "integer"
+                },
+                "page_size": {
+                    "description": "每页显示数量，默认:50，最大:100",
+                    "type": "integer"
+                }
+            }
+        },
+        "interfaces.Response": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "description": "状态, [200=成功, 400=失败, 401=未登录, 403=无相关权限, 404=请求接口不存在, 405=请求方法不允许, 500=系统错误]",
+                    "type": "integer"
+                },
+                "data": {
+                    "description": "数据"
+                },
+                "msg": {
+                    "description": "信息",
+                    "type": "string"
+                }
+            }
+        },
+        "model.Okr": {
+            "type": "object",
+            "properties": {
+                "archive_at": {
+                    "type": "string"
+                },
+                "archive_user": {
+                    "$ref": "#/definitions/model.UserBasic"
+                },
+                "archive_userid": {
+                    "type": "integer"
+                },
+                "ascription": {
+                    "type": "integer"
+                },
+                "can_owner_update_score": {
+                    "description": "KR负责人是否能修改评分",
+                    "type": "boolean"
+                },
+                "can_superior_update_score": {
+                    "description": "KR上级是否能修改评分",
+                    "type": "boolean"
+                },
+                "canceled": {
+                    "type": "integer"
+                },
+                "completed": {
+                    "type": "integer"
+                },
+                "confidence": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "department_id": {
+                    "type": "string"
+                },
+                "dialog_id": {
+                    "type": "integer"
+                },
+                "end_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "key_results": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.Okr"
+                    }
+                },
+                "kr_score": {
+                    "description": "KR总评分",
+                    "type": "number"
+                },
+                "objective_num": {
+                    "description": "O的数字编号",
+                    "type": "string"
+                },
+                "parent_id": {
+                    "type": "integer"
+                },
+                "parent_okr": {
+                    "$ref": "#/definitions/model.Okr"
+                },
+                "parent_title": {
+                    "description": "父级目标标题",
+                    "type": "string"
+                },
+                "participant": {
+                    "type": "string"
+                },
+                "priority": {
+                    "type": "string"
+                },
+                "progress": {
+                    "type": "integer"
+                },
+                "progress_status": {
+                    "type": "integer"
+                },
+                "project_id": {
+                    "type": "integer"
+                },
+                "score": {
+                    "description": "个人评分和O总评分",
+                    "type": "number"
+                },
+                "score_completed_at": {
+                    "type": "string"
+                },
+                "score_num": {
+                    "type": "integer"
+                },
+                "start_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "integer"
+                },
+                "superior_score": {
+                    "description": "上级评分",
+                    "type": "number"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "user": {
+                    "$ref": "#/definitions/model.UserBasic"
+                },
+                "userid": {
+                    "type": "integer"
+                },
+                "visible_range": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.OkrFollow": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "okr_id": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "userid": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.OkrLog": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "okr_id": {
+                    "type": "integer"
+                },
+                "operation": {
+                    "type": "string"
+                },
+                "record": {
+                    "type": "string"
+                },
+                "records": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "user_avatar": {
+                    "type": "string"
+                },
+                "user_disable_at": {
+                    "type": "string"
+                },
+                "user_nickname": {
+                    "type": "string"
+                },
+                "userid": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.OkrReplay": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "key_results": {
+                    "description": "KR集合",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.Okr"
+                    }
+                },
+                "kr_history": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.OkrReplayHistory"
+                    }
+                },
+                "objective_num": {
+                    "description": "O的数字编号",
+                    "type": "string"
+                },
+                "okr_alias": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "okr_ascription": {
+                    "type": "integer"
+                },
+                "okr_department_id": {
+                    "type": "string"
+                },
+                "okr_id": {
+                    "type": "integer"
+                },
+                "okr_priority": {
+                    "type": "string"
+                },
+                "okr_progress": {
+                    "type": "integer"
+                },
+                "okr_title": {
+                    "type": "string"
+                },
+                "okr_userid": {
+                    "type": "integer"
+                },
+                "problem": {
+                    "type": "string"
+                },
+                "replay": {
+                    "type": "integer"
+                },
+                "replays": {
+                    "description": "复盘集合",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/model.OkrReplay"
+                    }
+                },
+                "review": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "userid": {
+                    "type": "integer"
+                }
+            }
+        },
+        "model.OkrReplayHistory": {
+            "type": "object",
+            "properties": {
+                "comment": {
+                    "type": "integer"
+                },
+                "confidence": {
+                    "type": "integer"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "okr_id": {
+                    "type": "integer"
+                },
+                "parent_id": {
+                    "type": "integer"
+                },
+                "progress": {
+                    "type": "integer"
+                },
+                "replay_id": {
+                    "type": "integer"
+                },
+                "score": {
+                    "type": "number"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "model.User": {
+            "type": "object",
+            "properties": {
+                "az": {
+                    "description": "首字母",
+                    "type": "string"
+                },
+                "bot": {
+                    "description": "是否是机器人 1-是 0-否",
+                    "type": "integer"
+                },
+                "changepass": {
+                    "description": "是否需要修改密码 1-是 0-否",
+                    "type": "integer"
+                },
+                "created_at": {
+                    "description": "创建时间",
+                    "type": "string"
+                },
+                "created_ip": {
+                    "description": "创建ip",
+                    "type": "string"
+                },
+                "department": {
+                    "description": "部门",
+                    "type": "string"
+                },
+                "department_name": {
+                    "description": "部门名称",
+                    "type": "string"
+                },
+                "disable_at": {
+                    "description": "禁用时间",
+                    "type": "string"
+                },
+                "email": {
+                    "description": "邮箱",
+                    "type": "string"
+                },
+                "email_verity": {
+                    "description": "邮箱是否验证 1-是 0-否",
+                    "type": "integer"
+                },
+                "identity": {
+                    "description": "身份",
+                    "type": "string"
+                },
+                "last_at": {
+                    "description": "最后登录时间",
+                    "type": "string"
+                },
+                "last_ip": {
+                    "description": "最后登录ip",
+                    "type": "string"
+                },
+                "line_at": {
+                    "description": "在线时间",
+                    "type": "string"
+                },
+                "line_ip": {
+                    "description": "在线ip",
+                    "type": "string"
+                },
+                "login_num": {
+                    "description": "登录次数",
+                    "type": "integer"
+                },
+                "nickname": {
+                    "description": "昵称",
+                    "type": "string"
+                },
+                "nickname_original": {
+                    "description": "昵称原始值",
+                    "type": "string"
+                },
+                "pinyin": {
+                    "description": "拼音",
+                    "type": "string"
+                },
+                "profession": {
+                    "description": "职业",
+                    "type": "string"
+                },
+                "task_dialog_id": {
+                    "description": "任务对话框id",
+                    "type": "integer"
+                },
+                "tel": {
+                    "description": "手机号",
+                    "type": "string"
+                },
+                "token": {
+                    "description": "token",
+                    "type": "string"
+                },
+                "userid": {
+                    "description": "用户id",
+                    "type": "integer"
+                },
+                "userimg": {
+                    "description": "头像",
+                    "type": "string"
+                }
+            }
+        },
+        "model.UserBasic": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "description": "创建时间",
+                    "type": "string"
+                },
+                "department": {
+                    "description": "部门",
+                    "type": "string"
+                },
+                "disable_at": {
+                    "description": "禁用时间",
+                    "type": "string"
+                },
+                "email": {
+                    "description": "邮箱",
+                    "type": "string"
+                },
+                "identity": {
+                    "description": "身份",
+                    "type": "string"
+                },
+                "nickname": {
+                    "description": "昵称",
+                    "type": "string"
+                },
+                "profession": {
+                    "description": "职业",
+                    "type": "string"
+                },
+                "userid": {
+                    "description": "用户id",
+                    "type": "integer"
+                },
+                "userimg": {
+                    "description": "头像",
+                    "type": "string"
+                }
+            }
+        },
+        "model.UserDepartment": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "dialog_id": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "owner_user": {
+                    "$ref": "#/definitions/model.User"
+                },
+                "owner_userid": {
+                    "type": "integer"
+                },
+                "parent_department": {
+                    "$ref": "#/definitions/model.UserDepartment"
+                },
+                "parent_id": {
+                    "type": "integer"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,61 @@
+ErrCaptchaCode: Verification code error
+ErrCmdTimeout: Command execution timeout
+ErrDooTaskDataFormat: Data format error
+ErrDooTaskRequestFailed: Request failed
+ErrDooTaskRequestFailedWithErr: 'Request failed: {{.detail}}'
+ErrDooTaskResponseFormat: Response format error
+ErrDooTaskUnmarshalResponse: 'Parsing response failed: {{.detail}}'
+ErrEnvProhibition: This operation is prohibited in the current environment
+ErrInvalidParameter: Parameter error
+ErrMailContentReject: The email content is rejected. Please check whether the receiving function is enabled
+ErrMailNotConfig: The sending mailbox is not configured
+ErrMailToInvalid: Please enter the correct recipient address
+ErrNoPermission: Insufficient authority
+ErrOkrAdminNotCancel: Administrators only
+ErrOkrArchiveStatusInvalid: Archive status error
+ErrOkrArchiveStatusNotCompleted: Status archiving for Completed, Cancelled only
+ErrOkrArchivedStatusInvalid: OKR has been filed
+ErrOkrAscriptionInvalid: The destination attribution parameter is incorrect
+ErrOkrCanceled: O The target has been cancelled and cannot be operated
+ErrOkrCompleted: O The target is complete and cannot be operated
+ErrOkrCompletedReplay: Please add a copy first
+ErrOkrConfidenceInvalid: Confidence Index Please enter an integer between 0 and 100
+ErrOkrDepartmentOwnerOrAdminNotCancel: Only department heads and administrators can perform this operation
+ErrOkrInvalidKrScore: Invalid KR score
+ErrOkrIsFinishNotScoreInvalid: Complete No score parameter is incorrect
+ErrOkrKeyResultAtLeastOne: There was at least one key result
+ErrOkrKeyResultTitleEmpty: The key result header cannot be empty
+ErrOkrKrScoreNotComplete: KR score is not complete
+ErrOkrKrTimeInvalid: The KR time must be within the O time range
+ErrOkrNoData: No data is queried
+ErrOkrNoDepartment: You are not currently in any department and cannot be initiated!
+ErrOkrNoPermission: No OKR permission
+ErrOkrNoViewPermission: Currently there is no view permission
+ErrOkrOwnerNotCancel: Responsible person only
+ErrOkrOwnerNotScore: Person in charge not rated
+ErrOkrOwnerOrAdminNotCancel: This operation is performed only by principals and administrators
+ErrOkrOwnerScored: This rating is scored by the supervisor of the person in charge
+ErrOkrPriorityInvalid: The target priority parameter is incorrect
+ErrOkrProgressInvalid: Progress Please enter an integer ranging from 0 to 100
+ErrOkrProgressNotEnough: The KR progress has not reached 100%
+ErrOkrProgressStatusInvalid: The progress status parameter is incorrect
+ErrOkrReplayCommentInvalid: Please select KR Review
+ErrOkrReplayLengthInvalid: The content is too long. Please limit it to 255 characters
+ErrOkrReplayStatusInvalid: Invalid disk status
+ErrOkrScoreInvalid: Please enter an integer ranging from 0 to 10
+ErrOkrScoreTypeInvalid: Score type error
+ErrOkrScoreWeightInvalid: The sum of the self-rated weight and the parent rating weight must equal 100
+ErrOkrScored: 'KR has been scored and cannot operate: {{.detail}}'
+ErrOkrScoredNotUpdate: Score is not modifiable
+ErrOkrScoredNotUpdateProgress: You are not allowed to modify the progress after scoring
+ErrOkrStatusInvalid: Target status error
+ErrOkrSuperiorScored: Superior rated
+ErrOkrTimeEmpty: Time cannot be empty
+ErrOkrTimeFormat: Time format error
+ErrOkrTimeInvalid: The start time cannot be later than the end time. Select a new time range
+ErrOkrTitleLengthInvalid: The title is too long. Please limit it to 255 characters
+ErrOkrTypeInvalid: The target type parameter is incorrect
+ErrOkrUserDisabled: The responsible person does not exist. Please reassign the responsible person
+ErrOkrVisibleRangeInvalid: The target visibility parameter is incorrect
+ErrRequestTimeout: Request timeout
+ErrTypeNotLogin: Not logged in

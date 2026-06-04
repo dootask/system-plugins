@@ -1,0 +1,116 @@
+@import 'dark.less';
+@import 'light.less';
+@import 'tailwind.less';
+
+/* 刷新按钮 */
+.okr-app-refresh i {
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0 10px;
+}
+
+/* 时间组件 */
+.okr-date-picker-waps {
+    width: 100%;
+    height: 32px;
+    border-radius: 3px;
+}
+
+.okr-app-date-pickers {
+    width: 100%;
+}
+
+.okr-app-date-pickers input,
+.okr-date-picker-waps {
+    background: #fff;
+    border-color: #e8e8e8;
+    font-weight: 400;
+}
+
+
+/* drawer样式调整  */
+.n-drawer-header__close {
+    display: none;
+}
+.okr.n-drawer--right-placement {
+    @apply m-0 rounded-none;
+    padding: calc(var(--status-bar-height, 0px) + 8px) 0 calc(var(--navigation-bar-height, 0px) + 8px);
+}
+
+.okr.n-drawer--right-placement .n-drawer-header {
+    border-bottom: none !important;
+    line-height: 1.5 !important;
+}
+/* modal样式调整  */
+
+.n-modal{
+    border-radius: 18px;
+    box-shadow: none;
+}
+
+/* 全局返回按钮 */
+.okr-nav-back {
+    cursor: pointer;
+    padding-right: 8px;
+    color: #636468;
+    width: 36px;
+}
+
+.okr-nav-back .okrfont {
+    font-size: 26px;
+}
+
+/* 全局更多下拉样式 */
+.okr-more-button-popover.n-popover {
+    @apply overflow-hidden rounded;
+}
+
+.okr-more-button-popover.n-popover .n-popover__content {
+    @apply bg-white py-4;
+}
+
+.okr-more-button-popover.n-popover .n-popover__content p {
+    @apply py-8 px-16 cursor-pointer;
+}
+
+.okr-more-button-popover.n-popover .n-popover__content p:hover {
+    background: #F4F5F7;
+}
+
+/* 全局O编号 */
+.okr-objective-num {
+    color: #68d838;
+    display: inline-block;
+    font-size: 12px;
+    transform: scale(0.9);
+    border-radius: 8px;
+    padding: 0 6px;
+    margin-right: 4px;
+    background: rgba(135, 208, 104, 0.2);
+    white-space: nowrap;
+}
+
+button:focus {
+    outline: none !important;
+}
+
+button::-moz-focus-inner {
+    border: 0;
+}
+
+input[type="submit"]::-moz-focus-inner,
+input[type="button"]::-moz-focus-inner {
+    border: 0;
+}
+
+/* 抖动动画 */
+.common-shake {
+    animation: animation-common-shake 0.5s cubic-bezier(.36,.07,.19,.97) both;
+    transform: translate3d(0, 0, 0);
+}
+
+@keyframes animation-common-shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}

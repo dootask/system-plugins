@@ -1,0 +1,61 @@
+ErrCaptchaCode: Authentifizierungsfehler bestätigt
+ErrCmdTimeout: Der befehl wird mit verspätung ausgeführt
+ErrDooTaskDataFormat: Fehler bei der datenformat
+ErrDooTaskRequestFailed: Bitte abgelehnt.
+ErrDooTaskRequestFailedWithErr: 'Anfrage abgelehnt: {{.detail}}'
+ErrDooTaskResponseFormat: Format ist nicht korrekt.
+ErrDooTaskUnmarshalResponse: 'Nicht interpretieren können: {{.detail}} antworten'
+ErrEnvProhibition: Dies ist unter den aktuellen umständen verboten
+ErrInvalidParameter: Fehlerhafte parameter
+ErrMailContentReject: Die e-mail wird abgelehnt, bitte prüfen sie, ob der postfach die funktion empfangsfunktion geöffnet hat
+ErrMailNotConfig: Ein e-mail-postfach ist nicht eingerichtet
+ErrMailToInvalid: Bitte geben sie die richtige adresse ein
+ErrNoPermission: Begrenzter zugang.
+ErrOkrAdminNotCancel: Es ist nur für administrator geöffnet
+ErrOkrArchiveStatusInvalid: Fehler im archiv
+ErrOkrArchiveStatusNotCompleted: Nur ein archiv nach dem status als erledigt, ausgeliehen und ausgeschieden ist
+ErrOkrArchivedStatusInvalid: OKR hat die akten ausgepackt
+ErrOkrAscriptionInvalid: Fehler bei der zuweisung der zielperson
+ErrOkrCanceled: O ziel nicht betriebsbereit
+ErrOkrCompleted: O ziel nicht erreichbar
+ErrOkrCompletedReplay: Bitte fügen sie zuerst die schaltfläche hinzu
+ErrOkrConfidenceInvalid: Geben sie bitte einen ganzzahligen wert Von 0-100 ein
+ErrOkrDepartmentOwnerOrAdminNotCancel: Nur leiter der abteilung und administrator
+ErrOkrInvalidKrScore: Das fehlerhafte KRML
+ErrOkrIsFinishNotScoreInvalid: Ob ein fehlerhafter parameter abgeschlossen ist
+ErrOkrKeyResultAtLeastOne: Zumindest ein entscheidendes ergebnis
+ErrOkrKeyResultTitleEmpty: Die prioritätsergebnisse stehen nicht Leer
+ErrOkrKrScoreNotComplete: Die infrarot-analyse ist noch nicht fertig
+ErrOkrKrTimeInvalid: Die KR ist in der zone Von O * -zeit
+ErrOkrNoData: Die verwandten daten wurden nicht entwendet
+ErrOkrNoDepartment: Sie sind noch nicht aktiv in einer abteilung!
+ErrOkrNoPermission: Hier darf man sich nicht einmischen
+ErrOkrNoViewPermission: Dies kann nicht autorisiert werden
+ErrOkrOwnerNotCancel: Nur mitarbeiter
+ErrOkrOwnerNotScore: Leiter der mission unbenotet.
+ErrOkrOwnerOrAdminNotCancel: Nur die aufsicht und der administrator
+ErrOkrOwnerScored: Diese beurteilung wird Von der abteilungsleiter der direktoren vorgenommen
+ErrOkrPriorityInvalid: Fehler der zielprioritäten
+ErrOkrProgressInvalid: Fortschritt gibt einen ganzzahligen wert Von 0-100 ein
+ErrOkrProgressNotEnough: Die KR liegt noch nicht bei 100%
+ErrOkrProgressStatusInvalid: Fehler im zeitplan
+ErrOkrReplayCommentInvalid: Wählen sie die infrarot-analyse
+ErrOkrReplayLengthInvalid: Die inhalte sind zu lang und bitte auf 255 zeichen beschränkt
+ErrOkrReplayStatusInvalid: Die kaputte aktiv ist
+ErrOkrScoreInvalid: Bitte geben sie einen ganzzahligen wert Von 0 bis 10 ein
+ErrOkrScoreTypeInvalid: 'Fehlertyp: beurteilung abgebrochen'
+ErrOkrScoreWeightInvalid: Die bewertung selbst und die beurteilung der vorgesetzten müssen in relation zu 100 liegen
+ErrOkrScored: 'Die infrarot-anlage ist nicht gültig: {{.detail}}'
+ErrOkrScoredNotUpdate: Die punktzahl wird nicht mehr korrigiert.
+ErrOkrScoredNotUpdateProgress: Der durchsuchungsbefehl ist nicht zulässig nach punktzahl
+ErrOkrStatusInvalid: Falsche koordinaten.
+ErrOkrSuperiorScored: An die vorgesetzten.
+ErrOkrTimeEmpty: Die zeit ist nicht Leer
+ErrOkrTimeFormat: Format ist falsch
+ErrOkrTimeInvalid: Der anfangszeitraum darf nicht größer sein als das ende. Bitte wählen sie die passende zeitspanne erneut
+ErrOkrTitleLengthInvalid: Die überschrift ist viel zu lang und wird bitte auf 255 zeichen beschränkt
+ErrOkrTypeInvalid: Fehlerhafter zieltyp fehler
+ErrOkrUserDisabled: Den verantwortlichen gibt es nicht. Bitte verteilen sie ihn neu
+ErrOkrVisibleRangeInvalid: Fehler im parameter des zieleintrags
+ErrRequestTimeout: Wir Bitten um mehr zeit.
+ErrTypeNotLogin: Nicht eingegeben.

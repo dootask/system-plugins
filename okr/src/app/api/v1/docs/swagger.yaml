@@ -1,0 +1,2151 @@
+basePath: /api/v1
+definitions:
+  interfaces.OkrAlignResp:
+    properties:
+      alias:
+        description: 目标别名
+        items:
+          type: string
+        type: array
+      align_objective:
+        description: 对齐目标
+        type: string
+      archive_at:
+        type: string
+      archive_user:
+        $ref: '#/definitions/model.UserBasic'
+      archive_userid:
+        type: integer
+      ascription:
+        type: integer
+      can_owner_update_score:
+        description: KR负责人是否能修改评分
+        type: boolean
+      can_superior_update_score:
+        description: KR上级是否能修改评分
+        type: boolean
+      canceled:
+        type: integer
+      completed:
+        type: integer
+      confidence:
+        type: integer
+      created_at:
+        type: string
+      department_id:
+        type: string
+      dialog_id:
+        type: integer
+      end_at:
+        type: string
+      id:
+        type: integer
+      key_results:
+        items:
+          $ref: '#/definitions/model.Okr'
+        type: array
+      kr_score:
+        description: KR总评分
+        type: number
+      objective_num:
+        description: O的数字编号
+        type: string
+      parent_id:
+        type: integer
+      parent_okr:
+        $ref: '#/definitions/model.Okr'
+      parent_title:
+        description: 父级目标标题
+        type: string
+      participant:
+        type: string
+      prefix:
+        description: 前缀
+        type: string
+      priority:
+        type: string
+      progress:
+        type: integer
+      progress_status:
+        type: integer
+      project_id:
+        type: integer
+      score:
+        description: 个人评分和O总评分
+        type: number
+      score_completed_at:
+        type: string
+      score_num:
+        type: integer
+      start_at:
+        type: string
+      status:
+        type: integer
+      superior_score:
+        description: 上级评分
+        type: number
+      title:
+        type: string
+      type:
+        type: integer
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/model.UserBasic'
+      userid:
+        type: integer
+      visible_range:
+        type: integer
+    type: object
+  interfaces.OkrAnalyzeDepartment:
+    properties:
+      id:
+        description: 部门id
+        type: integer
+      name:
+        description: 部门名称
+        type: string
+      owner:
+        description: 是否部门负责人
+        type: boolean
+    type: object
+  interfaces.OkrAnalyzeDept:
+    properties:
+      complete:
+        description: okr 完成数
+        type: integer
+      department_id:
+        description: 部门id
+        type: integer
+      department_name:
+        description: 部门名称
+        type: string
+      total:
+        description: okr 总数
+        type: integer
+    type: object
+  interfaces.OkrAnalyzeDeptScoreProportion:
+    properties:
+      already_reviewed:
+        description: 已评分
+        type: integer
+      department_id:
+        description: 部门id
+        type: integer
+      department_name:
+        description: 部门名称
+        type: string
+      total:
+        description: okr 总数
+        type: integer
+      unscored:
+        description: 未评分
+        type: integer
+    type: object
+  interfaces.OkrAnalyzeOverall:
+    properties:
+      complete:
+        description: okr 完成数
+        type: integer
+      total:
+        description: okr 总数
+        type: integer
+    type: object
+  interfaces.OkrAnalyzePersonnelScoreRate:
+    properties:
+      complete:
+        description: okr 完成数
+        type: integer
+      total:
+        description: okr 总数
+        type: integer
+    type: object
+  interfaces.OkrAnalyzeScore:
+    properties:
+      seven_to_ten:
+        description: 7-10分
+        type: integer
+      three_to_seven:
+        description: 3-7分
+        type: integer
+      total:
+        description: okr 总数
+        type: integer
+      unscored:
+        description: 未评分
+        type: integer
+      zero_to_three:
+        description: 0-3分
+        type: integer
+    type: object
+  interfaces.OkrAnalyzeScoreDept:
+    properties:
+      department_id:
+        description: 部门id
+        type: integer
+      department_name:
+        description: 部门名称
+        type: string
+      seven_to_ten:
+        description: 7-10分
+        type: integer
+      three_to_seven:
+        description: 3-7分
+        type: integer
+      total:
+        description: okr 总数
+        type: integer
+      unscored:
+        description: 未评分
+        type: integer
+      zero_to_three:
+        description: 0-3分
+        type: integer
+    type: object
+  interfaces.OkrCreateReq:
+    properties:
+      align_objective:
+        description: 对齐目标
+        type: string
+      ascription:
+        description: 归属 1-部门 2-个人
+        type: integer
+      end_at:
+        description: 结束时间
+        type: string
+      key_results:
+        description: 关键结果
+        items:
+          $ref: '#/definitions/interfaces.OkrKeyResultCreateReq'
+        type: array
+      priority:
+        description: 优先级 （必填）
+        type: string
+      project_id:
+        description: 项目id
+        type: integer
+      start_at:
+        description: 开始时间
+        type: string
+      title:
+        description: 目标 （必填）
+        type: string
+      type:
+        description: 类型 1-承诺型 2-挑战型 （必填）
+        type: integer
+      visible_range:
+        description: 可见范围  1-全公司 2-仅相关成员 3-仅部门成员
+        type: integer
+    required:
+    - ascription
+    - end_at
+    - key_results
+    - priority
+    - start_at
+    - title
+    - type
+    type: object
+  interfaces.OkrKeyResultCreateReq:
+    properties:
+      confidence:
+        description: 信心指数 0-100
+        type: integer
+      end_at:
+        description: 结束时间 （必填）
+        type: string
+      participant:
+        description: 参与人,多个用逗号隔开
+        type: string
+      start_at:
+        description: 开始时间 （必填）
+        type: string
+      title:
+        description: 关键结果 （必填）
+        type: string
+    required:
+    - end_at
+    - start_at
+    - title
+    type: object
+  interfaces.OkrKeyResultUpdateReq:
+    properties:
+      confidence:
+        description: 信心指数 0-100
+        type: integer
+      end_at:
+        description: 结束时间 （必填）
+        type: string
+      id:
+        description: okr id
+        type: integer
+      is_delete:
+        description: 是否删除 true-删除 false-不删除
+        type: boolean
+      participant:
+        description: 参与人,多个用逗号隔开
+        type: string
+      start_at:
+        description: 开始时间 （必填）
+        type: string
+      title:
+        description: 关键结果 （必填）
+        type: string
+    required:
+    - end_at
+    - id
+    - is_delete
+    - start_at
+    - title
+    type: object
+  interfaces.OkrReplayComment:
+    properties:
+      comment:
+        description: 评价 1-做得好的 2-可提升的
+        type: integer
+      okr_id:
+        description: okr id
+        type: integer
+    required:
+    - comment
+    - okr_id
+    type: object
+  interfaces.OkrReplayCreateReq:
+    properties:
+      comments:
+        description: 复盘评价
+        items:
+          $ref: '#/definitions/interfaces.OkrReplayComment'
+        type: array
+      okr_id:
+        description: okr id
+        type: integer
+      problem:
+        description: 问题与不足
+        type: string
+      review:
+        description: 价值与收获
+        type: string
+    required:
+    - comments
+    - okr_id
+    type: object
+  interfaces.OkrResp:
+    properties:
+      alias:
+        description: 目标别名
+        items:
+          type: string
+        type: array
+      align_count:
+        description: 对齐目标数量
+        type: integer
+      align_objective:
+        description: 对齐目标ids
+        items:
+          type: integer
+        type: array
+      archive_at:
+        type: string
+      archive_user:
+        $ref: '#/definitions/model.UserBasic'
+      archive_userid:
+        type: integer
+      ascription:
+        type: integer
+      can_owner_update_score:
+        description: KR负责人是否能修改评分
+        type: boolean
+      can_superior_update_score:
+        description: KR上级是否能修改评分
+        type: boolean
+      canceled:
+        type: integer
+      completed:
+        type: integer
+      confidence:
+        type: integer
+      created_at:
+        type: string
+      department_id:
+        type: string
+      dialog_id:
+        type: integer
+      end_at:
+        type: string
+      id:
+        type: integer
+      is_follow:
+        description: 是否被关注
+        type: boolean
+      key_results:
+        items:
+          $ref: '#/definitions/model.Okr'
+        type: array
+      kr_count:
+        description: kr总数量
+        type: integer
+      kr_finish_count:
+        description: kr完成数量
+        type: integer
+      kr_score:
+        description: KR总评分
+        type: number
+      objective_num:
+        description: O的数字编号
+        type: string
+      parent_id:
+        type: integer
+      parent_okr:
+        $ref: '#/definitions/model.Okr'
+      parent_title:
+        description: 父级目标标题
+        type: string
+      participant:
+        type: string
+      priority:
+        type: string
+      progress:
+        type: integer
+      progress_status:
+        type: integer
+      project_id:
+        type: integer
+      score:
+        description: 个人评分和O总评分
+        type: number
+      score_completed_at:
+        type: string
+      score_num:
+        type: integer
+      start_at:
+        type: string
+      status:
+        type: integer
+      superior_score:
+        description: 上级评分
+        type: number
+      superior_user:
+        description: 上级用户
+        items:
+          type: integer
+        type: array
+      title:
+        type: string
+      type:
+        type: integer
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/model.UserBasic'
+      user_avatar:
+        description: 用户头像
+        type: string
+      userid:
+        type: integer
+      visible_range:
+        type: integer
+    type: object
+  interfaces.OkrSettingReq:
+    properties:
+      score_department_user:
+        description: 单选：指定可评分部门及部分负责人OKR的人员
+        type: integer
+      self_score_weight:
+        description: 自评权重
+        type: integer
+      superior_score_weight:
+        description: 上级评分权重
+        type: integer
+      type:
+        description: '类型 get: 获取 (默认)，save: 保存，all: 获取所有'
+        type: string
+    type: object
+  interfaces.OkrUpdateReq:
+    properties:
+      align_objective:
+        description: 对齐目标
+        type: string
+      end_at:
+        description: 结束时间
+        type: string
+      id:
+        description: okr id
+        type: integer
+      key_results:
+        description: 关键结果
+        items:
+          $ref: '#/definitions/interfaces.OkrKeyResultUpdateReq'
+        type: array
+      priority:
+        description: 优先级 （必填）
+        type: string
+      project_id:
+        description: 项目id
+        type: integer
+      start_at:
+        description: 开始时间
+        type: string
+      title:
+        description: 目标 （必填）
+        type: string
+      type:
+        description: 类型 1-承诺型 2-挑战型 （必填）
+        type: integer
+      visible_range:
+        description: 可见范围  1-全公司 2-仅相关成员 3-仅部门成员
+        type: integer
+    required:
+    - end_at
+    - id
+    - key_results
+    - priority
+    - start_at
+    - title
+    - type
+    type: object
+  interfaces.Pagination:
+    properties:
+      count:
+        description: 总数
+        type: integer
+      data:
+        description: 数据
+      last_page:
+        description: 最后一页
+        type: integer
+      page:
+        description: 当前页，默认:1
+        type: integer
+      page_size:
+        description: 每页显示数量，默认:50，最大:100
+        type: integer
+    type: object
+  interfaces.Response:
+    properties:
+      code:
+        description: 状态, [200=成功, 400=失败, 401=未登录, 403=无相关权限, 404=请求接口不存在, 405=请求方法不允许,
+          500=系统错误]
+        type: integer
+      data:
+        description: 数据
+      msg:
+        description: 信息
+        type: string
+    type: object
+  model.Okr:
+    properties:
+      archive_at:
+        type: string
+      archive_user:
+        $ref: '#/definitions/model.UserBasic'
+      archive_userid:
+        type: integer
+      ascription:
+        type: integer
+      can_owner_update_score:
+        description: KR负责人是否能修改评分
+        type: boolean
+      can_superior_update_score:
+        description: KR上级是否能修改评分
+        type: boolean
+      canceled:
+        type: integer
+      completed:
+        type: integer
+      confidence:
+        type: integer
+      created_at:
+        type: string
+      department_id:
+        type: string
+      dialog_id:
+        type: integer
+      end_at:
+        type: string
+      id:
+        type: integer
+      key_results:
+        items:
+          $ref: '#/definitions/model.Okr'
+        type: array
+      kr_score:
+        description: KR总评分
+        type: number
+      objective_num:
+        description: O的数字编号
+        type: string
+      parent_id:
+        type: integer
+      parent_okr:
+        $ref: '#/definitions/model.Okr'
+      parent_title:
+        description: 父级目标标题
+        type: string
+      participant:
+        type: string
+      priority:
+        type: string
+      progress:
+        type: integer
+      progress_status:
+        type: integer
+      project_id:
+        type: integer
+      score:
+        description: 个人评分和O总评分
+        type: number
+      score_completed_at:
+        type: string
+      score_num:
+        type: integer
+      start_at:
+        type: string
+      status:
+        type: integer
+      superior_score:
+        description: 上级评分
+        type: number
+      title:
+        type: string
+      type:
+        type: integer
+      updated_at:
+        type: string
+      user:
+        $ref: '#/definitions/model.UserBasic'
+      userid:
+        type: integer
+      visible_range:
+        type: integer
+    type: object
+  model.OkrFollow:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      okr_id:
+        type: integer
+      updated_at:
+        type: string
+      userid:
+        type: integer
+    type: object
+  model.OkrLog:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: integer
+      okr_id:
+        type: integer
+      operation:
+        type: string
+      record:
+        type: string
+      records:
+        additionalProperties: true
+        type: object
+      user_avatar:
+        type: string
+      user_disable_at:
+        type: string
+      user_nickname:
+        type: string
+      userid:
+        type: integer
+    type: object
+  model.OkrReplay:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      key_results:
+        description: KR集合
+        items:
+          $ref: '#/definitions/model.Okr'
+        type: array
+      kr_history:
+        items:
+          $ref: '#/definitions/model.OkrReplayHistory'
+        type: array
+      objective_num:
+        description: O的数字编号
+        type: string
+      okr_alias:
+        items:
+          type: string
+        type: array
+      okr_ascription:
+        type: integer
+      okr_department_id:
+        type: string
+      okr_id:
+        type: integer
+      okr_priority:
+        type: string
+      okr_progress:
+        type: integer
+      okr_title:
+        type: string
+      okr_userid:
+        type: integer
+      problem:
+        type: string
+      replay:
+        type: integer
+      replays:
+        description: 复盘集合
+        items:
+          $ref: '#/definitions/model.OkrReplay'
+        type: array
+      review:
+        type: string
+      updated_at:
+        type: string
+      userid:
+        type: integer
+    type: object
+  model.OkrReplayHistory:
+    properties:
+      comment:
+        type: integer
+      confidence:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      okr_id:
+        type: integer
+      parent_id:
+        type: integer
+      progress:
+        type: integer
+      replay_id:
+        type: integer
+      score:
+        type: number
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  model.User:
+    properties:
+      az:
+        description: 首字母
+        type: string
+      bot:
+        description: 是否是机器人 1-是 0-否
+        type: integer
+      changepass:
+        description: 是否需要修改密码 1-是 0-否
+        type: integer
+      created_at:
+        description: 创建时间
+        type: string
+      created_ip:
+        description: 创建ip
+        type: string
+      department:
+        description: 部门
+        type: string
+      department_name:
+        description: 部门名称
+        type: string
+      disable_at:
+        description: 禁用时间
+        type: string
+      email:
+        description: 邮箱
+        type: string
+      email_verity:
+        description: 邮箱是否验证 1-是 0-否
+        type: integer
+      identity:
+        description: 身份
+        type: string
+      last_at:
+        description: 最后登录时间
+        type: string
+      last_ip:
+        description: 最后登录ip
+        type: string
+      line_at:
+        description: 在线时间
+        type: string
+      line_ip:
+        description: 在线ip
+        type: string
+      login_num:
+        description: 登录次数
+        type: integer
+      nickname:
+        description: 昵称
+        type: string
+      nickname_original:
+        description: 昵称原始值
+        type: string
+      pinyin:
+        description: 拼音
+        type: string
+      profession:
+        description: 职业
+        type: string
+      task_dialog_id:
+        description: 任务对话框id
+        type: integer
+      tel:
+        description: 手机号
+        type: string
+      token:
+        description: token
+        type: string
+      userid:
+        description: 用户id
+        type: integer
+      userimg:
+        description: 头像
+        type: string
+    type: object
+  model.UserBasic:
+    properties:
+      created_at:
+        description: 创建时间
+        type: string
+      department:
+        description: 部门
+        type: string
+      disable_at:
+        description: 禁用时间
+        type: string
+      email:
+        description: 邮箱
+        type: string
+      identity:
+        description: 身份
+        type: string
+      nickname:
+        description: 昵称
+        type: string
+      profession:
+        description: 职业
+        type: string
+      userid:
+        description: 用户id
+        type: integer
+      userimg:
+        description: 头像
+        type: string
+    type: object
+  model.UserDepartment:
+    properties:
+      created_at:
+        type: string
+      dialog_id:
+        type: integer
+      id:
+        type: integer
+      name:
+        type: string
+      owner_user:
+        $ref: '#/definitions/model.User'
+      owner_userid:
+        type: integer
+      parent_department:
+        $ref: '#/definitions/model.UserDepartment'
+      parent_id:
+        type: integer
+      updated_at:
+        type: string
+    type: object
+host: http://localhost
+info:
+  contact: {}
+  description: DooTask是一款轻量级的开源在线项目任务管理工具，提供各类文档协作工具、在线思维导图、在线流程图、项目管理、任务分发、即时IM，文件管理等工具。
+  license:
+    name: AGPL-3.0 license
+    url: http://www.gnu.org/licenses/
+  termsOfService: https://www.hitosea.com/
+  title: DooTask
+  version: "1.0"
+paths:
+  /okr/align/cancel:
+    get:
+      consumes:
+      - application/json
+      description: 取消对齐目标
+      parameters:
+      - description: 对齐目标okr id
+        in: query
+        name: align_okr_id
+        required: true
+        type: integer
+      - description: okr id
+        in: query
+        name: okr_id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/interfaces.Response'
+      summary: 取消对齐目标
+      tags:
+      - Okr
+  /okr/align/detail:
+    get:
+      consumes:
+      - application/json
+      description: 获取对齐目标by目标id
+      parameters:
+      - description: okr id
+        in: query
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/interfaces.OkrAlignResp'
+                  type: array
+              type: object
+      summary: 获取对齐目标by目标id
+      tags:
+      - Okr
+  /okr/align/list:
+    get:
+      consumes:
+      - application/json
+      description: 获取对齐目标列表
+      parameters:
+      - description: 目标（O）
+        in: query
+        name: objective
+        type: string
+      - description: 当前页，默认:1
+        in: query
+        name: page
+        type: integer
+      - description: 每页显示数量，默认:50，最大:100
+        in: query
+        name: page_size
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/interfaces.Pagination'
+                  - properties:
+                      data:
+                        items:
+                          $ref: '#/definitions/model.Okr'
+                        type: array
+                    type: object
+              type: object
+      summary: 获取对齐目标列表
+      tags:
+      - Okr
+  /okr/align/update:
+    post:
+      consumes:
+      - application/json
+      description: 更新对齐目标
+      parameters:
+      - description: 对齐目标
+        in: formData
+        name: align_objective
+        type: string
+      - description: okr id
+        in: formData
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Okr'
+              type: object
+      summary: 更新对齐目标
+      tags:
+      - Okr
+  /okr/analyze/complete:
+    get:
+      consumes:
+      - application/json
+      description: OKR整体平均完成度
+      parameters:
+      - description: 部门id
+        in: query
+        name: department
+        required: true
+        type: number
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/interfaces.OkrAnalyzeOverall'
+              type: object
+      summary: OKR整体平均完成度
+      tags:
+      - OkrAnalyze
+  /okr/analyze/department:
+    get:
+      consumes:
+      - application/json
+      description: OKR整体平均完成度
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/interfaces.OkrAnalyzeDepartment'
+              type: object
+      summary: OKR整体平均完成度
+      tags:
+      - OkrAnalyze
+  /okr/analyze/dept/complete:
+    get:
+      consumes:
+      - application/json
+      description: OKR各部门平均完成度
+      parameters:
+      - description: 部门id
+        in: query
+        name: department
+        required: true
+        type: number
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/interfaces.OkrAnalyzeDept'
+                  type: array
+              type: object
+      summary: OKR各部门平均完成度
+      tags:
+      - OkrAnalyze
+  /okr/analyze/dept/score:
+    get:
+      consumes:
+      - application/json
+      description: OKR各部门评分分布
+      parameters:
+      - description: 部门id
+        in: query
+        name: department
+        required: true
+        type: number
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/interfaces.OkrAnalyzeScoreDept'
+              type: object
+      summary: OKR各部门评分分布
+      tags:
+      - OkrAnalyze
+  /okr/analyze/dept/score/proportion:
+    get:
+      consumes:
+      - application/json
+      description: OKR部门评分占比
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  items:
+                    $ref: '#/definitions/interfaces.OkrAnalyzeDeptScoreProportion'
+                  type: array
+              type: object
+      summary: OKR各部门评分占比
+      tags:
+      - OkrAnalyze
+  /okr/analyze/personnel/score/rate:
+    get:
+      consumes:
+      - application/json
+      description: OKR人员评分率
+      parameters:
+      - description: 部门id
+        in: query
+        name: department
+        required: true
+        type: number
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/interfaces.OkrAnalyzePersonnelScoreRate'
+              type: object
+      summary: OKR人员评分率
+      tags:
+      - OkrAnalyze
+  /okr/analyze/score:
+    get:
+      consumes:
+      - application/json
+      description: OKR评分分布
+      parameters:
+      - description: 部门id
+        in: query
+        name: department
+        required: true
+        type: number
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/interfaces.OkrAnalyzeScore'
+              type: object
+      summary: OKR评分分布
+      tags:
+      - OkrAnalyze
+  /okr/archive:
+    get:
+      consumes:
+      - application/json
+      description: OKR归档目标
+      parameters:
+      - description: okr id
+        in: query
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/interfaces.Response'
+      summary: OKR归档目标
+      tags:
+      - Okr
+  /okr/archive/list:
+    get:
+      consumes:
+      - application/json
+      description: OKR归档列表
+      parameters:
+      - description: 目标（O）
+        in: query
+        name: objective
+        type: string
+      - description: 当前页，默认:1
+        in: query
+        name: page
+        type: integer
+      - description: 每页显示数量，默认:50，最大:100
+        in: query
+        name: page_size
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/interfaces.Pagination'
+                  - properties:
+                      data:
+                        items:
+                          $ref: '#/definitions/model.Okr'
+                        type: array
+                    type: object
+              type: object
+      summary: OKR归档列表
+      tags:
+      - Okr
+  /okr/archive/restore:
+    get:
+      consumes:
+      - application/json
+      description: OKR还原归档目标
+      parameters:
+      - description: okr id
+        in: query
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/interfaces.Response'
+      summary: OKR还原归档目标
+      tags:
+      - Okr
+  /okr/cancel:
+    get:
+      consumes:
+      - application/json
+      description: 取消/重启目标
+      parameters:
+      - description: okr id
+        in: query
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Okr'
+              type: object
+      summary: 取消/重启目标
+      tags:
+      - Okr
+  /okr/confidence/update:
+    post:
+      consumes:
+      - application/json
+      description: 更新信心指数
+      parameters:
+      - description: 信心指数 0-100
+        in: formData
+        name: confidence
+        type: integer
+      - description: okr id
+        in: formData
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Okr'
+              type: object
+      summary: 更新信心指数
+      tags:
+      - Okr
+  /okr/create:
+    post:
+      consumes:
+      - application/json
+      description: 创建OKR
+      parameters:
+      - description: request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/interfaces.OkrCreateReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Okr'
+              type: object
+      summary: 创建OKR
+      tags:
+      - Okr
+  /okr/delete:
+    get:
+      consumes:
+      - application/json
+      description: 删除OKR
+      parameters:
+      - description: okr id
+        in: query
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/interfaces.Response'
+      summary: 删除OKR
+      tags:
+      - Okr
+  /okr/department/list:
+    get:
+      consumes:
+      - application/json
+      description: 获取部门OKR列表
+      parameters:
+      - description: 是否已完成未评分 0-未完成 1-已完成
+        in: query
+        name: completed
+        type: integer
+      - description: 部门id
+        in: query
+        name: department_id
+        type: integer
+      - description: 结束时间
+        in: query
+        name: end_at
+        type: string
+      - description: 目标（O）
+        in: query
+        name: objective
+        type: string
+      - description: 当前页，默认:1
+        in: query
+        name: page
+        type: integer
+      - description: 每页显示数量，默认:50，最大:100
+        in: query
+        name: page_size
+        type: integer
+      - description: 开始时间
+        in: query
+        name: start_at
+        type: string
+      - description: 类型 1-承诺型 2-挑战型
+        in: query
+        name: type
+        type: integer
+      - description: 用户id
+        in: query
+        name: userid
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/interfaces.Pagination'
+                  - properties:
+                      data:
+                        items:
+                          $ref: '#/definitions/interfaces.OkrResp'
+                        type: array
+                    type: object
+              type: object
+      summary: 获取部门OKR列表
+      tags:
+      - Okr
+  /okr/department/search:
+    get:
+      consumes:
+      - application/json
+      description: 获取部门列表
+      parameters:
+      - description: 当前页，默认:1
+        in: query
+        name: page
+        type: integer
+      - description: 每页显示数量，默认:50，最大:100
+        in: query
+        name: page_size
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/interfaces.Pagination'
+                  - properties:
+                      data:
+                        items:
+                          $ref: '#/definitions/model.UserDepartment'
+                        type: array
+                    type: object
+              type: object
+      summary: 获取部门列表
+      tags:
+      - Okr
+  /okr/detail:
+    get:
+      consumes:
+      - application/json
+      description: 获取OKR详情
+      parameters:
+      - description: okr id
+        in: query
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/interfaces.OkrResp'
+              type: object
+      summary: 获取OKR详情
+      tags:
+      - Okr
+  /okr/follow:
+    get:
+      consumes:
+      - application/json
+      description: 关注或取消关注目标
+      parameters:
+      - description: okr id
+        in: query
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.OkrFollow'
+              type: object
+      summary: 关注或取消关注目标
+      tags:
+      - Okr
+  /okr/follow/list:
+    get:
+      consumes:
+      - application/json
+      description: 获取关注的OKR列表
+      parameters:
+      - description: 目标（O）
+        in: query
+        name: objective
+        type: string
+      - description: 当前页，默认:1
+        in: query
+        name: page
+        type: integer
+      - description: 每页显示数量，默认:50，最大:100
+        in: query
+        name: page_size
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/interfaces.Pagination'
+                  - properties:
+                      data:
+                        items:
+                          $ref: '#/definitions/interfaces.OkrResp'
+                        type: array
+                    type: object
+              type: object
+      summary: 获取关注的OKR列表
+      tags:
+      - Okr
+  /okr/leave/list:
+    get:
+      consumes:
+      - application/json
+      description: 离职/删除人员OKR列表
+      parameters:
+      - description: 目标（O）
+        in: query
+        name: objective
+        type: string
+      - description: 当前页，默认:1
+        in: query
+        name: page
+        type: integer
+      - description: 每页显示数量，默认:50，最大:100
+        in: query
+        name: page_size
+        type: integer
+      - description: 用户id
+        in: query
+        name: userid
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/interfaces.Pagination'
+                  - properties:
+                      data:
+                        items:
+                          $ref: '#/definitions/model.Okr'
+                        type: array
+                    type: object
+              type: object
+      summary: 离职/删除人员OKR列表
+      tags:
+      - Okr
+  /okr/leave/update:
+    post:
+      consumes:
+      - application/json
+      description: 分配离职/删除人员OKR负责人
+      parameters:
+      - collectionFormat: csv
+        description: okr ids
+        in: formData
+        items:
+          type: integer
+        name: okr_ids
+        required: true
+        type: array
+      - description: 新负责人id
+        in: formData
+        name: userid
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/interfaces.Response'
+      summary: 分配离职/删除人员OKR负责人
+      tags:
+      - Okr
+  /okr/log/list:
+    get:
+      consumes:
+      - application/json
+      description: 获取动态列表by目标id
+      parameters:
+      - description: okr id
+        in: query
+        name: id
+        required: true
+        type: integer
+      - description: 当前页，默认:1
+        in: query
+        name: page
+        type: integer
+      - description: 每页显示数量，默认:50，最大:100
+        in: query
+        name: page_size
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/interfaces.Pagination'
+                  - properties:
+                      data:
+                        items:
+                          $ref: '#/definitions/model.OkrLog'
+                        type: array
+                    type: object
+              type: object
+      summary: 获取动态列表by目标id
+      tags:
+      - Okr
+  /okr/my/list:
+    get:
+      consumes:
+      - application/json
+      description: 获取我的OKR列表
+      parameters:
+      - description: 目标（O）
+        in: query
+        name: objective
+        type: string
+      - description: 当前页，默认:1
+        in: query
+        name: page
+        type: integer
+      - description: 每页显示数量，默认:50，最大:100
+        in: query
+        name: page_size
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/interfaces.Pagination'
+                  - properties:
+                      data:
+                        items:
+                          $ref: '#/definitions/interfaces.OkrResp'
+                        type: array
+                    type: object
+              type: object
+      summary: 获取我的OKR列表
+      tags:
+      - Okr
+  /okr/owner/list:
+    get:
+      consumes:
+      - application/json
+      description: OKR负责人列表
+      parameters:
+      - description: 关键词
+        in: query
+        name: keyword
+        type: string
+      - description: 当前页，默认:1
+        in: query
+        name: page
+        type: integer
+      - description: 每页显示数量，默认:50，最大:100
+        in: query
+        name: page_size
+        type: integer
+      - description: 状态 0-正常 1-已归档 2-离职/删除人员
+        in: query
+        name: status
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/interfaces.Pagination'
+                  - properties:
+                      data:
+                        items:
+                          $ref: '#/definitions/model.User'
+                        type: array
+                    type: object
+              type: object
+      summary: OKR负责人列表
+      tags:
+      - Okr
+  /okr/participant/list:
+    get:
+      consumes:
+      - application/json
+      description: 获取参与的OKR列表
+      parameters:
+      - description: 目标（O）
+        in: query
+        name: objective
+        type: string
+      - description: 当前页，默认:1
+        in: query
+        name: page
+        type: integer
+      - description: 每页显示数量，默认:50，最大:100
+        in: query
+        name: page_size
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/interfaces.Pagination'
+                  - properties:
+                      data:
+                        items:
+                          $ref: '#/definitions/interfaces.OkrResp'
+                        type: array
+                    type: object
+              type: object
+      summary: 获取参与的OKR列表
+      tags:
+      - Okr
+  /okr/participant/update:
+    post:
+      consumes:
+      - application/json
+      description: 更新参与人
+      parameters:
+      - description: okr id
+        in: formData
+        name: id
+        required: true
+        type: integer
+      - description: 参与人,多个用逗号隔开
+        in: formData
+        name: participant
+        type: string
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Okr'
+              type: object
+      summary: 更新参与人
+      tags:
+      - Okr
+  /okr/project/list:
+    get:
+      consumes:
+      - application/json
+      description: 获取项目列表
+      parameters:
+      - description: 当前页，默认:1
+        in: query
+        name: page
+        type: integer
+      - description: 每页显示数量，默认:50，最大:100
+        in: query
+        name: page_size
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/interfaces.Response'
+      summary: 获取项目列表
+      tags:
+      - Dootask
+  /okr/replay/create:
+    post:
+      consumes:
+      - application/json
+      description: 添加复盘
+      parameters:
+      - description: request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/interfaces.OkrReplayCreateReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.OkrReplay'
+              type: object
+      summary: 添加复盘
+      tags:
+      - Okr
+  /okr/replay/detail:
+    get:
+      consumes:
+      - application/json
+      description: 复盘详情
+      parameters:
+      - description: 复盘 id
+        in: query
+        name: id
+        required: true
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.OkrReplay'
+              type: object
+      summary: 复盘详情
+      tags:
+      - Okr
+  /okr/replay/list:
+    get:
+      consumes:
+      - application/json
+      description: 获取OKR复盘列表
+      parameters:
+      - description: 部门id
+        in: query
+        name: department_id
+        type: integer
+      - description: 结束时间
+        in: query
+        name: end_at
+        type: string
+      - description: 目标（O）
+        in: query
+        name: objective
+        type: string
+      - description: 目标id(兼容手机端详情)
+        in: query
+        name: okr_id
+        type: integer
+      - description: 当前页，默认:1
+        in: query
+        name: page
+        type: integer
+      - description: 每页显示数量，默认:50，最大:100
+        in: query
+        name: page_size
+        type: integer
+      - description: 选中已评分未复盘 true-选中 false-未选中
+        in: query
+        name: select_replayed
+        type: boolean
+      - description: 开始时间
+        in: query
+        name: start_at
+        type: string
+      - description: 用户id
+        in: query
+        name: userid
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/interfaces.Pagination'
+                  - properties:
+                      data:
+                        items:
+                          $ref: '#/definitions/model.OkrReplay'
+                        type: array
+                    type: object
+              type: object
+      summary: 获取OKR复盘列表
+      tags:
+      - Okr
+  /okr/replay/okr/list:
+    get:
+      consumes:
+      - application/json
+      description: 获取复盘列表by目标id
+      parameters:
+      - description: okr id
+        in: query
+        name: id
+        required: true
+        type: integer
+      - description: 当前页，默认:1
+        in: query
+        name: page
+        type: integer
+      - description: 每页显示数量，默认:50，最大:100
+        in: query
+        name: page_size
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  allOf:
+                  - $ref: '#/definitions/interfaces.Pagination'
+                  - properties:
+                      data:
+                        items:
+                          $ref: '#/definitions/model.OkrReplay'
+                        type: array
+                    type: object
+              type: object
+      summary: 获取复盘列表by目标id
+      tags:
+      - Okr
+  /okr/score:
+    post:
+      consumes:
+      - application/json
+      description: OKR评分
+      parameters:
+      - description: okr id
+        in: formData
+        name: id
+        required: true
+        type: integer
+      - description: 个人评分 0-10
+        in: formData
+        name: score
+        type: number
+      - description: 评分类型 1-个人评分 2-上级评分
+        in: formData
+        name: type
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Okr'
+              type: object
+      summary: OKR评分
+      tags:
+      - Okr
+  /okr/setting:
+    post:
+      consumes:
+      - application/json
+      description: 获取/保存okr设置
+      parameters:
+      - description: request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/interfaces.OkrSettingReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/interfaces.OkrSettingReq'
+              type: object
+      summary: 获取/保存okr设置
+      tags:
+      - Okr
+  /okr/statistics/completes:
+    get:
+      consumes:
+      - application/json
+      description: 获取/未完成、已完成/已取消目标数量
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/interfaces.Response'
+      summary: 获取/未完成、已完成/已取消目标数量
+      tags:
+      - StatisticsAll
+  /okr/statistics/overall:
+    get:
+      consumes:
+      - application/json
+      description: 查询个人OKR整体完成度和评分
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/interfaces.Response'
+      summary: 获取个人OKR整体完成度和与评分和
+      tags:
+      - Okr
+  /okr/update:
+    post:
+      consumes:
+      - application/json
+      description: 更新OKR
+      parameters:
+      - description: request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/interfaces.OkrUpdateReq'
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Okr'
+              type: object
+      summary: 更新OKR
+      tags:
+      - Okr
+  /okr/update/progress:
+    post:
+      consumes:
+      - application/json
+      description: 更新进度和进度状态
+      parameters:
+      - description: okr id
+        in: formData
+        name: id
+        required: true
+        type: integer
+      - description: 进度 0-100
+        in: formData
+        name: progress
+        type: integer
+      - description: 进度状态 0-默认 1-正常 2-有风险 3-延期
+        in: formData
+        name: status
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/interfaces.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/model.Okr'
+              type: object
+      summary: 更新进度和进度状态
+      tags:
+      - Okr
+  /okr/user/basic:
+    get:
+      consumes:
+      - application/json
+      description: 获取指定会员基础信息
+      parameters:
+      - description: 用户id
+        in: query
+        name: userid
+        required: true
+        type: number
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/interfaces.Response'
+      summary: 获取指定会员基础信息
+      tags:
+      - Dootask
+  /okr/user/info:
+    get:
+      consumes:
+      - application/json
+      description: 获取用户信息
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/interfaces.Response'
+      summary: 获取用户信息
+      tags:
+      - Dootask
+  /okr/user/list:
+    get:
+      consumes:
+      - application/json
+      description: 获取用户列表
+      parameters:
+      - description: 是否只获取部门用户
+        in: query
+        name: dept_only
+        type: boolean
+      - description: 关键词
+        in: query
+        name: keyword
+        type: string
+      - description: 当前页，默认:1
+        in: query
+        name: page
+        type: integer
+      - description: 每页显示数量，默认:50，最大:100
+        in: query
+        name: page_size
+        type: integer
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/interfaces.Response'
+      summary: 获取用户列表
+      tags:
+      - Dootask
+  /ws:
+    get:
+      consumes:
+      - application/json
+      description: 请使用ws连接
+      parameters:
+      - in: query
+        name: language
+        type: string
+      - in: query
+        name: token
+        type: string
+      responses: {}
+      summary: Websocket ws
+      tags:
+      - Websocket
+swagger: "2.0"

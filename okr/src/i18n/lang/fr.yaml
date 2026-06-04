@@ -1,0 +1,61 @@
+ErrCaptchaCode: Code de vérification incorrect
+ErrCmdTimeout: Délai d’exécution de la commande expire
+ErrDooTaskDataFormat: Format de données incorrect
+ErrDooTaskRequestFailed: La demande a échoué
+ErrDooTaskRequestFailedWithErr: 'Demande échouée: {{.detail}}'
+ErrDooTaskResponseFormat: Format de réponse incorrect
+ErrDooTaskUnmarshalResponse: 'Échec de la réponse résolue: {{.detail}}'
+ErrEnvProhibition: L’environnement actuel interdit cette opération
+ErrInvalidParameter: Paramètres incorrects
+ErrMailContentReject: Le contenu du message a été refusé, vérifiez que votre boîte aux lettres est active pour recevoir
+ErrMailNotConfig: Email d’envoi non configuré
+ErrMailToInvalid: Veuillez entrer l’adresse correcte du destinataire
+ErrNoPermission: Manque de pouvoirs
+ErrOkrAdminNotCancel: Action réservée aux administrateurs
+ErrOkrArchiveStatusInvalid: Erreur dans l’état des archives
+ErrOkrArchiveStatusNotCompleted: Dossier de statut pour [terminé, annulé] seulement
+ErrOkrArchivedStatusInvalid: OKR est archivé
+ErrOkrAscriptionInvalid: Paramètre d’attribution de cible incorrect
+ErrOkrCanceled: O cible annulée inopérable
+ErrOkrCompleted: O objectif atteint inopérationnel
+ErrOkrCompletedReplay: Veuillez d’abord ajouter une copie
+ErrOkrConfidenceInvalid: Indice de confiance veuillez entrer un nombre entier de 0 à 100
+ErrOkrDepartmentOwnerOrAdminNotCancel: Opération réservée aux chefs de service, administrateurs
+ErrOkrInvalidKrScore: Score KR non valide
+ErrOkrIsFinishNotScoreInvalid: Est terminé paramètre non noté erreur
+ErrOkrKeyResultAtLeastOne: Au moins un résultat clé
+ErrOkrKeyResultTitleEmpty: Le titre des résultats clés ne peut pas être vide
+ErrOkrKrScoreNotComplete: KR score non terminé
+ErrOkrKrTimeInvalid: Temps KR doit être dans la plage de temps O
+ErrOkrNoData: Aucune donnée n’a été consultée
+ErrOkrNoDepartment: Vous n’êtes actuellement affilié à aucun département et ne pouvez pas initier!
+ErrOkrNoPermission: Aucune autorisation OKR
+ErrOkrNoViewPermission: Aucune autorisation de visionnement pour le moment
+ErrOkrOwnerNotCancel: Opération réservée aux personnes responsables
+ErrOkrOwnerNotScore: Responsable non évalué
+ErrOkrOwnerOrAdminNotCancel: Opération réservée aux responsables, administrateurs
+ErrOkrOwnerScored: Cette note a été notée par le supérieur de la personne responsable
+ErrOkrPriorityInvalid: Objectif priorité paramètre erreur
+ErrOkrProgressInvalid: Progrès veuillez entrer un nombre entier de 0 à 100
+ErrOkrProgressNotEnough: Progrès KR pas encore atteint 100%
+ErrOkrProgressStatusInvalid: Progrès statut paramètres erreur
+ErrOkrReplayCommentInvalid: Veuillez choisir KR évaluation
+ErrOkrReplayLengthInvalid: Le contenu est trop long. Veuillez le limiter à 255 caractères
+ErrOkrReplayStatusInvalid: Statut de contre-réponse invalide
+ErrOkrScoreInvalid: Évaluation veuillez entrer un nombre entier de 0 à 10
+ErrOkrScoreTypeInvalid: Type de notation incorrect
+ErrOkrScoreWeightInvalid: La somme des pondérations d’autoévaluation et de notation supérieure doit être égale à 100
+ErrOkrScored: 'KR évalué non opérationnel: {{.detail}}'
+ErrOkrScoredNotUpdate: Les notes ne sont pas modifiables
+ErrOkrScoredNotUpdateProgress: Aucune modification de la progression n’est autorisée après le score
+ErrOkrStatusInvalid: Erreur d’état cible
+ErrOkrSuperiorScored: Supérieur a noté
+ErrOkrTimeEmpty: Le temps ne peut pas être vide
+ErrOkrTimeFormat: Format de l’heure incorrect
+ErrOkrTimeInvalid: L’heure de début ne peut pas être plus grande que l’heure de fin, veuillez sélectionner une nouvelle période appropriée
+ErrOkrTitleLengthInvalid: Le contenu du titre est trop long, veuillez le limiter à 255 caractères
+ErrOkrTypeInvalid: Type de cible paramètre erreur
+ErrOkrUserDisabled: Le responsable n’existe pas, réaffecter le responsable
+ErrOkrVisibleRangeInvalid: Cible visible range paramètre incorrect
+ErrRequestTimeout: La demande a expiré
+ErrTypeNotLogin: Pas de login
