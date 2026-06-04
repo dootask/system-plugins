@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width,initial-scale=1.0">
+    <style>
+        html,body {
+            margin: 0;
+            padding: 0;
+        }
+        .aaa {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 0;
+        }
+    </style>
+    <script>
+        window.addEventListener('message', function({data, source}) {
+            if (typeof data === "undefined" || data.app !== 'minder') {
+                return;
+            }
+            if (data.action === 'ready') {
+                source.postMessage({
+                    app: 'minder',
+                    action: 'setContent',
+                    content: {
+                        "root": {
+                            "data": {
+                                "id": "57UWG8YNF5TL",
+                                "text": "默认节点"
+                            },
+                            "children": [
+                                {
+                                    "data": {
+                                        "id": "cqprm84lzz40",
+                                        "created": 1677137476137,
+                                        "text": "分支主题"
+                                    },
+                                    "children": []
+                                }
+                            ]
+                        },
+                        "template": "default",
+                        "theme": "fresh-blue",
+                        "version": "1.4.43"
+                    }
+                }, "*");
+            }
+        })
+    </script>
+</head>
+<body>
+<iframe class="aaa" width="100%" height="100%" src="http://localhost:8080/"></iframe>
+</body>
+</html>

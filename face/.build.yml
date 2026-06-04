@@ -1,0 +1,5 @@
+# 发布时构建并推送 Docker 镜像。源码来自 innet8/doofacemark。
+# 注意：镜像在 hitosea2020 名下，推送需该 Docker Hub 账号权限（与 kuaifan 不同）。
+image: hitosea2020/dooface
+context: src
+dockerfile: src/Dockerfile
