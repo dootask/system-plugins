@@ -1,6 +1,6 @@
 services:
   ai:
-    image: "kuaifan/dootask-ai:${PLUGIN_VERSION}"
+    image: "dootask/ai:${PLUGIN_VERSION}"
     restart: unless-stopped
     environment:
       # 连主项目 redis（向量存 Redis 8+ 原生 vectorset）；变量由 AppStore compose --env-file 主仓库 .env 提供，

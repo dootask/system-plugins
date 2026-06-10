@@ -1028,14 +1028,13 @@ async def vision_preview(filename: str):
 
 @app.post('/kb/reindex')
 async def kb_reindex(request: Request, x_ingest_token: str = Header(default="", alias="X-Ingest-Token")):
-    """触发 ai-kb 重新入库（增量或全量）。
+    """手动触发 ai-kb 入库（免重启即时生效；容器启动时也会自动 reconcile 对账）。
 
     认证：header X-Ingest-Token 必须与环境变量 KB_INGEST_TOKEN 一致。
     Body (JSON):
-        - paths: 相对 KB_CONTENT_DIR 的 markdown 路径列表（增量模式必填）
-        - mode:  "incremental"（默认，配合 paths）或 "full"（全量重建）
-
-    CI step 在 dootask 主仓库合入 main 后调用此端点同步 ai-kb 内容。
+        - paths: 相对 KB_CONTENT_DIR 的 markdown 路径列表（incremental 模式用）
+        - mode:  "reconcile"（默认，按文件 hash 对账增量收敛）
+                 / "incremental"（仅指定 paths）/ "full"（全量重建）
     """
     expected = os.environ.get("KB_INGEST_TOKEN", "")
     if not expected:
@@ -1052,14 +1051,16 @@ async def kb_reindex(request: Request, x_ingest_token: str = Header(default="", 
         body = {}
 
     paths = body.get("paths") if isinstance(body, dict) else None
-    mode = (body.get("mode") if isinstance(body, dict) else None) or ("incremental" if paths else "full")
+    mode = (body.get("mode") if isinstance(body, dict) else None) or ("incremental" if paths else "reconcile")
 
     try:
-        from helper.kb.ingest import ingest_paths, ingest_all
-        if mode == "full" or not paths:
+        from helper.kb.ingest import ingest_paths, ingest_all, reconcile
+        if mode == "full":
             result = await ingest_all()
-        else:
+        elif mode == "incremental" and paths:
             result = await ingest_paths(paths)
+        else:
+            result = await reconcile()
     except Exception as exc:
         logger.exception("kb_reindex failed")
         return JSONResponse(content={"code": 500, "error": str(exc)}, status_code=500)

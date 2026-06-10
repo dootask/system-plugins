@@ -23,8 +23,8 @@ fields:
       en: KB reindex token
       zh: 知识库重建令牌
     description:
-      en: "Internal token for the POST /kb/reindex endpoint (used by CI incremental ingest). If regenerated on upgrade, sync the CI secret accordingly."
-      zh: "POST /kb/reindex 端点的内部令牌（CI 增量入库用）。升级时若重新生成，需同步更新 CI 的 secret。"
+      en: "Internal token for manually triggering POST /kb/reindex to rebuild the knowledge base index."
+      zh: "手动调 POST /kb/reindex 重建知识库索引时使用的内部令牌。"
     type: password
     required: false
     default: "$random:48"

@@ -4,16 +4,19 @@ Ingest: 主仓库 ai-kb markdown → 主 redis vectorset + 正文 HASH
 入口：
 - ingest_one(rel_path)   单文件
 - ingest_paths(paths)    批量增量（POST /kb/reindex 用）
-- ingest_all()           全量（lifespan 启动期 / 运维兜底）
+- ingest_all()           全量（首次入库 / 模型漂移重建）
+- reconcile()            按文件 hash 对账增量收敛（容器启动期调用，
+                         客户实例没有外部触发通道，靠它吸收 DooTask 更新带来的内容增删改）
 
-CLI：python -m helper.kb.ingest [--path X] [--dry-run] [--locale zh]
+CLI：python -m helper.kb.ingest [--path X] [--reconcile] [--dry-run] [--locale zh]
 """
 
 import asyncio
 import glob as _glob
+import hashlib
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import frontmatter
 from redis.commands.vectorset.commands import QuantizationOptions
@@ -60,6 +63,10 @@ def _list_md_files(root: str, locale: str = "zh") -> List[str]:
         os.path.relpath(p, root)
         for p in _glob.glob(pattern, recursive=True)
     )
+
+
+def _file_hash(raw: bytes) -> str:
+    return hashlib.sha1(raw).hexdigest()[:16]
 
 
 async def _vrem_quiet(elem: str) -> None:
@@ -112,6 +119,14 @@ async def _delete_old_chunks(chunk_id: str) -> int:
     return len(stale)
 
 
+async def _write_bookkeeping(rel_path: str, chunk_id: str, count: int, file_hash: str) -> None:
+    """meta 双账：src:{id} 记 chunk 数（删除用），path:{rel_path} 记 hash+id（对账用）。"""
+    await get_raw_client().hset(META_KEY, mapping={
+        f"src:{chunk_id}".encode(): str(count).encode(),
+        f"path:{rel_path}".encode(): f"{file_hash}:{chunk_id}".encode(),
+    })
+
+
 async def ingest_one(rel_path: str, kb_root: Optional[str] = None) -> Dict[str, Any]:
     """ingest 单个 markdown 文件。"""
     root = kb_root or _kb_root()
@@ -121,12 +136,15 @@ async def ingest_one(rel_path: str, kb_root: Optional[str] = None) -> Dict[str, 
         return {"path": rel_path, "ok": False, "error": "file not found"}
 
     try:
-        post = frontmatter.load(full)
+        with open(full, "rb") as f:
+            raw = f.read()
+        post = frontmatter.loads(raw.decode("utf-8"))
     except Exception as e:
         return {"path": rel_path, "ok": False, "error": f"frontmatter parse: {e}"}
 
     fm = post.metadata
     body = post.content
+    file_hash = _file_hash(raw)
 
     missing = [k for k in REQUIRED_FM if not fm.get(k)]
     if missing:
@@ -135,6 +153,7 @@ async def ingest_one(rel_path: str, kb_root: Optional[str] = None) -> Dict[str, 
     chunks = split_markdown(body)
     if not chunks:
         await _delete_old_chunks(fm["id"])
+        await _write_bookkeeping(rel_path, str(fm["id"]), 0, file_hash)
         return {"path": rel_path, "id": fm["id"], "chunks": 0, "ok": True, "error": None}
 
     title = str(fm.get("title") or "")
@@ -183,7 +202,7 @@ async def ingest_one(rel_path: str, kb_root: Optional[str] = None) -> Dict[str, 
             attributes=attrs,
         )
 
-    await r.hset(META_KEY, f"src:{fm['id']}", str(len(chunks)))
+    await _write_bookkeeping(rel_path, str(fm["id"]), len(chunks), file_hash)
 
     return {"path": rel_path, "id": fm["id"], "chunks": len(chunks), "ok": True, "error": None}
 
@@ -243,6 +262,65 @@ async def ingest_all(
     return await ingest_paths(all_paths, kb_root=root)
 
 
+async def reconcile(
+    kb_root: Optional[str] = None,
+    locales: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """按文件内容 hash 对账，增量收敛新增/变更/删除的 markdown。
+
+    无变化时只做本地哈希比对，零 embedding API 调用、零写入。
+    meta 缺 path:* 账（如从旧版本升级）时相关文件会被视为变更，触发一次性重灌补账。
+    """
+    root = kb_root or _kb_root()
+    if not os.path.isdir(root):
+        logger.warning(f"KB content dir not found: {root}; skip reconcile")
+        return {"changed": 0, "removed": 0, "ingested": 0, "failed": 0, "total_chunks": 0, "errors": []}
+
+    locales = locales or ["zh"]
+    disk: Dict[str, str] = {}
+    for loc in locales:
+        for p in _list_md_files(root, loc):
+            try:
+                with open(os.path.join(root, p), "rb") as f:
+                    disk[p] = _file_hash(f.read())
+            except OSError:
+                continue
+
+    r = get_raw_client()
+    indexed: Dict[str, Tuple[str, str]] = {}  # rel_path -> (hash, chunk_id)
+    for k, v in (await r.hgetall(META_KEY) or {}).items():
+        key = k.decode()
+        if key.startswith("path:"):
+            h, _, cid = v.decode().partition(":")
+            indexed[key[5:]] = (h, cid)
+
+    changed = [p for p in disk if disk[p] != indexed.get(p, ("",))[0]]
+    removed = [p for p in indexed if p not in disk]
+
+    # 先删后增：同 id 的文件移动路径时，避免删除旧路径误伤新写入的 chunk
+    for p in removed:
+        await _delete_old_chunks(indexed[p][1])
+        await r.hdel(META_KEY, f"path:{p}")
+
+    if not changed:
+        return {"changed": 0, "removed": len(removed), "ingested": 0, "failed": 0, "total_chunks": 0, "errors": []}
+
+    logger.info(f"reconcile: {len(changed)} changed, {len(removed)} removed")
+    result = await ingest_paths(changed, kb_root=root)
+
+    # 同一路径换了 chunk id：清掉旧 id 留下的孤儿
+    for p in changed:
+        prev_id = indexed.get(p, ("", ""))[1]
+        if not prev_id:
+            continue
+        cur = await r.hget(META_KEY, f"path:{p}")
+        cur_id = cur.decode().partition(":")[2] if cur else ""
+        if cur_id and cur_id != prev_id:
+            await _delete_old_chunks(prev_id)
+
+    return {"changed": len(changed), "removed": len(removed), **result}
+
+
 # CLI 入口（开发期 docker exec 调用）
 async def _main():
     import argparse
@@ -250,6 +328,7 @@ async def _main():
     parser.add_argument("--kb-root", default=None, help="KB 根目录（默认 KB_CONTENT_DIR）")
     parser.add_argument("--path", action="append", help="单文件相对路径，可重复；不给则全量")
     parser.add_argument("--locale", action="append", help="指定 locale，可重复；默认 zh")
+    parser.add_argument("--reconcile", action="store_true", help="按 hash 对账增量收敛")
     parser.add_argument("--dry-run", action="store_true", help="只列出待 ingest 文件")
     args = parser.parse_args()
 
@@ -263,7 +342,9 @@ async def _main():
                 print(f"  {p}")
         return
 
-    if args.path:
+    if args.reconcile:
+        result = await reconcile(kb_root=root, locales=args.locale)
+    elif args.path:
         result = await ingest_paths(args.path, kb_root=root)
     else:
         result = await ingest_all(kb_root=root, locales=args.locale)

@@ -1,10 +1,7 @@
-### 变更
-- 帮助知识库（RAG）的 embedding 改为调用 OpenAI 兼容 API（默认 DooTask 官方服务 ai.dootask.com，开箱即用；如需自有服务，在主程序 .env 设置 EMBEDDING_BASE_URL / EMBEDDING_API_KEY 覆盖），不再在容器内本地推理。
-- 回归单一镜像（~550MB），移除标准版/完整版双镜像选择；所有安装默认具备帮助知识库检索能力。
-- 向量存储迁移至主程序 Redis 的原生 vectorset（需 Redis 8+），移除 redis-stack 附属容器。
+### 新增
+- AI 助手现在更"懂"DooTask 了：当你问"某个功能怎么用、在哪里设置"时，助手会先查阅内置的产品使用手册再回答，并附上引用来源；查不到时会如实说明，不再编造。
+- 产品手册随 DooTask 主程序一起更新：升级 DooTask 后重启本插件即可加载最新内容，无需任何手动操作。
+- 安装界面新增"Embedding 模型"选项（用于知识库检索匹配，默认通义千问，开箱即用，普通用户无需调整）。
 
 ### 升级注意
-- 要求主程序 Redis ≥ 8.0（`redis:alpine` 浮动镜像较旧时执行 `docker compose pull redis && docker compose up -d redis` 升级；不满足时帮助检索自动禁用，AI 聊天不受影响）。
-- 升级后 AI 会话上下文会重置一次（缓存从 redis-stack 迁回主 Redis）。
-- 旧的 redis-stack 数据卷可手动清理：`docker volume rm <项目前缀>_dootask-ai-redis-stack-data`。
-- 若使用 CI 自动触发 /kb/reindex，请将 CI 中的 KB_INGEST_TOKEN secret 与本次安装配置的值同步。
+- 此功能需要 DooTask 主程序的 Redis 版本不低于 8.0。版本过旧时该功能会自动关闭，AI 聊天不受影响；如需启用，请在主程序中将 Redis 升级到最新。

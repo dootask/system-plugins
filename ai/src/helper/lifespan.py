@@ -89,8 +89,9 @@ async def _init_kb(app: FastAPI) -> None:
     RAG_ENABLED → 主 redis 支持 vectorset（Redis 8+）→ embedding API 连通
     （probe 取 dim）→ 索引与当前模型/维度一致（漂移默认自动重建）。
 
-    多 worker 协同：VCARD>0 且 meta 匹配直接 skip；否则用 file lock 选一个 worker
-    跑 ingest，其他 worker 等数据出现就标记 ready。
+    多 worker 协同：索引可用时全部 worker 立即 ready，由抢到 file lock 的 worker
+    做内容 hash 对账（reconcile，收敛 DooTask 更新带来的 markdown 增删改，
+    无变化时零 API 调用）；空索引/漂移时 leader 全量重建，其他 worker 等数据出现。
     """
     if os.environ.get("RAG_ENABLED", "true").lower() not in ("true", "1", "yes"):
         app.state.kb_loaded = False
@@ -100,7 +101,7 @@ async def _init_kb(app: FastAPI) -> None:
     try:
         from helper.kb import embeddings as kb_embeddings
         from helper.kb.index import count_docs, drop_all, ensure_vset, supports_vectorset
-        from helper.kb.ingest import ingest_all
+        from helper.kb.ingest import ingest_all, reconcile
 
         if not await supports_vectorset():
             app.state.kb_loaded = False
@@ -123,14 +124,36 @@ async def _init_kb(app: FastAPI) -> None:
             # drop_all 放到 leader 锁内执行：多 worker 同时检测到漂移时
             # 不能各自 drop，否则会互删对方正在重建的数据
 
-        skip_if_indexed = os.environ.get("KB_SKIP_INGEST_IF_INDEXED", "true").lower() in ("true", "1", "yes")
         existing = await count_docs()
-        if index_ok and skip_if_indexed and existing > 0:
+        kb_root = os.environ.get("KB_CONTENT_DIR", "/app/kb-content")
+
+        if index_ok and existing > 0:
+            # 索引可用：全部 worker 立即 ready；抢到锁的 worker 对账收敛内容差异
             app.state.kb_loaded = True
-            logger.info(f"ai-kb already indexed (docs={existing}); skip ingest_all")
+            if not os.path.isdir(kb_root):
+                logger.warning(f"ai-kb content dir not found: {kb_root}; skip reconcile")
+                return
+            lock_fd = _try_acquire_ingest_lock()
+            if lock_fd is None:
+                logger.info(f"ai-kb ready (docs={existing}); reconcile held by another worker")
+                return
+            try:
+                result = await reconcile(kb_root=kb_root)
+                if result["changed"] or result["removed"]:
+                    logger.info(
+                        f"ai-kb reconcile: changed={result['changed']} removed={result['removed']} "
+                        f"ingested={result['ingested']} failed={result['failed']}; docs={await count_docs()}"
+                    )
+                else:
+                    logger.info(f"ai-kb ready (docs={existing}); content in sync")
+            finally:
+                try:
+                    fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                    os.close(lock_fd)
+                except OSError:
+                    pass
             return
 
-        kb_root = os.environ.get("KB_CONTENT_DIR", "/app/kb-content")
         if not os.path.isdir(kb_root):
             logger.warning(f"ai-kb content dir not found: {kb_root}; RAG queries will return empty")
             app.state.kb_loaded = True

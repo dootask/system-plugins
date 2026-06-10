@@ -4,7 +4,9 @@
 数据布局（共享主程序 redis，全部收敛到 dootask_ai:kb: 命名空间）：
 - {KEY_PREFIX}{chunk_id}#{i}   HASH，chunk 正文（title/text/source/feature/scope/type/locale，不存向量）
 - {VSET_KEY}                   vectorset，element 名 = "{chunk_id}#{i}"，附 locale/scope 等过滤属性
-- {META_KEY}                   HASH：model / dim / ingested_at + src:{chunk_id} → 该文件 chunk 数（记账式删除用）
+- {META_KEY}                   HASH：model / dim / ingested_at
+                               + src:{chunk_id} → chunk 数（记账式删除用）
+                               + path:{rel_path} → "{hash}:{chunk_id}"（启动对账用）
 
 主 redis 与 Laravel 共用 keyspace，删除一律走 meta 记账，禁止全库 SCAN。
 client 强制 RESP2（protocol=2）：vectorset 响应走扁平数组解析路径最稳，
