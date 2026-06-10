@@ -9,11 +9,12 @@ from helper.config import DEFAULT_MODELS
 
 logger = logging.getLogger("ai")
 
-class ModelInfo(TypedDict):
+class ModelInfo(TypedDict, total=False):
     """模型信息类型定义"""
     id: str
     name: str
     support_mcp: bool
+    thinking: str  # off | low | medium | high，缺省视为 off
 
 class ModelListError(Exception):
     """Raised when model list retrieval fails."""
@@ -67,7 +68,8 @@ def _fetch_ollama_models(
         formatted.append({
             "id": str(model_name),
             "name": display_name if display_name and display_name != model_name else str(model_name),
-            "support_mcp": False
+            "support_mcp": False,
+            "thinking": "off"
         })
 
     if not formatted:

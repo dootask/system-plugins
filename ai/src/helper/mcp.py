@@ -1,5 +1,6 @@
 import json
 import logging
+import re
 from functools import wraps
 from typing import Any, Callable, Dict, List, Optional
 
@@ -159,6 +160,11 @@ def ensure_dootask_mcp_config(enabled: bool) -> None:
         logger.error("❌ 写入 MCP 配置失败: %s", exc)
 
 
+def _strip_thinking_suffix(name: str) -> str:
+    """去掉历史遗留的 ` (thinking)` 等思考后缀，便于与干净的 model_name 匹配。"""
+    return re.sub(r"\s*\(\s*(think|thinking|reasoning)\s*\)\s*$", "", name, flags=re.IGNORECASE).strip()
+
+
 def _mcp_supports_model(mcp_entry: Dict[str, object], model_name: str) -> bool:
     """检查目标模型是否在 MCP 的支持列表中。"""
     if not model_name:
@@ -166,13 +172,14 @@ def _mcp_supports_model(mcp_entry: Dict[str, object], model_name: str) -> bool:
     supported = mcp_entry.get("supportedModels")
     if not isinstance(supported, list) or not supported:
         return True
+    target = _strip_thinking_suffix(model_name)
     for item in supported:
         model_id = None
         if isinstance(item, dict):
             model_id = item.get("id")
         elif isinstance(item, str):
             model_id = item
-        if isinstance(model_id, str) and model_id == model_name:
+        if isinstance(model_id, str) and _strip_thinking_suffix(model_id) == target:
             return True
     return False
 

@@ -59,12 +59,12 @@ DEFAULT_MODELS = {
         {"id": "o4-mini", "name": "o4 Mini", "support_mcp": True, "support_vision": True},
     ],
     "claude": [
-        {"id": "claude-fable-5", "name": "Claude Fable 5", "support_mcp": True, "support_vision": True},
-        {"id": "claude-opus-4-8 (thinking)", "name": "Claude Opus 4.8", "support_mcp": True, "support_vision": True},
-        {"id": "claude-opus-4-7 (thinking)", "name": "Claude Opus 4.7", "support_mcp": True, "support_vision": True},
-        {"id": "claude-opus-4-6 (thinking)", "name": "Claude Opus 4.6", "support_mcp": True, "support_vision": True},
-        {"id": "claude-sonnet-4-6 (thinking)", "name": "Claude Sonnet 4.6", "support_mcp": True, "support_vision": True},
-        {"id": "claude-haiku-4-5 (thinking)", "name": "Claude Haiku 4.5", "support_mcp": True, "support_vision": True},
+        {"id": "claude-fable-5", "name": "Claude Fable 5", "support_mcp": True, "support_vision": True, "thinking": "off"},
+        {"id": "claude-opus-4-8", "name": "Claude Opus 4.8", "support_mcp": True, "support_vision": True, "thinking": "medium"},
+        {"id": "claude-opus-4-7", "name": "Claude Opus 4.7", "support_mcp": True, "support_vision": True, "thinking": "medium"},
+        {"id": "claude-opus-4-6", "name": "Claude Opus 4.6", "support_mcp": True, "support_vision": True, "thinking": "medium"},
+        {"id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6", "support_mcp": True, "support_vision": True, "thinking": "medium"},
+        {"id": "claude-haiku-4-5", "name": "Claude Haiku 4.5", "support_mcp": True, "support_vision": True, "thinking": "medium"},
     ],
     "deepseek": [
         {"id": "deepseek-v4-pro", "name": "DeepSeek V4 Pro", "support_mcp": True, "support_vision": False},

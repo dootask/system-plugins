@@ -6,24 +6,59 @@ export interface GeneratedField extends FieldConfig {
   originalProp: string
 }
 
+export type ThinkingEffort = "off" | "low" | "medium" | "high"
+
+export const THINKING_EFFORTS: ThinkingEffort[] = ["off", "low", "medium", "high"]
+
+const normalizeThinking = (value: unknown): ThinkingEffort =>
+  THINKING_EFFORTS.includes(value as ThinkingEffort) ? (value as ThinkingEffort) : "off"
+
 export interface ModelItem {
   id: string
   name: string
   support_mcp: boolean
   support_vision: boolean
+  thinking: ThinkingEffort
 }
 
-export const parseModelNames = (raw: string | ModelItem[] | undefined | null) => {
+export interface ModelOption {
+  value: string
+  label: string
+  support_mcp: boolean
+  support_vision: boolean
+  thinking: ThinkingEffort
+}
+
+const mapModelArray = (items: Partial<ModelItem>[]): ModelOption[] =>
+  items
+    .filter((item) => item && item.id)
+    .map((item) => ({
+      value: String(item.id),
+      label: item.name || String(item.id),
+      support_mcp: item.support_mcp ?? false,
+      support_vision: item.support_vision ?? false,
+      thinking: normalizeThinking(item.thinking),
+    }))
+
+export const parseModelNames = (raw: string | ModelItem[] | undefined | null): ModelOption[] => {
   if (!raw) return []
 
-  // 如果已经是数组格式（新的 JSON 格式）
+  // 已经是数组格式（新的 JSON 格式）
   if (Array.isArray(raw)) {
-    return raw.map(item => ({
-      value: item.id,
-      label: item.name,
-      support_mcp: item.support_mcp,
-      support_vision: item.support_vision ?? false
-    }))
+    return mapModelArray(raw)
+  }
+
+  // 字符串形式的 JSON 数组
+  const trimmed = raw.trim()
+  if (trimmed.startsWith("[")) {
+    try {
+      const parsed = JSON.parse(trimmed)
+      if (Array.isArray(parsed)) {
+        return mapModelArray(parsed)
+      }
+    } catch {
+      // 解析失败则回退到旧字符串解析
+    }
   }
 
   // 兼容旧的字符串格式 "id | name"
@@ -37,7 +72,8 @@ export const parseModelNames = (raw: string | ModelItem[] | undefined | null) =>
         value,
         label: label || value,
         support_mcp: false,
-        support_vision: false
+        support_vision: false,
+        thinking: "off" as ThinkingEffort,
       }
     })
     .filter((item) => item.value)

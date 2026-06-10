@@ -13,10 +13,25 @@ import {
   useReactTable,
   type ColumnDef,
 } from "@tanstack/react-table"
-import { ArrowDown, ArrowUp, Trash2 } from "lucide-react"
+import { ArrowDown, ArrowUp, Plug, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Badge } from "@/components/ui/badge"
+import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import {
   Table,
   TableBody,
@@ -25,13 +40,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { parseModelNames } from "@/lib/aibot"
+import { parseModelNames, THINKING_EFFORTS, type ThinkingEffort } from "@/lib/aibot"
+import type { MCPConfig } from "@/data/mcp-config"
+import { useI18n } from "@/lib/i18n-context"
 import { cn } from "@/lib/utils"
 
 type ModelTableRow = {
   id: string
   value: string
   label: string
+  thinking: ThinkingEffort
 }
 
 type ModelTableCellKey = "value" | "label"
@@ -41,15 +59,21 @@ const createRowId = () =>
     ? crypto.randomUUID()
     : Math.random().toString(36).slice(2, 12)
 
-const serializeRows = (rows: ModelTableRow[]) =>
-  rows
+const serializeRows = (rows: ModelTableRow[]) => {
+  const items = rows
     .map((row) => ({
-      value: row.value.trim(),
-      label: row.label.trim(),
+      id: row.value.trim(),
+      name: row.label.trim(),
+      thinking: row.thinking,
     }))
-    .filter((row) => row.value)
-    .map((row) => (row.label && row.label !== row.value ? `${row.value}|${row.label}` : row.value))
-    .join("\n")
+    .filter((row) => row.id)
+    .map((row) => ({
+      id: row.id,
+      name: row.name || row.id,
+      thinking: row.thinking,
+    }))
+  return items.length ? JSON.stringify(items) : ""
+}
 
 const parseRows = (value: string, previousRows: ModelTableRow[] = []) => {
   return parseModelNames(value).map((item, index) => {
@@ -58,6 +82,7 @@ const parseRows = (value: string, previousRows: ModelTableRow[] = []) => {
       id,
       value: item.value,
       label: item.label,
+      thinking: item.thinking,
     }
   })
 }
@@ -66,6 +91,7 @@ const createRow = (): ModelTableRow => ({
   id: `row-${createRowId()}`,
   value: "",
   label: "",
+  thinking: "off",
 })
 
 export interface ModelListTableProps {
@@ -81,6 +107,9 @@ export interface ModelListTableProps {
   labelPlaceholder: string
   maxLength?: number
   disabled?: boolean
+  mcps?: MCPConfig[]
+  onToggleModelMcp?: (modelId: string, mcpId: string, checked: boolean) => void
+  onApplyModelMcpToAll?: (sourceModelId: string, allModelIds: string[]) => void
 }
 
 export const ModelListTable = ({
@@ -96,7 +125,15 @@ export const ModelListTable = ({
   labelPlaceholder,
   maxLength,
   disabled,
+  mcps,
+  onToggleModelMcp,
+  onApplyModelMcpToAll,
 }: ModelListTableProps) => {
+  const { t } = useI18n()
+  const enabledMcps = useMemo(
+    () => (mcps ?? []).filter((mcp) => mcp.enabled !== false),
+    [mcps],
+  )
   const [rows, setRows] = useState<ModelTableRow[]>(() => parseRows(value))
   const rowsRef = useRef(rows)
   const lastSerializedRef = useRef(value)
@@ -161,6 +198,16 @@ export const ModelListTable = ({
         (prev) =>
           prev.map((row) => (row.id === rowId ? { ...row, [key]: nextValue } : row)),
         false,
+      )
+    },
+    [updateRows],
+  )
+
+  const handleThinkingChange = useCallback(
+    (rowId: string, nextValue: ThinkingEffort) => {
+      updateRows(
+        (prev) => prev.map((row) => (row.id === rowId ? { ...row, thinking: nextValue } : row)),
+        true,
       )
     },
     [updateRows],
@@ -233,6 +280,128 @@ export const ModelListTable = ({
         ),
       },
       {
+        id: "thinking",
+        header: () => t("sheet.models.column.thinking"),
+        cell: ({ row }) => (
+          <Select
+            value={row.original.thinking}
+            onValueChange={(next) => handleThinkingChange(row.original.id, next as ThinkingEffort)}
+            disabled={disabled}
+          >
+            <SelectTrigger className="h-9 w-[88px]">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {THINKING_EFFORTS.map((level) => (
+                <SelectItem key={level} value={level}>
+                  {t(`sheet.models.thinking.${level}`)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ),
+        meta: {
+          headerClassName: "w-[100px]",
+        },
+      },
+      {
+        id: "mcp",
+        header: () => t("sheet.models.column.mcp"),
+        cell: ({ row, table }) => {
+          const modelId = row.original.value.trim()
+          const count = modelId
+            ? enabledMcps.filter((mcp) =>
+                (mcp.supportedModels ?? []).some((m) => m.id === modelId),
+              ).length
+            : 0
+          return (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-9 gap-1.5 px-2.5"
+                  disabled={disabled}
+                >
+                  <Plug className="h-3.5 w-3.5" />
+                  <Badge variant="secondary" className="px-1.5">
+                    {count}
+                  </Badge>
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-72 p-0">
+                <div className="border-b px-3 py-2.5 text-sm font-medium">
+                  {t("sheet.models.mcpPickerTitle")}
+                  {modelId && <span className="text-muted-foreground"> · {modelId}</span>}
+                </div>
+                {!modelId ? (
+                  <p className="px-3 py-3 text-sm text-muted-foreground">
+                    {t("sheet.models.mcpNeedId")}
+                  </p>
+                ) : enabledMcps.length === 0 ? (
+                  <p className="px-3 py-3 text-sm text-muted-foreground">
+                    {t("sheet.models.mcpEmpty")}
+                  </p>
+                ) : (
+                  <>
+                    <ScrollArea className="max-h-60">
+                      <ul className="space-y-2 px-3 py-3">
+                        {enabledMcps.map((mcp) => {
+                          const checked = (mcp.supportedModels ?? []).some((m) => m.id === modelId)
+                          return (
+                            <li key={mcp.id} className="flex items-center gap-2">
+                              <Checkbox
+                                id={`mcp-${mcp.id}-${row.original.id}`}
+                                checked={checked}
+                                disabled={disabled}
+                                onCheckedChange={(next) =>
+                                  onToggleModelMcp?.(modelId, mcp.id, next === true)
+                                }
+                              />
+                              <label
+                                htmlFor={`mcp-${mcp.id}-${row.original.id}`}
+                                className="cursor-pointer text-sm leading-none"
+                              >
+                                {mcp.name}
+                              </label>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </ScrollArea>
+                    {onApplyModelMcpToAll && (
+                      <div className="border-t p-2">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="w-full"
+                          disabled={disabled}
+                          onClick={() => {
+                            const allModelIds = table
+                              .getRowModel()
+                              .rows.map((item) => item.original.value.trim())
+                              .filter(Boolean)
+                            onApplyModelMcpToAll(modelId, allModelIds)
+                          }}
+                        >
+                          {t("sheet.models.mcpApplyAll")}
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </PopoverContent>
+            </Popover>
+          )
+        },
+        meta: {
+          headerClassName: "w-[96px]",
+          cellClassName: "text-center",
+        },
+      },
+      {
         id: "actions",
         header: () => <span className="sr-only">{actionLabel}</span>,
         cell: ({ row, table }) => {
@@ -292,10 +461,15 @@ export const ModelListTable = ({
       handleCellFocus,
       handleMoveRow,
       handleRemoveRow,
+      handleThinkingChange,
       labelPlaceholder,
       modelLabel,
       modelPlaceholder,
       removeLabel,
+      t,
+      enabledMcps,
+      onToggleModelMcp,
+      onApplyModelMcpToAll,
     ],
   )
 

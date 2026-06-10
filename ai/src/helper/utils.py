@@ -88,6 +88,25 @@ def _patch_deepseek_reasoning_content_bug():
 _patch_anthropic_model_dump_bug()
 _patch_deepseek_reasoning_content_bug()
 
+# 思考档位 → 各 provider 的预算/强度映射
+THINKING_BUDGET_TOKENS = {"low": 2048, "medium": 8192, "high": 16384}
+
+
+def _normalize_thinking_level(thinking_effort, thinking):
+    """将 thinking_effort（字符串档位）与 legacy thinking（整数）归一化为 off/low/medium/high。"""
+    if isinstance(thinking_effort, str):
+        level = thinking_effort.strip().lower()
+        if level in THINKING_BUDGET_TOKENS or level == "off":
+            return level
+    # legacy 兼容：thinking 整数 >0 视为 medium
+    try:
+        if int(thinking) > 0:
+            return "medium"
+    except (TypeError, ValueError):
+        pass
+    return "off"
+
+
 def get_model_instance(model_type, model_name, api_key, **kwargs):
     """根据模型类型返回对应的模型实例"""
 
@@ -96,6 +115,8 @@ def get_model_instance(model_type, model_name, api_key, **kwargs):
     temperature = kwargs.get("temperature", 0.7)
     max_tokens = kwargs.get("max_tokens", 0)
     thinking = kwargs.get("thinking", 0)
+    thinking_effort = kwargs.get("thinking_effort")
+    thinking_level = _normalize_thinking_level(thinking_effort, thinking)
     streaming = kwargs.get("streaming", True)
 
     if model_type == "xai":
@@ -150,8 +171,8 @@ def get_model_instance(model_type, model_name, api_key, **kwargs):
             name_lower = (model_name or "").lower()
             if "-chat" in name_lower:
                 temperature = 1
-            if thinking > 0:
-                config.update({"reasoning_effort": "medium"})
+            if thinking_level != "off":
+                config.update({"reasoning_effort": thinking_level})
             else:
                 match = re.search(r"\bgpt-(\d+)", name_lower)
                 gpt_major = int(match.group(1)) if match else None
@@ -159,17 +180,20 @@ def get_model_instance(model_type, model_name, api_key, **kwargs):
                     reasoning_effort = "medium" if "pro" in name_lower else "low"
                     config.update({"reasoning_effort": reasoning_effort})
         elif model_type == "claude":
-            if thinking > 0:
-                config.update({"thinking": {"type": "enabled", "budget_tokens": 2000 if thinking == 1 else thinking}})
+            if thinking_level != "off":
+                budget = THINKING_BUDGET_TOKENS[thinking_level]
+                config.update({"thinking": {"type": "enabled", "budget_tokens": budget}})
+                # Anthropic 要求 max_tokens > budget_tokens
+                config["max_tokens"] = max(config.get("max_tokens", 0), budget + 4096)
         elif model_type == "deepseek":
-            if thinking > 0:
+            if thinking_level != "off":
                 # DeepSeek's `thinking` is a body-level param; route via extra_body so
                 # it survives openai SDK kwarg validation (>=2.x rejects unknown args).
-                budget = 2000 if thinking == 1 else thinking
+                budget = THINKING_BUDGET_TOKENS[thinking_level]
                 config.update({"extra_body": {"thinking": {"type": "enabled", "budget_tokens": budget}}})
         elif model_type == "ollama":
             # langchain-ollama drops the response `thinking` field unless reasoning is truthy.
-            if thinking > 0:
+            if thinking_level != "off":
                 config.update({"reasoning": True})
 
         common_params = {

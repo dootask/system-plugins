@@ -1,6 +1,9 @@
 import { useMemo, useState, useCallback, useEffect } from "react"
 
+import { Plug } from "lucide-react"
+
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { ModelListTable } from "@/components/aibot/ModelListTable"
 import {
   Sheet,
@@ -31,6 +34,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 import type { AIBotItem, AIBotKey } from "@/data/aibots"
 import type { GeneratedField } from "@/lib/aibot"
 import { parseModelNames } from "@/lib/aibot"
+import type { MCPConfig } from "@/data/mcp-config"
 import { useI18n } from "@/lib/i18n-context"
 export interface BotSettingsSheetProps {
   open: boolean
@@ -50,6 +54,9 @@ export interface BotSettingsSheetProps {
   onReset: (bot: AIBotKey) => void
   onUseDefaultModels: (bot: AIBotKey) => Promise<string | null>
   onRegisterModelEditorBackHandler?: (handler: () => boolean) => void
+  mcps: MCPConfig[]
+  onToggleModelMcp: (bot: AIBotKey, modelId: string, mcpId: string, checked: boolean) => void
+  onApplyModelMcpToAll: (bot: AIBotKey, sourceModelId: string, allModelIds: string[]) => void
 }
 
 export const BotSettingsSheet = ({
@@ -70,8 +77,20 @@ export const BotSettingsSheet = ({
   savingMap,
   defaultsLoadingMap,
   onRegisterModelEditorBackHandler,
+  mcps,
+  onToggleModelMcp,
+  onApplyModelMcpToAll,
 }: BotSettingsSheetProps) => {
   const { t } = useI18n()
+  const enabledMcps = useMemo(() => mcps.filter((mcp) => mcp.enabled !== false), [mcps])
+  const mcpCountFor = useCallback(
+    (modelId: string) =>
+      modelId
+        ? enabledMcps.filter((mcp) => (mcp.supportedModels ?? []).some((m) => m.id === modelId))
+            .length
+        : 0,
+    [enabledMcps],
+  )
   const [modelEditor, setModelEditor] = useState<{
     bot: AIBotItem
     field: GeneratedField
@@ -175,14 +194,35 @@ export const BotSettingsSheet = ({
             <div className="rounded-md border bg-muted/30 p-3 text-sm max-h-44 overflow-y-auto">
               {displayModels.length ? (
                 <ul className="space-y-2">
-                  {displayModels.map((item) => (
-                    <li key={`${item.value}|${item.label}`} className="leading-relaxed flex items-center justify-between">
-                      <span className="font-medium">{item.label || item.value}</span>
-                      {item.label && (
-                        <span className="text-muted-foreground pl-2 text-xs text-right">{item.value}</span>
-                      )}
-                    </li>
-                  ))}
+                  {displayModels.map((item) => {
+                    const mcpCount = mcpCountFor(item.value)
+                    return (
+                      <li
+                        key={`${item.value}|${item.label}`}
+                        className="leading-relaxed flex items-center justify-between gap-2"
+                      >
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="font-medium truncate">{item.label || item.value}</span>
+                          {item.label && item.label !== item.value && (
+                            <span className="text-muted-foreground text-xs truncate">{item.value}</span>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                          {item.thinking !== "off" && (
+                            <Badge variant="outline" className="font-normal">
+                              {t("sheet.models.column.thinking")}: {t(`sheet.models.thinking.${item.thinking}`)}
+                            </Badge>
+                          )}
+                          {mcpCount > 0 && (
+                            <Badge variant="secondary" className="gap-1 font-normal">
+                              <Plug className="h-3 w-3" />
+                              {mcpCount}
+                            </Badge>
+                          )}
+                        </div>
+                      </li>
+                    )
+                  })}
                 </ul>
               ) : (
                 <p className="text-sm text-muted-foreground">{t("sheet.models.empty")}</p>
@@ -440,11 +480,6 @@ export const BotSettingsSheet = ({
               <div className="space-y-4 pr-3 pb-6">
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">{modelEditor.field.label}</Label>
-                  {(modelEditor.bot.value === "claude" || modelEditor.bot.value === "ollama") && (
-                    <p className="text-xs text-muted-foreground">
-                      {t("sheet.models.thinkingHint")}
-                    </p>
-                  )}
                   <ModelListTable
                     value={modelEditorValue}
                     onChange={setModelEditorValue}
@@ -458,6 +493,13 @@ export const BotSettingsSheet = ({
                     labelPlaceholder={t("sheet.models.labelPlaceholder")}
                     maxLength={modelEditor.field.maxlength}
                     disabled={modelEditorDefaultsLoading || modelEditorSaving}
+                    mcps={mcps}
+                    onToggleModelMcp={(modelId, mcpId, checked) =>
+                      onToggleModelMcp(modelEditor.bot.value, modelId, mcpId, checked)
+                    }
+                    onApplyModelMcpToAll={(sourceModelId, allModelIds) =>
+                      onApplyModelMcpToAll(modelEditor.bot.value, sourceModelId, allModelIds)
+                    }
                   />
                 </div>
               </div>

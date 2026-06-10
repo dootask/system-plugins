@@ -24,10 +24,10 @@ import { createLocalizedAIBotList } from "@/data/aibots"
 import { getAISystemConfig, type SystemConfig } from "@/data/aibot-config"
 import type { MCPConfig } from "@/data/mcp-config"
 import { type VisionConfig, DEFAULT_VISION_CONFIG } from "@/data/vision-config"
-import { mergeFields, parseModelNames } from "@/lib/aibot"
-import type { GeneratedField } from "@/lib/aibot"
+import { mergeFields, parseModelNames, THINKING_EFFORTS } from "@/lib/aibot"
+import type { GeneratedField, ThinkingEffort } from "@/lib/aibot"
 import { useI18n } from "@/lib/i18n-context"
-import { loadMCPConfigs, saveMCPConfig, deleteMCPConfig } from "@/lib/mcp-storage"
+import { loadMCPConfigs, saveMCPConfig, saveMCPConfigs, deleteMCPConfig } from "@/lib/mcp-storage"
 import { loadVisionConfig, saveVisionConfig } from "@/lib/vision-storage"
 
 type SettingsState = Record<AIBotKey, Record<string, string>>
@@ -450,18 +450,22 @@ function App() {
         throw new Error(t("errors.modelsNotFound"))
       }
 
-      // 处理新的 JSON 格式：检查是否是对象数组（包含 id, name, support_mcp）
+      // 处理新的 JSON 格式：检查是否是对象数组（包含 id, name, thinking 等）
       let modelsString: string
       if (modelsArray.length > 0 && typeof modelsArray[0] === 'object' && 'id' in modelsArray[0]) {
-        // 新格式：{id, name, support_mcp} 转换为 "id|name" 格式
-        modelsString = modelsArray
-          .map((model: { id: string; name: string; support_mcp: boolean }) =>
-            model.name && model.name !== model.id ? `${model.id}|${model.name}` : model.id
-          )
-          .join("\n")
+        // 新格式：序列化为模型列表 JSON（携带 thinking 默认档位）
+        modelsString = JSON.stringify(
+          modelsArray.map((model: { id: string; name?: string; thinking?: string }) => ({
+            id: model.id,
+            name: model.name || model.id,
+            thinking: THINKING_EFFORTS.includes(model.thinking as ThinkingEffort)
+              ? (model.thinking as ThinkingEffort)
+              : "off",
+          })),
+        )
       } else {
-        // 旧格式：直接是字符串数组
-        modelsString = modelsArray.join("\n")
+        // 旧格式：字符串数组
+        modelsString = (modelsArray as string[]).join("\n")
       }
       messageSuccess(t("success.fetchSuccess"))
       return modelsString
@@ -525,6 +529,69 @@ function App() {
       messageError(resolveErrorMessage(error, t("errors.submitFailed")))
     }
   }
+
+  const handleToggleModelMcp = useCallback(
+    async (bot: AIBotKey, modelId: string, mcpId: string, checked: boolean) => {
+      const target = mcps.find((item) => item.id === mcpId)
+      if (!target) {
+        return
+      }
+      const label =
+        bots.find((item) => item.value === bot)?.models?.find((m) => m.value === modelId)?.label ??
+        modelId
+      const supported = target.supportedModels ?? []
+      const exists = supported.some((m) => m.id === modelId)
+      let nextSupported = supported
+      if (checked && !exists) {
+        nextSupported = [...supported, { id: modelId, name: label }]
+      } else if (!checked && exists) {
+        nextSupported = supported.filter((m) => m.id !== modelId)
+      } else {
+        return
+      }
+      try {
+        const result = await saveMCPConfig({ ...target, supportedModels: nextSupported }, mcps)
+        setMcps(result)
+      } catch (error) {
+        messageError(resolveErrorMessage(error, t("errors.submitFailed")))
+      }
+    },
+    [mcps, bots, t],
+  )
+
+  const handleApplyModelMcpToAll = useCallback(
+    async (bot: AIBotKey, sourceModelId: string, allModelIds: string[]) => {
+      if (!sourceModelId || allModelIds.length === 0) {
+        return
+      }
+      if (!confirm(t("sheet.models.mcpApplyAllConfirm"))) {
+        return
+      }
+      const botModels = bots.find((item) => item.value === bot)?.models ?? []
+      const labelFor = (id: string) =>
+        botModels.find((m) => m.value === id)?.label ?? id
+      const nextMcps = mcps.map((mcp) => {
+        if (mcp.enabled === false) {
+          return mcp
+        }
+        const supported = mcp.supportedModels ?? []
+        const sourceIncluded = supported.some((m) => m.id === sourceModelId)
+        const withoutTargets = supported.filter((m) => !allModelIds.includes(m.id))
+        const additions = sourceIncluded
+          ? allModelIds.map((id) => ({ id, name: labelFor(id) }))
+          : []
+        return { ...mcp, supportedModels: [...withoutTargets, ...additions] }
+      })
+      try {
+        await saveMCPConfigs(nextMcps)
+        setMcps(nextMcps)
+        messageSuccess(t("success.save"))
+      } catch (error) {
+        messageError(resolveErrorMessage(error, t("errors.submitFailed")))
+      }
+    },
+    [mcps, bots, t],
+  )
 
   const handleEditVision = () => {
     if (!isAdmin) {
@@ -617,6 +684,9 @@ function App() {
             onReset={handleReset}
             onUseDefaultModels={handleUseDefaultModels}
             onRegisterModelEditorBackHandler={handleRegisterModelEditorBackHandler}
+            mcps={mcps}
+            onToggleModelMcp={handleToggleModelMcp}
+            onApplyModelMcpToAll={handleApplyModelMcpToAll}
           />
           <MCPEditorSheet
             open={mcpEditorOpen}

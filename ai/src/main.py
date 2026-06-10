@@ -145,6 +145,7 @@ async def chat(request: Request):
         temperature = float(extras_json.get('temperature', 0.7))
         max_tokens = int(extras_json.get('max_tokens', 0))
         thinking = int(extras_json.get('thinking', 0))
+        thinking_effort = extras_json.get('thinking_effort')
         before_text = extras_json.get('before_text')
         before_clear = int(extras_json.get('before_clear', 0))
         context_key = extras_json.get('context_key', '')
@@ -229,6 +230,7 @@ async def chat(request: Request):
         "temperature": temperature,
         "max_tokens": max_tokens,
         "thinking": thinking,
+        "thinking_effort": thinking_effort,
         "context_limit": context_limit,
         "locale": locale,
 
@@ -317,6 +319,7 @@ async def stream(msg_id: str, stream_key: str):
                 temperature=data["temperature"],
                 max_tokens=data["max_tokens"],
                 thinking=data["thinking"],
+                thinking_effort=data.get("thinking_effort"),
                 streaming=True,
             )
 
@@ -608,6 +611,7 @@ async def invoke_auth(request: Request, token: str = Header(..., alias="Authoriz
         'max_tokens': 0,
         'temperature': 0.7,
         'thinking': 0,
+        'thinking_effort': '',
         'locale': 'zh',  # ai-kb 检索语种
         'rag_enabled': 1,  # ai-kb 灰度开关；0 跳过 RAG hint 注入（PHP 灰度判定后透传）
     }
@@ -632,7 +636,7 @@ async def invoke_auth(request: Request, token: str = Header(..., alias="Authoriz
     except (ValueError, TypeError):
         context_limit = 0
 
-    model_type, model_name, max_tokens, temperature, thinking, locale, rag_enabled = (
+    model_type, model_name, max_tokens, temperature, thinking, thinking_effort, locale, rag_enabled = (
         params[k] for k in defaults.keys()
     )
 
@@ -654,6 +658,7 @@ async def invoke_auth(request: Request, token: str = Header(..., alias="Authoriz
         "temperature": temperature,
         "max_tokens": max_tokens,
         "thinking": thinking,
+        "thinking_effort": thinking_effort or None,
         "context_limit": context_limit,
         "locale": locale,
         "rag_enabled": int(bool(rag_enabled)),
@@ -797,6 +802,7 @@ async def invoke_stream(request: Request, stream_key: str):
             temperature=data["temperature"],
             max_tokens=data["max_tokens"],
             thinking=data["thinking"],
+            thinking_effort=data.get("thinking_effort"),
             streaming=True,
         )
         tools = await load_mcp_tools_for_model(
