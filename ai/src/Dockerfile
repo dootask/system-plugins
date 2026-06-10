@@ -47,11 +47,16 @@ ENV PORT=5001 \
     TIMEOUT=120 \
     PYTHONUNBUFFERED=1 \
     REDIS_HOST=redis \
-    REDIS_PORT=6379
+    REDIS_PORT=6379 \
+    TIKTOKEN_CACHE_DIR=/app/tiktoken_cache
 
 # 安装 curl
 RUN apt-get update && apt-get install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/*
+
+# 预下载 tiktoken 词表并烤进镜像，避免运行时每次重启联网下载
+# （helper/context.py 在 import 期调用 get_encoding，曾因联网下载卡 ~100s）
+RUN python -c "import tiktoken; tiktoken.get_encoding('o200k_base'); tiktoken.get_encoding('cl100k_base')"
 
 # 复制项目文件
 COPY main.py .
@@ -73,7 +78,8 @@ USER appuser
 EXPOSE $PORT
 
 # 健康检查
-HEALTHCHECK --start-period=30s --interval=30s --timeout=5s --retries=3 \
+# RAG 初始化已后台化，服务通常几秒内就绪；缩短 interval 让容器更快翻 healthy。
+HEALTHCHECK --start-period=10s --interval=10s --timeout=5s --retries=3 \
     CMD curl -f http://localhost:$PORT/health || exit 1
 
 # 启动命令

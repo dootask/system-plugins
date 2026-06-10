@@ -192,6 +192,7 @@ async def lifespan_context(app: FastAPI):
     """FastAPI 生命周期钩子，负责启动/停止 Redis 和周期任务。"""
     mcp_task = None
     vision_task = None
+    kb_task = None
     try:
         # Ensure default vision config exists
         ensure_default_vision_config()
@@ -201,8 +202,11 @@ async def lifespan_context(app: FastAPI):
         redis_manager = RedisManager()
         app.state.redis_manager = redis_manager
 
-        # ai-kb / RAG 初始化（不阻塞其他启动逻辑）
-        await _init_kb(app)
+        # ai-kb / RAG 初始化放后台执行：embedding probe 可能慢/重试（默认 30s×4 次），
+        # 绝不能阻塞服务就绪，否则 /health 长时间不可用、容器迟迟不 healthy。
+        # kb_loaded 默认 False，后台 _init_kb 就绪后翻 True；RAG 未就绪时聊天自动降级。
+        app.state.kb_loaded = False
+        kb_task = asyncio.create_task(_init_kb(app))
 
         logger.info("✅ 初始化成功")
     except Exception as exc:
@@ -210,7 +214,7 @@ async def lifespan_context(app: FastAPI):
     try:
         yield
     finally:
-        for task in [mcp_task, vision_task]:
+        for task in [mcp_task, vision_task, kb_task]:
             if task is not None:
                 task.cancel()
                 try:
