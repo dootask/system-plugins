@@ -8,7 +8,7 @@ httpx[socks]
 langchain
 langchain-core
 langchain-anthropic
-langchain-community
+langchain-community==0.4.1   # 0.4.2 移走了 ChatCohere，helper/utils.py 会 ImportError
 langchain-deepseek
 langchain-google-genai
 langchain-xai
@@ -16,8 +16,10 @@ langchain-openai
 langchain-ollama
 langchain-text-splitters
 pyjwt
+python-frontmatter
+pyyaml
 qianfan
-redis
+redis>=8.0   # ai-kb 需要 vectorset 命令封装（redis-py 8.0+）
 tiktoken
 uvicorn
 pysocks

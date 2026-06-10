@@ -59,6 +59,7 @@ DEFAULT_MODELS = {
         {"id": "o4-mini", "name": "o4 Mini", "support_mcp": True, "support_vision": True},
     ],
     "claude": [
+        {"id": "claude-opus-4-8 (thinking)", "name": "Claude Opus 4.8", "support_mcp": True, "support_vision": True},
         {"id": "claude-opus-4-7 (thinking)", "name": "Claude Opus 4.7", "support_mcp": True, "support_vision": True},
         {"id": "claude-opus-4-6 (thinking)", "name": "Claude Opus 4.6", "support_mcp": True, "support_vision": True},
         {"id": "claude-sonnet-4-6 (thinking)", "name": "Claude Sonnet 4.6", "support_mcp": True, "support_vision": True},
@@ -69,12 +70,14 @@ DEFAULT_MODELS = {
         {"id": "deepseek-v4-flash", "name": "DeepSeek V4 Flash", "support_mcp": True, "support_vision": False},
     ],
     "gemini": [
+        {"id": "gemini-3.5-flash", "name": "Gemini 3.5 Flash", "support_mcp": True, "support_vision": True},
         {"id": "gemini-3.1-pro-preview", "name": "Gemini 3.1 Pro", "support_mcp": True, "support_vision": True},
         {"id": "gemini-3.1-flash-lite-preview", "name": "Gemini 3.1 Flash Lite", "support_mcp": True, "support_vision": True},
         {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro", "support_mcp": True, "support_vision": True},
         {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "support_mcp": True, "support_vision": True},
     ],
     "grok": [
+        {"id": "grok-4.3", "name": "Grok 4.3", "support_mcp": True, "support_vision": True},
         {"id": "grok-4.20-0309-reasoning", "name": "Grok 4.20 Reasoning", "support_mcp": True, "support_vision": True},
         {"id": "grok-4.20-0309-non-reasoning", "name": "Grok 4.20", "support_mcp": True, "support_vision": True},
         {"id": "grok-4-1-fast-reasoning", "name": "Grok 4.1 Fast Reasoning", "support_mcp": True, "support_vision": True},
@@ -88,6 +91,8 @@ DEFAULT_MODELS = {
         {"id": "glm-4.7", "name": "GLM-4.7", "support_mcp": True, "support_vision": False},
     ],
     "qianwen": [
+        {"id": "qwen3.7-max", "name": "Qwen3.7 Max", "support_mcp": True, "support_vision": False},
+        {"id": "qwen3.7-plus", "name": "Qwen3.7 Plus", "support_mcp": True, "support_vision": True},
         {"id": "qwen3.6-max-preview", "name": "Qwen3.6 Max", "support_mcp": True, "support_vision": False},
         {"id": "qwen3.6-plus", "name": "Qwen3.6 Plus", "support_mcp": True, "support_vision": True},
         {"id": "qwen3.6-flash", "name": "Qwen3.6 Flash", "support_mcp": True, "support_vision": False},
@@ -96,6 +101,7 @@ DEFAULT_MODELS = {
         {"id": "qwen-turbo", "name": "Qwen Turbo", "support_mcp": True, "support_vision": False},
     ],
     "wenxin": [
+        {"id": "ernie-5.1", "name": "ERNIE 5.1", "support_mcp": False, "support_vision": True},
         {"id": "ernie-x1.1", "name": "ERNIE X1.1", "support_mcp": False, "support_vision": False},
         {"id": "ernie-5.0-thinking-preview", "name": "ERNIE 5.0 Thinking", "support_mcp": False, "support_vision": True},
         {"id": "ernie-4.5-turbo-128k", "name": "ERNIE 4.5 Turbo 128K", "support_mcp": False, "support_vision": False},
@@ -139,7 +145,8 @@ CONTEXT_LIMITS = {
         "default": 1000000,
     },
     "grok": {
-        # Grok 4.x: 2M context
+        # Grok 4.3: 1M context；4.20 等旧 4.x: 2M
+        "grok-4.3": 1000000,
         "default": 2000000,
     },
     "zhipu": {
@@ -152,12 +159,15 @@ CONTEXT_LIMITS = {
         "default": 128000,
     },
     "qianwen": {
+        "qwen3.7-max": 256000,
+        "qwen3.7-plus": 128000,
         "qwen3-max": 128000,
         "qwen-plus": 32000,
         "qwen-turbo": 32000,
         "default": 32000,
     },
     "wenxin": {
+        "ernie-5.1": 128000,
         "ernie-5.0-thinking-preview": 128000,
         "ernie-4.5-turbo-128k": 128000,
         "ernie-4.5-turbo-vl-32k": 32000,

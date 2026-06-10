@@ -1,0 +1,31 @@
+services:
+  ai:
+    image: "kuaifan/dootask-ai:${PLUGIN_VERSION}"
+    restart: unless-stopped
+    environment:
+      # 0.5.4 起回连主项目 redis：向量改存 Redis 8+ 原生 vectorset，不再需要 redis-stack。
+      # ${REDIS_HOST}/${REDIS_PORT}/${REDIS_PASSWORD} 由 AppStore compose --env-file 主仓库 .env 提供
+      # （主 .env 的 REDIS_PASSWORD=null 字面量，代码侧按无密码处理）
+      REDIS_HOST: "${REDIS_HOST}"
+      REDIS_PORT: "${REDIS_PORT}"
+      REDIS_PASSWORD: "${REDIS_PASSWORD}"
+      TIMEOUT: 600
+      # ai-kb / RAG：embedding 走 OpenAI 兼容 API，不再容器内本地推理。
+      # 服务地址/密钥内置在镜像里（默认 DooTask 官方 ai.dootask.com）；
+      # 如需自有服务，在主程序 .env 设置 EMBEDDING_BASE_URL / EMBEDDING_API_KEY 即可覆盖。
+      # 注意：AppStore 的 ReplaceParams 只匹配精确 ${KEY}，fields 变量不要用 ${KEY:-default} 语法
+      KB_CONTENT_DIR: /app/kb-content
+      KB_INGEST_TOKEN: "${KB_INGEST_TOKEN}"
+      RAG_ENABLED: "${RAG_ENABLED:-true}"
+      EMBEDDING_BASE_URL: "${EMBEDDING_BASE_URL:-}"
+      EMBEDDING_API_KEY: "${EMBEDDING_API_KEY:-}"
+      EMBEDDING_MODEL: "${EMBEDDING_MODEL}"
+    volumes:
+      - dootask-ai-config:/app/config
+      # 只读挂载主仓库 ai-kb 内容
+      # 用 AppStore 注入的 ${ROOT_PATH}（指向宿主机 dootask 根目录），跨部署位置自动 work
+      # 不能用相对路径里的 .. —— AppStore 会 normalize 让它走不出 app 目录
+      - "${ROOT_PATH}/resources/ai-kb:/app/kb-content:ro"
+
+volumes:
+  dootask-ai-config:

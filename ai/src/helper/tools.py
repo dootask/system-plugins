@@ -6,6 +6,7 @@ Defines internal tools that are loaded alongside MCP tools.
 
 import json
 import logging
+import os
 from typing import Any, List, Type
 
 from langchain_core.tools import BaseTool
@@ -91,6 +92,59 @@ class GetSessionImageTool(BaseTool):
         }], None)
 
 
+class SearchHelpDocsInput(BaseModel):
+    """Input schema for search_help_docs tool."""
+
+    query: str = Field(description="用户问题原文，自然语言")
+    locale: str = Field(default="zh", description="语种过滤，zh 或 en，默认 zh")
+
+
+class SearchHelpDocsTool(BaseTool):
+    """检索 DooTask 帮助知识库（ai-kb），用于回答功能用法/概念/操作类问题。"""
+
+    name: str = "search_help_docs"
+    description: str = """检索 DooTask 帮助知识库。
+
+使用场景（用户提问命中以下任一即应调用）：
+- 询问 DooTask 功能用法："看板列怎么改名"、"怎么快速创建任务"
+- 询问产品概念定义："什么是子任务"、"工作流和视图什么区别"
+- 询问菜单/按钮位置："AI 助手入口在哪"、"审批中心怎么进"
+- 询问操作步骤："怎么把任务分配给别人"
+- 询问错误含义："权限不足是什么意思"
+
+返回 top-5 相关文档片段。**严禁编造检索结果之外的内容**：
+若返回为空或与问题不相关，直接说"我在帮助文档里没找到相关内容"，不要拼凑答案。"""
+
+    args_schema: Type[BaseModel] = SearchHelpDocsInput
+    response_format: str = "content_and_artifact"
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    def _run(self, query: str, locale: str = "zh") -> tuple:
+        raise NotImplementedError("Use async version")
+
+    async def _arun(self, query: str, locale: str = "zh") -> tuple:
+        try:
+            from helper.kb.retriever import search, format_hits
+        except Exception as e:
+            logger.error(f"search_help_docs import failed: {e}")
+            return ([{"type": "text", "text": "帮助文档检索模块未就绪"}], None)
+
+        try:
+            hits = await search(query, locale=locale, top_k=5)
+        except Exception as e:
+            logger.error(f"search_help_docs search failed: {e}")
+            return ([{"type": "text", "text": f"检索失败: {e}"}], None)
+
+        content = format_hits(hits)
+        artifact = {"hits": [h["id"] for h in hits], "query": query, "locale": locale}
+        return ([{"type": "text", "text": content}], artifact)
+
+
+def _rag_enabled() -> bool:
+    return os.environ.get("RAG_ENABLED", "true").lower() in ("true", "1", "yes")
+
+
 def load_builtin_tools(redis_manager: Any) -> List[BaseTool]:
     """Load all built-in tools.
 
@@ -100,6 +154,9 @@ def load_builtin_tools(redis_manager: Any) -> List[BaseTool]:
     Returns:
         List of built-in tools
     """
-    return [
-        GetSessionImageTool(redis_manager=redis_manager)
+    tools: List[BaseTool] = [
+        GetSessionImageTool(redis_manager=redis_manager),
     ]
+    if _rag_enabled():
+        tools.append(SearchHelpDocsTool())
+    return tools

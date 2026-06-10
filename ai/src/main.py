@@ -2,6 +2,7 @@
 import asyncio
 import json
 import logging
+import os
 import random
 import string
 import time
@@ -148,6 +149,7 @@ async def chat(request: Request):
         before_clear = int(extras_json.get('before_clear', 0))
         context_key = extras_json.get('context_key', '')
         context_limit = int(extras_json.get('context_limit', 0))
+        locale = extras_json.get('locale', 'zh')  # ai-kb 检索语种
     except json.JSONDecodeError:
         return JSONResponse(content={"code": 400, "error": "Invalid extras parameter"}, status_code=200)
 
@@ -228,6 +230,7 @@ async def chat(request: Request):
         "max_tokens": max_tokens,
         "thinking": thinking,
         "context_limit": context_limit,
+        "locale": locale,
 
         "context_key": context_key,
         "stream_key": stream_key,
@@ -357,6 +360,16 @@ async def stream(msg_id: str, stream_key: str):
                             break
                     else:
                         pre_context.insert(0, SystemMessage(content=hint_content))
+
+            # 添加 RAG 帮助文档检索提示（ai-kb）
+            # 请求级 rag_enabled=0（灰度未命中）跳过；env RAG_ENABLED=false 已在 tools.py 兜底
+            if getattr(app.state, "kb_loaded", False) and int(data.get("rag_enabled", 1)):
+                rag_hint_key = f"rag_hint_shown_{data['context_key']}"
+                rag_hint_value = await redis_manager.get_cache(rag_hint_key)
+                from helper.kb.hint import already_injected, inject_rag_hint
+                if not rag_hint_value and not already_injected(pre_context):
+                    inject_rag_hint(pre_context, locale=data.get("locale", "zh"))
+                    await redis_manager.set_cache(rag_hint_key, "1", ex=3600)
 
             middle_messages = []
             if middle_context:
@@ -595,6 +608,8 @@ async def invoke_auth(request: Request, token: str = Header(..., alias="Authoriz
         'max_tokens': 0,
         'temperature': 0.7,
         'thinking': 0,
+        'locale': 'zh',  # ai-kb 检索语种
+        'rag_enabled': 1,  # ai-kb 灰度开关；0 跳过 RAG hint 注入（PHP 灰度判定后透传）
     }
     
     # 应用默认值和类型转换
@@ -617,7 +632,7 @@ async def invoke_auth(request: Request, token: str = Header(..., alias="Authoriz
     except (ValueError, TypeError):
         context_limit = 0
 
-    model_type, model_name, max_tokens, temperature, thinking = (
+    model_type, model_name, max_tokens, temperature, thinking, locale, rag_enabled = (
         params[k] for k in defaults.keys()
     )
 
@@ -640,6 +655,8 @@ async def invoke_auth(request: Request, token: str = Header(..., alias="Authoriz
         "max_tokens": max_tokens,
         "thinking": thinking,
         "context_limit": context_limit,
+        "locale": locale,
+        "rag_enabled": int(bool(rag_enabled)),
         "status": "pending",
         "response": "",
         "created_at": int(time.time()),
@@ -742,6 +759,13 @@ async def invoke_stream(request: Request, stream_key: str):
         middle_context = remaining[1:]
     else:
         middle_context = remaining
+
+    # 追加 RAG 帮助文档检索提示（ai-kb）
+    # /invoke/stream 是一次性会话（每次 stream_key 都新），无需 redis 去重
+    # 请求级 rag_enabled=0（PHP 灰度判定后透传）跳过注入；env RAG_ENABLED=false 已在 tools.py 兜底
+    if getattr(app.state, "kb_loaded", False) and int(data.get("rag_enabled", 1)):
+        from helper.kb.hint import inject_rag_hint
+        inject_rag_hint(pre_context, locale=data.get("locale", "zh"))
 
     # 应用 token 限制
     final_context = handle_context_limits(
@@ -1001,6 +1025,47 @@ async def vision_preview(filename: str):
     }.get(ext, "application/octet-stream")
 
     return FileResponse(filepath, media_type=media_type)
+
+@app.post('/kb/reindex')
+async def kb_reindex(request: Request, x_ingest_token: str = Header(default="", alias="X-Ingest-Token")):
+    """触发 ai-kb 重新入库（增量或全量）。
+
+    认证：header X-Ingest-Token 必须与环境变量 KB_INGEST_TOKEN 一致。
+    Body (JSON):
+        - paths: 相对 KB_CONTENT_DIR 的 markdown 路径列表（增量模式必填）
+        - mode:  "incremental"（默认，配合 paths）或 "full"（全量重建）
+
+    CI step 在 dootask 主仓库合入 main 后调用此端点同步 ai-kb 内容。
+    """
+    expected = os.environ.get("KB_INGEST_TOKEN", "")
+    if not expected:
+        return JSONResponse(content={"code": 500, "error": "KB_INGEST_TOKEN not configured"}, status_code=500)
+    if x_ingest_token != expected:
+        return JSONResponse(content={"code": 403, "error": "invalid ingest token"}, status_code=403)
+
+    if not getattr(app.state, "kb_loaded", False):
+        return JSONResponse(content={"code": 503, "error": "ai-kb not initialized"}, status_code=503)
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+
+    paths = body.get("paths") if isinstance(body, dict) else None
+    mode = (body.get("mode") if isinstance(body, dict) else None) or ("incremental" if paths else "full")
+
+    try:
+        from helper.kb.ingest import ingest_paths, ingest_all
+        if mode == "full" or not paths:
+            result = await ingest_all()
+        else:
+            result = await ingest_paths(paths)
+    except Exception as exc:
+        logger.exception("kb_reindex failed")
+        return JSONResponse(content={"code": 500, "error": str(exc)}, status_code=500)
+
+    return JSONResponse(content={"code": 200, "data": result})
+
 
 @app.get('/health')
 async def health():

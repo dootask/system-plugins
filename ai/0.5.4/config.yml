@@ -1,0 +1,51 @@
+fields:
+  - name: EMBEDDING_MODEL
+    label:
+      en: Embedding model
+      zh: Embedding 模型
+    description:
+      en: "Embedding model for help-docs retrieval. Changing it triggers an automatic index rebuild on next start."
+      zh: "帮助知识库检索使用的 embedding 模型。更换模型后下次启动会自动重建索引。"
+    type: select
+    required: true
+    options:
+      - label:
+          en: "Qwen Embedding (Recommended)"
+          zh: "通义千问 Embedding（推荐）"
+        value: "qwen3-embedding:0.6b"
+      - label:
+          en: "BGE Multilingual Embedding"
+          zh: "BGE 多语言 Embedding"
+        value: bge-m3
+    default: "qwen3-embedding:0.6b"
+  - name: KB_INGEST_TOKEN
+    label:
+      en: KB reindex token
+      zh: 知识库重建令牌
+    description:
+      en: "Internal token for the POST /kb/reindex endpoint (used by CI incremental ingest). If regenerated on upgrade, sync the CI secret accordingly."
+      zh: "POST /kb/reindex 端点的内部令牌（CI 增量入库用）。升级时若重新生成，需同步更新 CI 的 secret。"
+    type: password
+    required: false
+    default: "$random:48"
+
+menu_items:
+  - location: application
+    label:
+      en: AI Assistants
+      zh: AI 助手
+    url: "ai/?theme={system_theme}&lang={system_lang}"
+    url_type: iframe
+    immersive: true
+    capsule:
+      visible: true
+      top: 18
+      right: 18
+require_version:
+  version: ">= 1.4.81"
+  reason:
+    en: "Requires new API features"
+    zh: "需要新的API功能"
+hooks:
+  upgrade: |
+    exit 0

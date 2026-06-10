@@ -1,6 +1,8 @@
 # 标准库导入
 import asyncio
+import fcntl
 import logging
+import os
 
 # 第三方库导入
 import httpx
@@ -48,6 +50,125 @@ async def periodic_vision_cleanup(interval: int = VISION_CLEANUP_INTERVAL) -> No
         cleanup_old_images()
 
 
+_INGEST_LOCK_PATH = "/tmp/ai_kb_ingest.lock"
+
+
+def _try_acquire_ingest_lock():
+    """非阻塞抢 ingest 进程锁；多 worker 中只让一个跑 ingest_all。
+
+    返回 fd（持有锁）或 None（被别的 worker 占了）。fd 在进程退出会自动释放。
+    """
+    try:
+        fd = os.open(_INGEST_LOCK_PATH, os.O_WRONLY | os.O_CREAT, 0o644)
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return fd
+    except BlockingIOError:
+        return None
+    except OSError:
+        return None
+
+
+async def _wait_for_ingest_done(timeout_s: int = 900) -> int:
+    """跟随 worker：轮询 count_docs() 直到主 worker 写完数据。"""
+    from helper.kb.index import count_docs
+    for _ in range(timeout_s):
+        try:
+            n = await count_docs()
+            if n > 0:
+                return n
+        except Exception:
+            pass
+        await asyncio.sleep(1)
+    return 0
+
+
+async def _init_kb(app: FastAPI) -> None:
+    """ai-kb / RAG 初始化：依次探测配置/能力/漂移，再视情况 ingest_all。
+
+    降级链（任一不满足 → kb_loaded=False + 独立日志，AI 聊天不受影响）：
+    RAG_ENABLED → EMBEDDING_BASE_URL 已配置 → 主 redis 支持 vectorset（Redis 8+）
+    → embedding API 连通（probe 取 dim）→ 索引与当前模型/维度一致（漂移默认自动重建）。
+
+    多 worker 协同：VCARD>0 且 meta 匹配直接 skip；否则用 file lock 选一个 worker
+    跑 ingest，其他 worker 等数据出现就标记 ready。
+    """
+    if os.environ.get("RAG_ENABLED", "true").lower() not in ("true", "1", "yes"):
+        app.state.kb_loaded = False
+        logger.info("RAG_ENABLED=false; skip ai-kb init")
+        return
+
+    try:
+        from helper.kb import embeddings as kb_embeddings
+        from helper.kb.index import count_docs, drop_all, ensure_vset, supports_vectorset
+        from helper.kb.ingest import ingest_all
+
+        if not kb_embeddings.is_configured():
+            app.state.kb_loaded = False
+            logger.info("EMBEDDING_BASE_URL not configured; ai-kb/RAG disabled")
+            return
+
+        if not await supports_vectorset():
+            app.state.kb_loaded = False
+            logger.warning(
+                "main redis lacks vectorset support (requires Redis >= 8); ai-kb/RAG disabled. "
+                "Upgrade with `docker compose pull redis && docker compose up -d redis`."
+            )
+            return
+
+        dim = await kb_embeddings.probe()
+        model = kb_embeddings.model_name()
+
+        index_ok = await ensure_vset(dim, model)
+        if not index_ok:
+            rebuild = os.environ.get("KB_REBUILD_ON_MODEL_CHANGE", "true").lower() in ("true", "1", "yes")
+            if not rebuild:
+                app.state.kb_loaded = False
+                logger.warning("embedding model/dim drift and KB_REBUILD_ON_MODEL_CHANGE=false; ai-kb disabled")
+                return
+            # drop_all 放到 leader 锁内执行：多 worker 同时检测到漂移时
+            # 不能各自 drop，否则会互删对方正在重建的数据
+
+        skip_if_indexed = os.environ.get("KB_SKIP_INGEST_IF_INDEXED", "true").lower() in ("true", "1", "yes")
+        existing = await count_docs()
+        if index_ok and skip_if_indexed and existing > 0:
+            app.state.kb_loaded = True
+            logger.info(f"ai-kb already indexed (docs={existing}); skip ingest_all")
+            return
+
+        kb_root = os.environ.get("KB_CONTENT_DIR", "/app/kb-content")
+        if not os.path.isdir(kb_root):
+            logger.warning(f"ai-kb content dir not found: {kb_root}; RAG queries will return empty")
+            app.state.kb_loaded = True
+            return
+
+        lock_fd = _try_acquire_ingest_lock()
+        if lock_fd is None:
+            logger.info("ai-kb ingest held by another worker; waiting for completion...")
+            n = await _wait_for_ingest_done()
+            app.state.kb_loaded = True
+            logger.info(f"ai-kb ready (followed leader); index docs={n}")
+            return
+
+        try:
+            if not index_ok:
+                logger.warning("embedding model/dim drift detected; dropping index for full rebuild (leader)")
+                await drop_all()
+            result = await ingest_all(kb_root=kb_root)
+            logger.info(f"ai-kb ingest_all: {result['ingested']} files, {result['total_chunks']} chunks")
+            app.state.kb_loaded = True
+            n = await count_docs()
+            logger.info(f"ai-kb ready; index docs={n}")
+        finally:
+            try:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
+                os.close(lock_fd)
+            except OSError:
+                pass
+    except Exception as exc:
+        app.state.kb_loaded = False
+        logger.exception(f"ai-kb init failed: {exc}")
+
+
 @asynccontextmanager
 async def lifespan_context(app: FastAPI):
     """FastAPI 生命周期钩子，负责启动/停止 Redis 和周期任务。"""
@@ -61,6 +182,10 @@ async def lifespan_context(app: FastAPI):
         vision_task = asyncio.create_task(periodic_vision_cleanup())
         redis_manager = RedisManager()
         app.state.redis_manager = redis_manager
+
+        # ai-kb / RAG 初始化（不阻塞其他启动逻辑）
+        await _init_kb(app)
+
         logger.info("✅ 初始化成功")
     except Exception as exc:
         logger.info(f"❌ 初始化失败: {str(exc)}")

@@ -16,10 +16,15 @@ class RedisManager:
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(RedisManager, cls).__new__(cls)
+            # 主 .env 里 REDIS_PASSWORD=null 是字面量字符串，按无密码处理
+            password = os.environ.get('REDIS_PASSWORD', '').strip()
+            if password.lower() in ('', 'null', 'none'):
+                password = None
             cls._instance.client = redis.Redis(
                 host=os.environ.get('REDIS_HOST', 'localhost'),
                 port=int(os.environ.get('REDIS_PORT', 6379)),
                 db=int(os.environ.get('REDIS_DB', 0)),  # 添加数据库配置
+                password=password,
                 decode_responses=True
             )
         return cls._instance
