@@ -1,5 +1,5 @@
 """
-主 redis vectorset 存取层（Redis 8 原生 VADD/VSIM，0.5.4 起替代独立 redis-stack）
+主 redis vectorset 存取层（Redis 8 原生 VADD/VSIM）
 
 数据布局（共享主程序 redis，全部收敛到 dootask_ai:kb: 命名空间）：
 - {KEY_PREFIX}{chunk_id}#{i}   HASH，chunk 正文（title/text/source/feature/scope/type/locale，不存向量）
@@ -7,8 +7,8 @@
 - {META_KEY}                   HASH：model / dim / ingested_at + src:{chunk_id} → 该文件 chunk 数（记账式删除用）
 
 主 redis 与 Laravel 共用 keyspace，删除一律走 meta 记账，禁止全库 SCAN。
-client 仍强制 RESP2（protocol=2）：延续 0.5.3 的教训，vectorset 在 RESP2 下
-走最简单的扁平数组解析路径，redis-py 转成 dict。
+client 强制 RESP2（protocol=2）：vectorset 响应走扁平数组解析路径最稳，
+redis-py 转成 dict{element: score}，插入序即相似度降序。
 """
 
 import logging

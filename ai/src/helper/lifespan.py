@@ -86,8 +86,8 @@ async def _init_kb(app: FastAPI) -> None:
     """ai-kb / RAG 初始化：依次探测配置/能力/漂移，再视情况 ingest_all。
 
     降级链（任一不满足 → kb_loaded=False + 独立日志，AI 聊天不受影响）：
-    RAG_ENABLED → EMBEDDING_BASE_URL 已配置 → 主 redis 支持 vectorset（Redis 8+）
-    → embedding API 连通（probe 取 dim）→ 索引与当前模型/维度一致（漂移默认自动重建）。
+    RAG_ENABLED → 主 redis 支持 vectorset（Redis 8+）→ embedding API 连通
+    （probe 取 dim）→ 索引与当前模型/维度一致（漂移默认自动重建）。
 
     多 worker 协同：VCARD>0 且 meta 匹配直接 skip；否则用 file lock 选一个 worker
     跑 ingest，其他 worker 等数据出现就标记 ready。
@@ -101,11 +101,6 @@ async def _init_kb(app: FastAPI) -> None:
         from helper.kb import embeddings as kb_embeddings
         from helper.kb.index import count_docs, drop_all, ensure_vset, supports_vectorset
         from helper.kb.ingest import ingest_all
-
-        if not kb_embeddings.is_configured():
-            app.state.kb_loaded = False
-            logger.info("EMBEDDING_BASE_URL not configured; ai-kb/RAG disabled")
-            return
 
         if not await supports_vectorset():
             app.state.kb_loaded = False

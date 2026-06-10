@@ -3,10 +3,9 @@
 
 供 SearchHelpDocsTool 调用。
 
-分数语义（注意与 0.5.3 的 RediSearch 相反）：VSIM 返回相似度 s=(1+cos)/2，
-范围 0-1，越大越相关。embedding API / redis 故障会抛异常——由 tools 层 catch
-后向 LLM 报"检索失败"，不能静默返回空（空会触发"文档没有相关内容"话术，
-是假阴性误导）。
+分数语义：VSIM 返回相似度 s=(1+cos)/2，范围 0-1，越大越相关。
+embedding API / redis 故障会抛异常——由 tools 层 catch 后向 LLM 报"检索失败"，
+不能静默返回空（空会触发"文档没有相关内容"话术，是假阴性误导）。
 """
 
 import logging
@@ -18,8 +17,7 @@ from .index import KEY_PREFIX, VSET_KEY, get_raw_client, get_vset
 logger = logging.getLogger("ai.kb.retriever")
 
 DEFAULT_TOP_K = 5
-# 相似度空间加分。0.5.3 在距离空间是 -0.1；s = 1 - d/2，等价换算为 +0.05，
-# 照搬 0.1 等于 boost 强度翻倍会改变排序基线。
+# 相似度空间的标题命中加分；等价于 cosine 距离空间的 -0.1（s = 1 - d/2）
 TITLE_BOOST = 0.05
 
 
