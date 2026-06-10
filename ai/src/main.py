@@ -18,7 +18,7 @@ from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, AIMessageChunk
 
 # 本地模块导入
-from helper.config import SERVER_PORT, CLEAR_COMMANDS, STREAM_TIMEOUT, UI_DIST_PATH
+from helper.config import SERVER_PORT, CLEAR_COMMANDS, STREAM_TIMEOUT, UI_DIST_PATH, MAIN_SERVER_URL
 from helper.invoke import parse_context, build_invoke_stream_key
 from helper.lifespan import lifespan_context
 from helper.models import (
@@ -217,6 +217,7 @@ async def chat(request: Request):
         "text": text,
         "token": token,
         "dialog_id": dialog_id,
+        "msg_uid": msg_uid,
         "version": version,
         "msg_user_token": params.get("msg_user[token]"),
         "before_text": before_text,
@@ -298,6 +299,14 @@ async def stream(msg_id: str, stream_key: str):
         dootask_available=dootask_available,
         token_candidates=[data.get("msg_user_token"), data.get("token")],
         redis_manager=app.state.redis_manager,
+        # 检索打点上下文：token 用真实用户 token（userid 由主仓库按 token 推导），缺失时 telemetry 跳过
+        rag_log_context={
+            "server_url": data.get("server_url") or "",
+            "token": data.get("msg_user_token") or "",
+            "dialog_id": data.get("dialog_id", 0),
+            "context_key": data.get("context_key", ""),
+            "source": "chat",
+        },
     )
     async def stream_generate(msg_id, msg_key, data, redis_manager):
         """
@@ -373,6 +382,14 @@ async def stream(msg_id: str, stream_key: str):
                 if not rag_hint_value and not already_injected(pre_context):
                     inject_rag_hint(pre_context, locale=data.get("locale", "zh"))
                     await redis_manager.set_cache(rag_hint_key, "1", ex=3600)
+
+                # 添加页面操作引导提示（ai-guide 围栏脚本 / show_guide 工具）
+                guide_hint_key = f"guide_hint_shown_{data['context_key']}"
+                guide_hint_value = await redis_manager.get_cache(guide_hint_key)
+                from helper.kb.guide_hint import guide_already_injected, inject_guide_hint
+                if not guide_hint_value and not guide_already_injected(pre_context):
+                    inject_guide_hint(pre_context, locale=data.get("locale", "zh"))
+                    await redis_manager.set_cache(guide_hint_key, "1", ex=3600)
 
             middle_messages = []
             if middle_context:
@@ -614,6 +631,7 @@ async def invoke_auth(request: Request, token: str = Header(..., alias="Authoriz
         'thinking_effort': '',
         'locale': 'zh',  # ai-kb 检索语种
         'rag_enabled': 1,  # ai-kb 灰度开关；0 跳过 RAG hint 注入（PHP 灰度判定后透传）
+        'context_key': '',  # 前端会话ID（PHP 透传），用于检索打点关联
     }
     
     # 应用默认值和类型转换
@@ -636,7 +654,7 @@ async def invoke_auth(request: Request, token: str = Header(..., alias="Authoriz
     except (ValueError, TypeError):
         context_limit = 0
 
-    model_type, model_name, max_tokens, temperature, thinking, thinking_effort, locale, rag_enabled = (
+    model_type, model_name, max_tokens, temperature, thinking, thinking_effort, locale, rag_enabled, context_key = (
         params[k] for k in defaults.keys()
     )
 
@@ -662,6 +680,7 @@ async def invoke_auth(request: Request, token: str = Header(..., alias="Authoriz
         "context_limit": context_limit,
         "locale": locale,
         "rag_enabled": int(bool(rag_enabled)),
+        "context_key": str(context_key or "")[:100],
         "status": "pending",
         "response": "",
         "created_at": int(time.time()),
@@ -770,7 +789,10 @@ async def invoke_stream(request: Request, stream_key: str):
     # 请求级 rag_enabled=0（PHP 灰度判定后透传）跳过注入；env RAG_ENABLED=false 已在 tools.py 兜底
     if getattr(app.state, "kb_loaded", False) and int(data.get("rag_enabled", 1)):
         from helper.kb.hint import inject_rag_hint
+        from helper.kb.guide_hint import inject_guide_hint
         inject_rag_hint(pre_context, locale=data.get("locale", "zh"))
+        # 页面操作引导提示（ai-guide 围栏脚本 / show_guide 工具）
+        inject_guide_hint(pre_context, locale=data.get("locale", "zh"))
 
     # 应用 token 限制
     final_context = handle_context_limits(
@@ -805,11 +827,20 @@ async def invoke_stream(request: Request, stream_key: str):
             thinking_effort=data.get("thinking_effort"),
             streaming=True,
         )
+        # 检索打点上下文：user_token 来自 Authorization 头，需剥掉 Bearer 前缀
+        _user_token = (data.get("user_token") or "").removeprefix("Bearer ").strip()
         tools = await load_mcp_tools_for_model(
             data.get("model_name", ""),
             dootask_available=bool(getattr(app.state, "dootask_mcp", False)),
             token_candidates=[data.get("user_token"), data.get("token")],
             redis_manager=app.state.redis_manager,
+            rag_log_context={
+                "server_url": MAIN_SERVER_URL,
+                "token": _user_token,
+                "dialog_id": 0,
+                "context_key": data.get("context_key", ""),
+                "source": "invoke",
+            },
         )
         agent = create_agent(model, tools)
 

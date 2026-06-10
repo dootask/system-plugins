@@ -7,7 +7,8 @@ Defines internal tools that are loaded alongside MCP tools.
 import json
 import logging
 import os
-from typing import Any, List, Type
+import time
+from typing import Any, Dict, List, Optional, Type
 
 from langchain_core.tools import BaseTool
 from pydantic import BaseModel, ConfigDict, Field
@@ -118,6 +119,10 @@ class SearchHelpDocsTool(BaseTool):
     args_schema: Type[BaseModel] = SearchHelpDocsInput
     response_format: str = "content_and_artifact"
 
+    # 请求级打点上下文（每请求新建工具实例，字段注入不会串请求）
+    # 形如 {"server_url", "token", "dialog_id", "context_key", "source"}；None 时不打点
+    log_context: Optional[Dict[str, Any]] = Field(default=None, exclude=True)
+
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def _run(self, query: str, locale: str = "zh") -> tuple:
@@ -130,11 +135,32 @@ class SearchHelpDocsTool(BaseTool):
             logger.error(f"search_help_docs import failed: {e}")
             return ([{"type": "text", "text": "帮助文档检索模块未就绪"}], None)
 
+        start = time.perf_counter()
         try:
             hits = await search(query, locale=locale, top_k=5)
         except Exception as e:
+            # 基础设施故障已有 error log，不打点
             logger.error(f"search_help_docs search failed: {e}")
             return ([{"type": "text", "text": f"检索失败: {e}"}], None)
+        duration_ms = int((time.perf_counter() - start) * 1000)
+
+        if self.log_context:
+            from helper.kb.telemetry import fire_search_log
+            fire_search_log(
+                self.log_context.get("server_url") or "",
+                self.log_context.get("token") or "",
+                {
+                    "query": query,
+                    "locale": locale,
+                    "source": self.log_context.get("source", ""),
+                    "dialog_id": self.log_context.get("dialog_id", 0),
+                    "context_key": self.log_context.get("context_key", ""),
+                    "source_ids": [h["id"] for h in hits],
+                    "top_score": hits[0]["score"] if hits else 0,
+                    "result_count": len(hits),
+                    "duration_ms": duration_ms,
+                },
+            )
 
         content = format_hits(hits)
         artifact = {"hits": [h["id"] for h in hits], "query": query, "locale": locale}
@@ -145,11 +171,12 @@ def _rag_enabled() -> bool:
     return os.environ.get("RAG_ENABLED", "true").lower() in ("true", "1", "yes")
 
 
-def load_builtin_tools(redis_manager: Any) -> List[BaseTool]:
+def load_builtin_tools(redis_manager: Any, log_context: Optional[Dict[str, Any]] = None) -> List[BaseTool]:
     """Load all built-in tools.
 
     Args:
         redis_manager: Redis manager instance
+        log_context: 请求级检索打点上下文（见 SearchHelpDocsTool.log_context）
 
     Returns:
         List of built-in tools
@@ -158,5 +185,5 @@ def load_builtin_tools(redis_manager: Any) -> List[BaseTool]:
         GetSessionImageTool(redis_manager=redis_manager),
     ]
     if _rag_enabled():
-        tools.append(SearchHelpDocsTool())
+        tools.append(SearchHelpDocsTool(log_context=log_context))
     return tools

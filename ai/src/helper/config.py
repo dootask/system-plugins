@@ -17,6 +17,9 @@ CLEAR_COMMANDS = [":clear", ":reset", ":restart", ":new", ":清空上下文", ":
 # 流式响应超时时间
 STREAM_TIMEOUT = 300
 
+# DooTask 主程序地址（检索打点回调等服务端到服务端请求）
+MAIN_SERVER_URL = os.environ.get("MAIN_SERVER_URL", "http://nginx")
+
 # MCP 服务器相关配置
 MCP_SERVER_URL = "http://nginx/apps/mcp_server"
 MCP_STREAM_URL = MCP_SERVER_URL + "/mcp"

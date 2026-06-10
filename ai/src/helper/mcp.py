@@ -234,6 +234,7 @@ async def load_mcp_tools_for_model(
     dootask_available: bool,
     token_candidates: List[Optional[str]],
     redis_manager: Optional[Any] = None,
+    rag_log_context: Optional[Dict[str, Any]] = None,
 ) -> List[object]:
     """根据配置文件加载与当前模型匹配的 MCP 工具列表。"""
     try:
@@ -290,7 +291,7 @@ async def load_mcp_tools_for_model(
     builtin_tools = []
     if redis_manager is not None:
         from helper.tools import load_builtin_tools
-        builtin_tools = load_builtin_tools(redis_manager)
+        builtin_tools = load_builtin_tools(redis_manager, log_context=rag_log_context)
 
     # Combine and wrap all tools
     all_tools = list(mcp_tools) + builtin_tools
