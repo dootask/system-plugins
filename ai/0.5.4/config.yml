@@ -42,10 +42,10 @@ menu_items:
       top: 18
       right: 18
 require_version:
-  version: ">= 1.4.81"
+  version: "> 1.7.90"
   reason:
-    en: "Requires new API features"
-    zh: "需要新的API功能"
+    en: "Requires main app support for the JSON model list format and per-model thinking effort"
+    zh: "需要主程序支持模型列表 JSON 格式与按模型思考程度"
 hooks:
   upgrade: |
     exit 0
