@@ -383,7 +383,7 @@ async def stream(msg_id: str, stream_key: str):
                     inject_rag_hint(pre_context, locale=data.get("locale", "zh"))
                     await redis_manager.set_cache(rag_hint_key, "1", ex=3600)
 
-                # 添加页面操作引导提示（ai-guide 围栏脚本 / show_guide 工具）
+                # 添加页面深链提示（回复内联 [文字](dootask://link/<id>)）
                 guide_hint_key = f"guide_hint_shown_{data['context_key']}"
                 guide_hint_value = await redis_manager.get_cache(guide_hint_key)
                 from helper.kb.guide_hint import guide_already_injected, inject_guide_hint
@@ -791,7 +791,7 @@ async def invoke_stream(request: Request, stream_key: str):
         from helper.kb.hint import inject_rag_hint
         from helper.kb.guide_hint import inject_guide_hint
         inject_rag_hint(pre_context, locale=data.get("locale", "zh"))
-        # 页面操作引导提示（ai-guide 围栏脚本 / show_guide 工具）
+        # 页面深链提示（回复内联 [文字](dootask://link/<id>)）
         inject_guide_hint(pre_context, locale=data.get("locale", "zh"))
 
     # 应用 token 限制

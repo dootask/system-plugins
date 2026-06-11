@@ -1,93 +1,117 @@
 """
-页面引导 system prompt hint
+页面深链 system prompt hint
 
-给 /chat 与 /invoke/stream 共用：教会模型生成 ai-guide 围栏脚本（通道A，
-前端渲染「带我去」按钮）与调用 show_guide 工具（通道B，用户明确要求时直接启动）。
-注入模式与 hint.py（RAG hint）一致。
+给 /chat 与 /invoke/stream 共用：教会模型把回复正文里"可定位的页面/面板"词
+渲染成内联深链 [显示文字](dootask://link/<id>)。前端据主仓库
+resources/ai-kb/_meta/page-links.yaml（只读挂载到 KB_CONTENT_DIR）校验，
+渲染成可点蓝色链接，点击直达该页面。
+
+替代原 driver.js 分步引导（ai-guide 围栏 + show_guide 工具，已下线）。
+注入模式与 hint.py（RAG hint）一致：合并进首条 SystemMessage。
+
+提示词刻意精简：只写模型无法自知的系统事实——id 闭集（前端按此校验）、
+深链能力边界（只到页面级）、输出语法（一个 few-shot 锁 markdown 格式）。
+"怎么表达得体"（去重/用词/克制）交给模型自行把握，不写规则。
 """
 
+import os
+from functools import lru_cache
 from typing import List
 
+import yaml
 from langchain_core.messages import SystemMessage
 
-GUIDE_HINT_ZH = (
-    "【页面操作引导】\n"
-    "回答 DooTask 功能的“怎么做”类问题、且答案包含界面操作步骤时，"
-    "在回复最末尾追加一个 ai-guide 围栏代码块（整个回复最多一个），"
-    "前端会渲染成「带我去」按钮，用户点击后分步高亮页面元素：\n"
-    "```ai-guide\n"
-    '{"version":1,"title":"在项目中创建任务","steps":[\n'
-    '{"content":"我们先回到工作台。点「下一步」我帮你切换过去。","pre_action":{"type":"action","name":"navigate_to_dashboard"},"target":null},\n'
-    '{"title":"找到入口","content":"点击顶部的「新建任务」按钮即可创建任务。","target":{"text":"新建任务","query":"新建任务的按钮"},"placement":"auto"}\n'
-    "]}\n"
-    "```\n"
-    "硬性规则：\n"
-    "1. steps 不超过 7 步，每步 content 不超过 80 字，用用户的语言书写。\n"
-    "2. **pre_action 在用户点「下一步」离开本步时才执行**（不是进入本步时）：本步 content 要描述"
-    "“接下来点下一步会发生什么”，下一步的 target 对应动作执行后的页面状态。\n"
-    "3. target 优先写 text（元素在界面上的真实可见文字，用 DooTask 实际用词，如“新建项目”而非“创建项目”）"
-    "+ query（元素语义描述，运行时智能匹配近义词）；selector 只允许填 get_page_context 实测返回的选择器，"
-    "禁止凭空编写；纯解说步骤 target 填 null。优先指向页面上显眼、可见的顶层按钮/菜单。\n"
-    "4. 用户可能不在目标页面：把“跳转/打开”单独作为一步，其 pre_action 为 type=action"
-    "（name 取 open_project/open_task/navigate_to_dashboard 等导航操作）；要高亮的元素在菜单/弹窗里时，"
-    "先用一步 pre_action type=click 打开它（target 指向触发按钮），下一步再高亮弹窗内元素。\n"
-    "5. 当用户明确说“带我去/带我操作/演示一下”且上下文存在 operation_session_id 时，"
-    "改为直接调用 show_guide 工具立即启动引导（建议先调 get_page_context 拿真实元素文字/选择器），"
-    "并且 show_guide 必须是本轮最后一个工具调用（引导启动会断开页面操作会话）；"
-    "此时不要再输出围栏块。没有 operation_session_id 时只用围栏块方式，target 只写 text+query。"
-)
+# 去重标记：判断 pre_context 是否已注入本 hint
+DEEPLINK_MARKER = "dootask://link/"
 
-GUIDE_HINT_EN = (
-    "[Page guide capability]\n"
-    "When answering how-to questions about DooTask that involve UI steps, append ONE "
-    "ai-guide fenced code block at the very end of your reply (at most one per reply). "
-    "The frontend renders it as a 'Show me' button that highlights page elements step by step:\n"
-    "```ai-guide\n"
-    '{"version":1,"title":"Create a task","steps":[\n'
-    '{"content":"Let\'s go to the dashboard first. Click Next and I will take you there.","pre_action":{"type":"action","name":"navigate_to_dashboard"},"target":null},\n'
-    '{"title":"Find the entry","content":"Click the “New task” button at the top to create a task.","target":{"text":"New task","query":"button to create a new task"},"placement":"auto"}\n'
-    "]}\n"
-    "```\n"
-    "Hard rules:\n"
-    "1. At most 7 steps; each content <= 80 chars; write in the user's language.\n"
-    "2. **pre_action runs when the user clicks Next to LEAVE this step** (not when entering it): "
-    "this step's content should describe what clicking Next will do; the NEXT step's target "
-    "reflects the page state AFTER the action.\n"
-    "3. Prefer target.text (the element's real on-screen label, using DooTask's actual wording) "
-    "+ target.query (semantic description, matched at runtime incl. synonyms); selector may ONLY "
-    "contain selectors returned by get_page_context - never invent one. Use target: null for "
-    "narration-only steps. Prefer prominent, visible, top-level buttons/menus.\n"
-    "4. The user may not be on the target page: make 'navigate/open' its own step whose pre_action "
-    "is type=action (name like open_project/navigate_to_dashboard); to highlight something inside a "
-    "menu/dialog, first add a step whose pre_action is type=click on the trigger, then the next step "
-    "highlights the element inside.\n"
-    "5. When the user explicitly says 'show me / guide me / walk me through' AND "
-    "operation_session_id exists in context, call the show_guide tool directly instead "
-    "(call get_page_context first for real labels/selectors), and show_guide MUST be "
-    "the last tool call of the turn (starting the guide disconnects the operation session); "
-    "do not also output the fenced block. Without operation_session_id, only use the fenced block "
-    "with target text+query."
-)
+
+def _kb_root() -> str:
+    # 与 helper/kb/ingest.py 的 _kb_root 一致
+    return os.environ.get("KB_CONTENT_DIR", "/app/kb-content")
+
+
+@lru_cache(maxsize=1)
+def _load_catalog() -> tuple:
+    """从 _meta/page-links.yaml 读取深链目录（id/title/description）。失败返回空。"""
+    path = os.path.join(_kb_root(), "_meta", "page-links.yaml")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or {}
+    except Exception:
+        return tuple()
+    links = data.get("links", {}) or {}
+    items = []
+    for lid, meta in links.items():
+        meta = meta or {}
+        items.append((lid, meta.get("title", lid), meta.get("description", "")))
+    return tuple(items)
+
+
+def _catalog_lines() -> str:
+    rows = []
+    for lid, title, desc in _load_catalog():
+        rows.append(f"- {lid}：{title}" + (f" — {desc}" if desc else ""))
+    return "\n".join(rows)
+
+
+def _build_hint_zh() -> str:
+    catalog = _catalog_lines()
+    if not catalog:
+        return ""
+    return (
+        "【页面深链】\n"
+        "回复里提到下表中的页面/面板时，把它写成 markdown 链接 "
+        "[显示文字](dootask://link/<id>)；前端会渲染成可点击的蓝色链接，用户点一下直达该页。\n"
+        "两点系统约束（其余你自行把握）：\n"
+        "1. <id> 只能取下表的值（前端按此闭集校验，臆造的 id 会失效）；拿不准就用纯文字、不要加链接。\n"
+        "2. 深链只能到“页面级”，无法定位页面内某个开关/按钮——故页面内的具体操作仍用文字说明。\n"
+        "可用目的地（id：标题 — 说明）：\n"
+        f"{catalog}\n"
+        "示例：在 [系统设置](dootask://link/setting_system) 的消息相关里可开启端到端加密。"
+    )
+
+
+def _build_hint_en() -> str:
+    catalog = _catalog_lines()
+    if not catalog:
+        return ""
+    return (
+        "[Page deep links]\n"
+        "When your reply mentions a page/panel listed below, write it as a markdown link "
+        "[label](dootask://link/<id>); the frontend renders it as a clickable link that takes "
+        "the user straight to that screen.\n"
+        "Two system constraints (use your own judgment for the rest):\n"
+        "1. <id> MUST be one of the values below (the frontend validates against this closed "
+        "set; invented ids silently fail). If unsure, use plain text with no link.\n"
+        "2. A deep link only reaches the page level — it cannot target a specific toggle/button "
+        "inside the page, so describe in-page actions in text.\n"
+        "Available destinations (id: title — note):\n"
+        f"{catalog}\n"
+        "Example: open end-to-end encryption under [System settings](dootask://link/setting_system)."
+    )
 
 
 def get_guide_hint(locale: str = "zh") -> str:
-    return GUIDE_HINT_EN if locale == "en" else GUIDE_HINT_ZH
+    return _build_hint_en() if locale == "en" else _build_hint_zh()
 
 
 def guide_already_injected(pre_context: List) -> bool:
-    """检查 pre_context 是否已含 guide hint。"""
+    """检查 pre_context 是否已含深链 hint。"""
     for msg in pre_context:
-        if isinstance(msg, SystemMessage) and "ai-guide" in (msg.content or ""):
+        if isinstance(msg, SystemMessage) and DEEPLINK_MARKER in (msg.content or ""):
             return True
     return False
 
 
 def inject_guide_hint(pre_context: List, locale: str = "zh") -> List:
-    """在 pre_context 注入 guide hint（合并到首条 SystemMessage，与 RAG hint 模式一致）。"""
-    if guide_already_injected(pre_context):
+    """在 pre_context 注入深链 hint（合并到首条 SystemMessage，与 RAG hint 模式一致）。
+
+    目录加载失败（hint 为空）时直接跳过，不污染上下文。
+    """
+    hint = get_guide_hint(locale)
+    if not hint or guide_already_injected(pre_context):
         return pre_context
 
-    hint = get_guide_hint(locale)
     for i, msg in enumerate(pre_context):
         if isinstance(msg, SystemMessage):
             pre_context[i] = SystemMessage(content=f"{msg.content}\n\n{hint}")
