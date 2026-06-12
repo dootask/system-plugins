@@ -21,6 +21,36 @@ import { createMcpId } from "@/data/mcp-config"
 import type { AIBotItem } from "@/data/aibots"
 import { useI18n } from "@/lib/i18n-context"
 
+const CONFIG_EXAMPLES = {
+  http: JSON.stringify(
+    {
+      transport: "streamable_http",
+      url: "https://mcp.example.com/mcp",
+      headers: { Authorization: "Bearer YOUR_TOKEN" },
+    },
+    null,
+    2,
+  ),
+  sse: JSON.stringify(
+    {
+      transport: "sse",
+      url: "https://mcp.example.com/sse",
+      headers: { Authorization: "Bearer YOUR_TOKEN" },
+    },
+    null,
+    2,
+  ),
+  stdio: JSON.stringify(
+    {
+      transport: "stdio",
+      command: "npx",
+      args: ["-y", "@modelcontextprotocol/server-filesystem", "/path"],
+    },
+    null,
+    2,
+  ),
+} as const
+
 export interface MCPEditorSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -174,9 +204,41 @@ export const MCPEditorSheet = ({
             {/* MCP配置 - 系统MCP不显示 */}
             {!mcp?.isSystem && (
               <div className="space-y-2">
-                <Label htmlFor="mcp-config" className="text-sm font-medium">
-                  {t("mcp.config")}
-                </Label>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <Label htmlFor="mcp-config" className="text-sm font-medium">
+                    {t("mcp.config")}
+                  </Label>
+                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                    <span>{t("mcp.exampleLabel")}</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => handleConfigChange(CONFIG_EXAMPLES.http)}
+                    >
+                      {t("mcp.exampleHttp")}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => handleConfigChange(CONFIG_EXAMPLES.sse)}
+                    >
+                      {t("mcp.exampleSse")}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-6 px-2 text-xs"
+                      onClick={() => handleConfigChange(CONFIG_EXAMPLES.stdio)}
+                    >
+                      {t("mcp.exampleStdio")}
+                    </Button>
+                  </div>
+                </div>
                 <Textarea
                   id="mcp-config"
                   value={config}
