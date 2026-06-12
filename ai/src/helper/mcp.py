@@ -235,6 +235,9 @@ async def load_mcp_tools_for_model(
     token_candidates: List[Optional[str]],
     redis_manager: Optional[Any] = None,
     rag_log_context: Optional[Dict[str, Any]] = None,
+    doo_enabled: bool = False,
+    doo_session_fd: Optional[int] = None,
+    doo_token: Optional[str] = None,
 ) -> List[object]:
     """根据配置文件加载与当前模型匹配的 MCP 工具列表。"""
     try:
@@ -293,6 +296,12 @@ async def load_mcp_tools_for_model(
         from helper.tools import load_builtin_tools
         builtin_tools = load_builtin_tools(redis_manager, log_context=rag_log_context)
 
+    # doo 执行工具：仅 AI 助手路径（doo_enabled）装载，聊天机器人路径不挂
+    doo_tools = []
+    if doo_enabled:
+        from helper.doo_tool import DooTool
+        doo_tools = [DooTool(token=doo_token or "", session_fd=int(doo_session_fd or 0))]
+
     # Combine and wrap all tools
-    all_tools = list(mcp_tools) + builtin_tools
+    all_tools = list(mcp_tools) + builtin_tools + doo_tools
     return [_wrap_tool_with_error_handling(tool) for tool in all_tools]

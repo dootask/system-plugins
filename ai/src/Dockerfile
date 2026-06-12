@@ -58,6 +58,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && \
 # （helper/context.py 在 import 期调用 get_encoding，曾因联网下载卡 ~100s）
 RUN python -c "import tiktoken; tiktoken.get_encoding('o200k_base'); tiktoken.get_encoding('cl100k_base')"
 
+# doo CLI（DooTask 命令行）——AI 经受控 doo 工具执行操作。
+# 预编译的纯静态二进制（CGO_ENABLED=0）由 vendor-doo.sh 落到 vendor/，见本目录 README/脚本。
+# 默认 amd64；buildx 多架构构建时 TARGETARCH 自动覆盖。
+ARG TARGETARCH=amd64
+COPY vendor/doo-linux-${TARGETARCH} /usr/local/bin/doo
+RUN chmod 0755 /usr/local/bin/doo
+
 # 复制项目文件
 COPY main.py .
 COPY helper/ helper/

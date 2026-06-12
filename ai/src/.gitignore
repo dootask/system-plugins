@@ -86,6 +86,9 @@ test.*
 ehthumbs.db
 Thumbs.db
 
+# 预编译的 doo 二进制（由 vendor-doo.sh 生成，构建时落盘，不入库）
+vendor/doo-linux-*
+
 # Vision data files (keep .gitkeep)
 data/vision/*.jpg
 data/vision/*.png

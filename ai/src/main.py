@@ -632,6 +632,8 @@ async def invoke_auth(request: Request, token: str = Header(..., alias="Authoriz
         'locale': 'zh',  # ai-kb 检索语种
         'rag_enabled': 1,  # ai-kb 灰度开关；0 跳过 RAG hint 注入（PHP 灰度判定后透传）
         'context_key': '',  # 前端会话ID（PHP 透传），用于检索打点关联
+        'doo_enabled': 0,  # AI 助手路径启用 doo 执行工具（PHP 透传，仅助手面板为 1）
+        'fd': 0,  # 用户当前 WebSocket fd（doo page 操作本人浏览器用，0 表示无）
     }
     
     # 应用默认值和类型转换
@@ -654,7 +656,7 @@ async def invoke_auth(request: Request, token: str = Header(..., alias="Authoriz
     except (ValueError, TypeError):
         context_limit = 0
 
-    model_type, model_name, max_tokens, temperature, thinking, thinking_effort, locale, rag_enabled, context_key = (
+    model_type, model_name, max_tokens, temperature, thinking, thinking_effort, locale, rag_enabled, context_key, doo_enabled, fd = (
         params[k] for k in defaults.keys()
     )
 
@@ -681,6 +683,8 @@ async def invoke_auth(request: Request, token: str = Header(..., alias="Authoriz
         "locale": locale,
         "rag_enabled": int(bool(rag_enabled)),
         "context_key": str(context_key or "")[:100],
+        "doo_enabled": int(bool(doo_enabled)),
+        "fd": int(fd),
         "status": "pending",
         "response": "",
         "created_at": int(time.time()),
@@ -841,6 +845,9 @@ async def invoke_stream(request: Request, stream_key: str):
                 "context_key": data.get("context_key", ""),
                 "source": "invoke",
             },
+            doo_enabled=bool(data.get("doo_enabled")),
+            doo_session_fd=int(data.get("fd") or 0),
+            doo_token=_user_token,
         )
         agent = create_agent(model, tools)
 
