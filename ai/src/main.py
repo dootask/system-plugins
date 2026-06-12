@@ -307,6 +307,10 @@ async def stream(msg_id: str, stream_key: str):
             "context_key": data.get("context_key", ""),
             "source": "chat",
         },
+        # 聊天机器人也走 doo（数据操作；无浏览器 fd，page 操作不可用，会优雅降级）
+        doo_enabled=True,
+        doo_session_fd=0,
+        doo_token=(data.get("msg_user_token") or data.get("token") or ""),
     )
     async def stream_generate(msg_id, msg_key, data, redis_manager):
         """
@@ -353,17 +357,17 @@ async def stream(msg_id: str, stream_key: str):
             # 获取现有上下文
             middle_context = await redis_manager.get_context(data["context_key"])
 
-            # 添加 MCP 工具使用提示
+            # 添加工具使用提示（doo：取历史聊天记录）
             hint_cache_key = None
-            if dootask_available:
+            if True:
                 hint_cache_key = f"mcp_hint_shown_{data['context_key']}"
                 # 检查是否需要添加提示：1) Redis 无标记 2) pre_context 中无该提示
                 hint_cache_value = await redis_manager.get_cache(hint_cache_key)
-                has_hint_in_context = any(isinstance(msg, SystemMessage) and "get_message_list" in msg.content for msg in pre_context)
+                has_hint_in_context = any(isinstance(msg, SystemMessage) and "doo message list" in msg.content for msg in pre_context)
                 if not hint_cache_value and not has_hint_in_context:
                     hint_content = (
                         f"如果用户的提问涉及历史对话内容或需要查看完整聊天记录，"
-                        f"请使用 get_message_list 工具获取（dialog_id: {data['dialog_id']}）。"
+                        f"请使用 doo 命令获取：doo message list --dialog {data['dialog_id']}。"
                     )
                     # 尝试追加到现有 SystemMessage，否则插入新的
                     for index, msg in enumerate(pre_context):
