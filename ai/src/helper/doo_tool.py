@@ -124,6 +124,8 @@ class DooTool(BaseTool):
             return ([{"type": "text", "text": f"命令超时（>{EXEC_TIMEOUT}s）"}], None)
 
         code = proc.returncode
+        # 审计：记录 argv（不含 token，token 只在 env）+ 退出码 + 是否带会话
+        logger.info("doo exec argv=%s fd=%s exit=%s", argv, int(self.session_fd or 0), code)
         stdout = (out_b or b"").decode("utf-8", "replace")
         stderr = (err_b or b"").decode("utf-8", "replace")
         if len(stdout) > STDOUT_LIMIT:

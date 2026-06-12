@@ -262,6 +262,10 @@ async def load_mcp_tools_for_model(
             continue
 
         is_dootask = mcp.get("id") == DOOTASK_MCP_ID
+        # 启用 doo 工具的路径（AI 助手）走 doo-only：跳过 dootask 内置 MCP，
+        # 其 29 个能力改由 DooTool 承担；自定义 MCP 不受影响。
+        if is_dootask and doo_enabled:
+            continue
         if is_dootask:
             server_key = "dootask-task"
         else:

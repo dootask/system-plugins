@@ -14,8 +14,10 @@ if [ ! -f "$DOO_DIR/Makefile" ]; then
   exit 1
 fi
 
-echo "==> 在 $DOO_DIR 交叉编译 linux 二进制"
-make -C "$DOO_DIR" build-all
+# 版本对齐：用 doo 源码所在仓库的短 commit 作为版本号，便于核对镜像内 doo 与源码一致
+DOO_VERSION="${DOO_VERSION:-$(git -C "$DOO_DIR" rev-parse --short HEAD 2>/dev/null || echo dev)}"
+echo "==> 在 $DOO_DIR 交叉编译 linux 二进制（version=$DOO_VERSION）"
+make -C "$DOO_DIR" build-all VERSION="$DOO_VERSION"
 
 mkdir -p "$HERE/vendor"
 cp "$DOO_DIR/dist/doo-linux-amd64" "$HERE/vendor/doo-linux-amd64"
