@@ -1,3 +1,17 @@
+# doo CLI 构建阶段：clone dootask-tools 锁定 tag，交叉编译 doo 二进制
+FROM golang:1.25-bookworm AS doo-builder
+ARG DOO_VERSION=v1.3.0
+ARG TARGETARCH=amd64
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+RUN git clone --depth 1 --branch ${DOO_VERSION} https://github.com/dootask/tools.git /src && \
+    cd /src/server/go/cmd/doo && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
+      go build \
+        -ldflags "-s -w -X github.com/dootask/tools/server/go/cmd/doo/internal/commands.Version=${DOO_VERSION#v}" \
+        -o /out/doo . && \
+    /out/doo --version
+
 # UI 构建阶段
 FROM node:20-alpine AS ui-builder
 WORKDIR /ui
@@ -59,10 +73,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && \
 RUN python -c "import tiktoken; tiktoken.get_encoding('o200k_base'); tiktoken.get_encoding('cl100k_base')"
 
 # doo CLI（DooTask 命令行）——AI 经受控 doo 工具执行操作。
-# 预编译的纯静态二进制（CGO_ENABLED=0）由 vendor-doo.sh 落到 vendor/，见本目录 README/脚本。
-# 默认 amd64；buildx 多架构构建时 TARGETARCH 自动覆盖。
-ARG TARGETARCH=amd64
-COPY vendor/doo-linux-${TARGETARCH} /usr/local/bin/doo
+# 从 dootask-tools 仓库锁定 tag clone 后交叉编译，纯静态二进制（CGO_ENABLED=0）。
+# 多架构由 buildx 通过 TARGETARCH 注入；版本号由 DOO_VERSION 决定，与 dootask-tools tag 一一对应。
+COPY --from=doo-builder /out/doo /usr/local/bin/doo
 RUN chmod 0755 /usr/local/bin/doo
 
 # 复制项目文件
