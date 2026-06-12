@@ -44,8 +44,8 @@ menu_items:
 require_version:
   version: "> 1.7.90"
   reason:
-    en: "Requires main app support for the JSON model list format and per-model thinking effort"
-    zh: "需要主程序支持模型列表 JSON 格式与按模型思考程度"
+    en: "Page operations require the main app's fd injection (assistant/auth) and operation dispatch endpoints (>= 1.7.91)"
+    zh: "页面操作依赖主程序的 fd 注入（assistant/auth）与操作派发端点（需 >= 1.7.91）"
 hooks:
   upgrade: |
     exit 0
