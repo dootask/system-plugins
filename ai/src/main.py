@@ -293,10 +293,8 @@ async def stream(msg_id: str, stream_key: str):
             media_type='text/event-stream'
         )
 
-    dootask_available = bool(getattr(app.state, "dootask_mcp", False))
     tools = await load_mcp_tools_for_model(
         data.get("model_name", ""),
-        dootask_available=dootask_available,
         token_candidates=[data.get("msg_user_token"), data.get("token")],
         redis_manager=app.state.redis_manager,
         # 检索打点上下文：token 用真实用户 token（userid 由主仓库按 token 推导），缺失时 telemetry 跳过
@@ -839,7 +837,6 @@ async def invoke_stream(request: Request, stream_key: str):
         _user_token = (data.get("user_token") or "").removeprefix("Bearer ").strip()
         tools = await load_mcp_tools_for_model(
             data.get("model_name", ""),
-            dootask_available=bool(getattr(app.state, "dootask_mcp", False)),
             token_candidates=[data.get("user_token"), data.get("token")],
             redis_manager=app.state.redis_manager,
             rag_log_context={

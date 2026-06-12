@@ -20,15 +20,9 @@ STREAM_TIMEOUT = 300
 # DooTask 主程序地址（检索打点回调等服务端到服务端请求）
 MAIN_SERVER_URL = os.environ.get("MAIN_SERVER_URL", "http://nginx")
 
-# MCP 服务器相关配置
-MCP_SERVER_URL = "http://nginx/apps/mcp_server"
-MCP_STREAM_URL = MCP_SERVER_URL + "/mcp"
-MCP_HEALTH_URL = MCP_SERVER_URL + "/healthz"
-MCP_CHECK_INTERVAL = 60  # 检查间隔，单位秒
-
-# MCP 配置文件路径及默认名称
+# 自定义 MCP 配置文件路径（用户自接的外部 MCP 服务器；DooTask 内置 MCP 已退役）
+# DOOTASK_MCP_ID 仍保留：用于识别并跳过历史配置里残留的系统 MCP 条目
 MCP_CONFIG_PATH = BASE_DIR / "config" / "mcp-config.json"
-DOOTASK_MCP_NAME = "DooTask MCP"
 DOOTASK_MCP_ID = "dootask-mcp"
 
 # Vision 配置文件路径

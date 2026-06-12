@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, List, Optional
 from langchain_core.tools import BaseTool, ToolException
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
-from helper.config import DOOTASK_MCP_ID, DOOTASK_MCP_NAME, MCP_CONFIG_PATH, MCP_STREAM_URL, DEFAULT_MODELS
+from helper.config import DOOTASK_MCP_ID, MCP_CONFIG_PATH
 
 logger = logging.getLogger("ai")
 
@@ -118,48 +118,6 @@ def save_mcp_config_data(data: Dict[str, object]) -> None:
         raise MCPConfigError("Failed to write MCP config") from exc
 
 
-def _collect_supported_mcp_models() -> List[Dict[str, str]]:
-    """从默认模型表收集支持 MCP 的模型列表。"""
-    seen: Dict[str, str] = {}
-    for items in DEFAULT_MODELS.values():
-        for item in items:
-            if item.get("support_mcp"):
-                seen[item["id"]] = item.get("name") or item["id"]
-    return [
-        {"id": model_id, "name": seen[model_id]}
-        for model_id in sorted(seen.keys())
-    ]
-
-
-def ensure_dootask_mcp_config(enabled: bool) -> None:
-    """确保 DooTask MCP 配置已写入配置文件。"""
-    config_data = load_mcp_config_data(fallback_empty=True)
-    mcps = config_data.get("mcps") or []
-
-    if any(
-        isinstance(mcp, dict) and mcp.get("id") == DOOTASK_MCP_ID
-        for mcp in mcps
-    ):
-        return
-
-    default_config = {
-        "id": DOOTASK_MCP_ID,
-        "name": DOOTASK_MCP_NAME,
-        "config": "{}",
-        "supportedModels": _collect_supported_mcp_models(),
-        "enabled": enabled,
-        "isSystem": True,
-    }
-    mcps.append(default_config)
-    config_data["mcps"] = mcps
-
-    try:
-        save_mcp_config_data(config_data)
-        logger.info("✅ 已写入默认 DooTask MCP 配置")
-    except MCPConfigError as exc:  # pragma: no cover - best effort config write
-        logger.error("❌ 写入 MCP 配置失败: %s", exc)
-
-
 def _strip_thinking_suffix(name: str) -> str:
     """去掉历史遗留的 ` (thinking)` 等思考后缀，便于与干净的 model_name 匹配。"""
     return re.sub(r"\s*\(\s*(think|thinking|reasoning)\s*\)\s*$", "", name, flags=re.IGNORECASE).strip()
@@ -182,25 +140,6 @@ def _mcp_supports_model(mcp_entry: Dict[str, object], model_name: str) -> bool:
         if isinstance(model_id, str) and _strip_thinking_suffix(model_id) == target:
             return True
     return False
-
-
-def _pick_token(token_candidates: List[Optional[str]]) -> str:
-    for token in token_candidates:
-        if isinstance(token, str) and token:
-            return token
-    return "unknown"
-
-
-def _build_dootask_mcp_config(
-    token: str,
-) -> Optional[Dict[str, object]]:
-    return {
-        "url": MCP_STREAM_URL,
-        "transport": "streamable_http",
-        "headers": {
-            "token": token or "unknown"
-        },
-    }
 
 
 def _load_custom_mcp_config(mcp_entry: Dict[str, object], server_key: str) -> Optional[Dict[str, object]]:
@@ -231,7 +170,6 @@ def _load_custom_mcp_config(mcp_entry: Dict[str, object], server_key: str) -> Op
 async def load_mcp_tools_for_model(
     model_name: str,
     *,
-    dootask_available: bool,
     token_candidates: List[Optional[str]],
     redis_manager: Optional[Any] = None,
     rag_log_context: Optional[Dict[str, Any]] = None,
@@ -239,7 +177,11 @@ async def load_mcp_tools_for_model(
     doo_session_fd: Optional[int] = None,
     doo_token: Optional[str] = None,
 ) -> List[object]:
-    """根据配置文件加载与当前模型匹配的 MCP 工具列表。"""
+    """加载自定义 MCP 工具 + 内置工具 + doo 工具。
+
+    DooTask 内置 MCP（原 29 个工具）已退役，改由 DooTool 经 doo CLI 承担；
+    这里只处理用户自接的外部自定义 MCP 服务器。
+    """
     try:
         config_data = load_mcp_config_data(fallback_empty=True)
     except MCPConfigError:
@@ -251,7 +193,6 @@ async def load_mcp_tools_for_model(
         return []
 
     server_configs: Dict[str, Dict[str, object]] = {}
-    token_value = _pick_token(token_candidates)
 
     for mcp in mcps:
         if not isinstance(mcp, dict):
@@ -261,25 +202,15 @@ async def load_mcp_tools_for_model(
         if not _mcp_supports_model(mcp, model_name):
             continue
 
-        is_dootask = mcp.get("id") == DOOTASK_MCP_ID
-        # 启用 doo 工具的路径（AI 助手）走 doo-only：跳过 dootask 内置 MCP，
-        # 其 29 个能力改由 DooTool 承担；自定义 MCP 不受影响。
-        if is_dootask and doo_enabled:
+        # dootask 内置 MCP 已退役，跳过所有系统 MCP 条目；自定义 MCP 不受影响
+        if mcp.get("id") == DOOTASK_MCP_ID or mcp.get("isSystem"):
             continue
-        if is_dootask:
-            server_key = "dootask-task"
-        else:
-            server_key = str(mcp.get("id") or mcp.get("name") or "").strip()
-            if not server_key:
-                server_key = f"mcp-{len(server_configs) + 1}"
 
-        if is_dootask:
-            if not dootask_available:
-                continue
-            config = _build_dootask_mcp_config(token_value)
-        else:
-            config = _load_custom_mcp_config(mcp, server_key)
+        server_key = str(mcp.get("id") or mcp.get("name") or "").strip()
+        if not server_key:
+            server_key = f"mcp-{len(server_configs) + 1}"
 
+        config = _load_custom_mcp_config(mcp, server_key)
         if not config:
             continue
         server_configs[server_key] = config
