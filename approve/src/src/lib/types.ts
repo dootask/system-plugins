@@ -21,16 +21,21 @@ export interface UserLite {
 }
 
 /**
- * 评论/审批意见附带的图片（存于 proc_event.attachments JSON）。
- * fileId 为主程序文件 id；url 为内容直链（评论时解析存储，便于前端 <img> 直接展示）。
+ * 上传附件（插件本地存储，参考 crm）：文件落在插件数据目录，库内只存访问信息。
+ * url 形如 /apps/approve/api/uploads/<uuid>，可直接用于 <img> 或下载。
  */
-export interface CommentImage {
-  fileId?: number
+export interface Attachment {
   name: string
-  ext?: string
-  size?: number
-  url?: string
+  url: string
+  size: number
+  mime: string
 }
+
+/** 上传接口返回值（与 Attachment 同构）。 */
+export type UploadResult = Attachment
+
+/** 评论/审批意见附带的图片（存于 proc_event.attachments JSON），与 Attachment 同构。 */
+export type CommentImage = Attachment
 
 // ───────────────────────── 数据库行类型（repo 层返回） ─────────────────────────
 // 形状与 lib/db.ts migrate() 的表列一一对应（SQLite 用 INTEGER 表布尔，0/1）。
@@ -125,9 +130,11 @@ export interface ProcAttachmentRow {
   field_key: string | null
   file_id: number | null
   local_path: string | null
+  url: string | null
   name: string | null
   size: number | null
   ext: string | null
+  mime: string | null
   uploaded_by: number
   created_at: string
 }

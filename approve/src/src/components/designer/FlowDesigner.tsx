@@ -25,6 +25,8 @@ import {
   DrawerTitle,
 } from '#/components/ui/drawer'
 import { pickUsers } from '#/lib/form/picker'
+import { useUsers } from '#/lib/use-users'
+import { UserChip } from '#/components/ui/user-chip'
 import {
   APPROVE_MODE_LABEL,
   OP_LABEL,
@@ -357,11 +359,12 @@ function Drawer({
       }}
     >
       <DrawerContent className="flex flex-col sm:max-w-md">
-        <DrawerHeader className="flex-row items-center justify-between border-b">
-          <DrawerTitle className="text-base">{title}</DrawerTitle>
+        {/* 关闭按钮放标题前面（左侧），避开右上角被胶囊遮挡 */}
+        <DrawerHeader className="flex-row items-center gap-2 space-y-0 border-b">
           <DrawerClose className="text-muted-foreground hover:text-foreground">
             <X className="size-5" />
           </DrawerClose>
+          <DrawerTitle className="text-base">{title}</DrawerTitle>
         </DrawerHeader>
         <div className="flex-1 space-y-4 overflow-y-auto p-4">{children}</div>
       </DrawerContent>
@@ -402,6 +405,8 @@ function NodeConfigPanel({
   onChange: (patch: Partial<FlowNode>) => void
 }) {
   const node = findNode(root, nodeId)
+  // useUsers 必须无条件调用（hooks 规则）；node 为空时传空数组。
+  const userOf = useUsers(node?.userIds ?? [])
   if (!node) return null
   const isApprover = node.type === 'approver'
   const st: SetType = node.settype ?? 'specific'
@@ -456,10 +461,9 @@ function NodeConfigPanel({
             {(node.userIds ?? []).map((id) => (
               <span
                 key={id}
-                className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-1 text-xs"
+                className="inline-flex items-center gap-1 rounded-md bg-secondary py-1 pr-2 pl-1 text-xs"
               >
-                <Users className="size-3" />
-                {id}
+                <UserChip user={userOf(id)} />
                 <button
                   type="button"
                   onClick={() =>

@@ -67,14 +67,14 @@ export interface FieldProps {
 
 /** 附件值（M3a 仅占位，真正上传在 M4 接主程序）。 */
 export interface FileValue {
-  /** 主程序 File id（M4 上传后回填）。 */
-  fileId?: number
   /** 文件名。 */
   name: string
+  /** 插件本地访问 URL（/apps/approve/api/uploads/<uuid>），上传后回填。 */
+  url: string
   /** 字节数。 */
   size?: number
-  /** 扩展名。 */
-  ext?: string
+  /** MIME 类型。 */
+  mime?: string
 }
 
 /** 单个字段定义。 */

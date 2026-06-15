@@ -6,7 +6,7 @@ import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { EmojiPicker } from '#/components/ui/emoji-picker'
 import { cn } from '#/lib/utils'
-import { ErrorBar, Loading, PageHeader } from '#/components/ui/misc'
+import { ErrorBar, Loading } from '#/components/ui/misc'
 import { FormDesigner } from '#/components/designer/FormDesigner'
 import { FlowDesigner } from '#/components/designer/FlowDesigner'
 import { validateFormSchema } from '#/lib/form/validate'
@@ -109,53 +109,58 @@ export function TemplateEditor({ idParam }: { idParam: string }) {
 
   return (
     <div>
-      <PageHeader
-        title={isNew ? '新建模板' : '编辑模板'}
-        action={
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => navigate({ to: '/admin' })}
-              disabled={saving}
-            >
-              取消
-            </Button>
-            <Button onClick={save} disabled={saving}>
-              {saving ? '保存中…' : '保存'}
-            </Button>
-          </div>
-        }
-      />
+      {/* 桌面端标题独占一行（移动端顶部标题栏已显示「模板编辑」） */}
+      <h1 className="mb-4 text-lg font-semibold max-md:hidden">
+        {isNew ? '新建模板' : '编辑模板'}
+      </h1>
       {error ? <ErrorBar message={error} /> : null}
 
-      <div className="mb-4 flex gap-1 border-b">
-        {TABS.map((t) => (
-          <button
-            key={t.key}
-            type="button"
-            onClick={() => setTab(t.key)}
-            className={cn(
-              'border-b-2 px-4 py-2 text-sm font-medium transition-colors',
-              tab === t.key
-                ? 'border-primary text-foreground'
-                : 'border-transparent text-muted-foreground hover:text-foreground',
-            )}
+      {/* 页签 + 操作按钮：保存/取消放在页签行右侧，避开右上角胶囊遮挡 */}
+      <div className="mb-4 flex justify-between gap-2 border-b">
+        <div className="flex min-w-0 gap-1 overflow-x-auto">
+          {TABS.map((t) => (
+            <button
+              key={t.key}
+              type="button"
+              onClick={() => setTab(t.key)}
+              className={cn(
+                'shrink-0 border-b-2 px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors',
+                tab === t.key
+                  ? 'border-primary text-foreground'
+                  : 'border-transparent text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+        <div className="-mt-3 flex shrink-0 items-center gap-2 self-center">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => navigate({ to: '/admin' })}
+            disabled={saving}
           >
-            {t.label}
-          </button>
-        ))}
+            取消
+          </Button>
+          <Button size="sm" onClick={save} disabled={saving}>
+            {saving ? '保存中…' : '保存'}
+          </Button>
+        </div>
       </div>
 
       {tab === 'basic' ? (
         <div className="max-w-md space-y-4">
           <div className="space-y-1.5">
             <Label>模板名称</Label>
-            <Input value={name} onChange={(e) => setName(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <Label>图标（emoji，可选）</Label>
-            <div>
+            {/* 图标（emoji）放输入框前面，与名称合并成一行 */}
+            <div className="flex items-center gap-2">
               <EmojiPicker value={icon} onChange={setIcon} />
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="flex-1"
+              />
             </div>
           </div>
           <div className="space-y-1.5">

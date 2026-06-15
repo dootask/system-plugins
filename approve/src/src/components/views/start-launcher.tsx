@@ -1,9 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { Search } from 'lucide-react'
+import { ListFilter, Search } from 'lucide-react'
 import { api, ApiError } from '#/lib/api'
 import { CATEGORY_GROUPS, groupOf } from '#/lib/categories'
+import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu'
 import { EmptyState, ErrorBar, Loading } from '#/components/ui/misc'
 import { cn } from '#/lib/utils'
 import type { DefSummary } from '#/lib/types'
@@ -52,7 +60,7 @@ export function StartLauncher() {
     <div>
       {/* 桌面端标题（移动端顶部标题栏已显示）；标题独占一行，让右上角留给胶囊 */}
       <h1 className="mb-4 text-lg font-semibold max-md:hidden">发起申请</h1>
-      {/* 顶部：分类页签（桌面）+ 搜索 */}
+      {/* 顶部：分类页签（桌面）+ 搜索；移动端搜索框右侧用筛选图标弹出分类 */}
       <div className="mb-5 flex items-center gap-3 max-sm:flex-col max-sm:items-stretch">
         <div className="flex flex-1 flex-wrap gap-1 max-sm:hidden">
           <TabPill active={tab === ALL} onClick={() => setTab(ALL)}>
@@ -68,14 +76,45 @@ export function StartLauncher() {
             </TabPill>
           ))}
         </div>
-        <div className="relative w-full sm:w-64">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            placeholder="搜索模板名称"
-            className="pl-8"
-          />
+        <div className="flex w-full items-center gap-2 sm:w-64">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              placeholder="搜索模板名称"
+              className="pl-8"
+            />
+          </div>
+          {/* 移动端分类筛选（桌面端有页签，故隐藏）；选中具体分类时图标高亮+圆点 */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="按分类筛选"
+                className={cn(
+                  'relative shrink-0 sm:hidden',
+                  tab !== ALL && 'border-primary text-primary',
+                )}
+              >
+                <ListFilter className="size-4" />
+                {tab !== ALL ? (
+                  <span className="absolute top-1 right-1 size-1.5 rounded-full bg-primary" />
+                ) : null}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuRadioGroup value={tab} onValueChange={setTab}>
+                <DropdownMenuRadioItem value={ALL}>全部</DropdownMenuRadioItem>
+                {groupsWithDefs.map((g) => (
+                  <DropdownMenuRadioItem key={g.code} value={g.code}>
+                    {g.label}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 

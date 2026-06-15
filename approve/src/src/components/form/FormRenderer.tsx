@@ -418,7 +418,7 @@ function FileField({
         const up = await uploadFile(f)
         onChange([
           ...valueRef.current,
-          { fileId: up.fileId, name: up.name, size: up.size, ext: up.ext },
+          { name: up.name, url: up.url, size: up.size, mime: up.mime },
         ])
       } catch (err) {
         setError(
@@ -434,10 +434,17 @@ function FileField({
     <div className="space-y-2">
       {value.map((f, i) => (
         <div
-          key={`${f.fileId ?? f.name}-${i}`}
+          key={`${f.url}-${i}`}
           className="flex items-center justify-between rounded-md border px-3 py-1.5 text-sm"
         >
-          <span className="truncate">{f.name}</span>
+          <a
+            href={`${f.url}?download&name=${encodeURIComponent(f.name)}`}
+            target="_blank"
+            rel="noreferrer"
+            className="truncate text-foreground hover:underline"
+          >
+            {f.name}
+          </a>
           {!readOnly ? (
             <button
               type="button"

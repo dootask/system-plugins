@@ -14,7 +14,7 @@ import { getActiveTask, getTask } from '#/lib/repo/tasks'
 import { listPendingByTask } from '#/lib/repo/actors'
 import type { ActOptions, EngineAction } from '#/lib/engine'
 import type { FileValue } from '#/lib/form/types'
-import { resolveCommentImages, syncAttachmentShares } from './attachments'
+import { sanitizeAttachments } from '#/lib/uploads'
 import { notifyOnAdvance, notifyResult } from './notify'
 import { idAfter } from './util'
 
@@ -76,8 +76,8 @@ export async function actTaskHandler(request: Request): Promise<Response> {
   const deps = await buildEngineDeps(token, roleIdsOfDef(def?.flow_nodes))
   const engine = createEngine(deps)
 
-  // 审批意见图片：解析内容直链并共享给参与人，随事件入库。
-  const attachments = await resolveCommentImages(inst.id, body.images, token)
+  // 审批意见图片：校验本地上传 URL 后随事件入库。
+  const attachments = sanitizeAttachments(body.images)
 
   // body 在 action 守卫后已非 null。
   const opts: ActOptions = {
@@ -100,8 +100,7 @@ export async function actTaskHandler(request: Request): Promise<Response> {
     return badRequest(e instanceof Error ? e.message : '操作失败')
   }
 
-  // 通知 + 附件共享（不阻断响应，失败仅记日志）。
-  await syncAttachmentShares(inst.id, token)
+  // 通知（不阻断响应，失败仅记日志）。
   await notifyOnAdvance(inst.id, prevTask?.id ?? null, token)
   await notifyResult(inst.id, token)
   return ok({ ok: true })
@@ -132,7 +131,6 @@ export async function resubmitHandler(
   } catch (e) {
     return badRequest(e instanceof Error ? e.message : '重新提交失败')
   }
-  await syncAttachmentShares(instId, token)
   await notifyOnAdvance(instId, prevTask?.id ?? null, token)
   return ok({ ok: true })
 }

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
 import { Plus, Search } from 'lucide-react'
 import { api, ApiError } from '#/lib/api'
-import { useDooTask } from '#/lib/dootask'
+import { confirmAction, useDooTask } from '#/lib/dootask'
 import { Button } from '#/components/ui/button'
 import { Badge } from '#/components/ui/badge'
 import { Input } from '#/components/ui/input'
@@ -89,7 +89,12 @@ export function TemplateList() {
     }
   }
   const del = async (d: DefRow) => {
-    if (!confirm(`确认删除模板「${d.name}」？已发起的审批单不受影响。`)) return
+    if (
+      !(await confirmAction(
+        `确认删除模板「${d.name}」？已发起的审批单不受影响。`,
+      ))
+    )
+      return
     try {
       await api(`/defs/${d.id}`, { method: 'DELETE' })
       load()
@@ -145,77 +150,69 @@ export function TemplateList() {
         <EmptyState title="暂无模板" hint="点击「新建模板」开始配置" />
       ) : (
         <>
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>模板</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead className="max-sm:hidden">版本</TableHead>
-                  <TableHead className="max-sm:hidden">更新时间</TableHead>
-                  <TableHead className="text-right">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((d) => (
-                  <TableRow key={d.id}>
-                    <TableCell>
-                      <span className="flex items-center gap-2 font-medium">
-                        <span className="text-lg leading-none">
-                          {d.icon || '📄'}
-                        </span>
-                        {d.name}
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>模板</TableHead>
+                <TableHead>状态</TableHead>
+                <TableHead className="max-sm:hidden">版本</TableHead>
+                <TableHead className="max-sm:hidden">更新时间</TableHead>
+                <TableHead className="text-right">操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.map((d) => (
+                <TableRow key={d.id}>
+                  <TableCell>
+                    <span className="flex items-center gap-2 font-medium">
+                      <span className="text-lg leading-none">
+                        {d.icon || '📄'}
                       </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant={
-                          d.status === 'enabled' ? 'default' : 'secondary'
-                        }
-                      >
-                        {d.status === 'enabled' ? '启用' : '停用'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-sm:hidden">
-                      v{d.version}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-sm:hidden">
-                      {formatTime(d.updated_at)}
-                    </TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          navigate({
-                            to: '/admin/defs/$id',
-                            params: { id: String(d.id) },
-                          })
-                        }
-                      >
-                        编辑
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => toggle(d)}
-                      >
-                        {d.status === 'enabled' ? '停用' : '启用'}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-destructive"
-                        onClick={() => del(d)}
-                      >
-                        删除
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                      {d.name}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={d.status === 'enabled' ? 'default' : 'secondary'}
+                    >
+                      {d.status === 'enabled' ? '启用' : '停用'}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground max-sm:hidden">
+                    v{d.version}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground max-sm:hidden">
+                    {formatTime(d.updated_at)}
+                  </TableCell>
+                  <TableCell className="text-right whitespace-nowrap">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        navigate({
+                          to: '/admin/defs/$id',
+                          params: { id: String(d.id) },
+                        })
+                      }
+                    >
+                      编辑
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => toggle(d)}>
+                      {d.status === 'enabled' ? '停用' : '启用'}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="text-destructive"
+                      onClick={() => del(d)}
+                    >
+                      删除
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
           <ListPager
             total={total}
             page={page}

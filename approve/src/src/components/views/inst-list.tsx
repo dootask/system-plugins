@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Search } from 'lucide-react'
+import { ListFilter, Search } from 'lucide-react'
 import { api, ApiError } from '#/lib/api'
+import { cn } from '#/lib/utils'
 import { useActivate } from '#/components/keep-alive'
 import { useUsers } from '#/lib/use-users'
 import { UserChip } from '#/components/ui/user-chip'
+import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import {
   Select,
@@ -13,6 +15,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu'
 import {
   Table,
   TableBody,
@@ -141,22 +150,59 @@ export function InstListView({ box, active }: { box: Box; active: boolean }) {
       {/* 桌面端标题独占一行（移动端顶部标题栏已显示），让右上角留给胶囊 */}
       <h1 className="mb-4 text-lg font-semibold max-md:hidden">{TITLE[box]}</h1>
 
-      {/* 搜索 + 筛选 */}
+      {/* 搜索 + 筛选（移动端用筛选图标弹出状态，桌面端保留下拉） */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-64">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            placeholder="搜索标题"
-            className="pl-8"
-          />
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <div className="relative flex-1 sm:w-64 sm:flex-none">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              placeholder="搜索标题"
+              className="pl-8"
+            />
+          </div>
+          {/* 移动端状态筛选 */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="按状态筛选"
+                className={cn(
+                  'relative shrink-0 sm:hidden',
+                  status && 'border-primary text-primary',
+                )}
+              >
+                <ListFilter className="size-4" />
+                {status ? (
+                  <span className="absolute top-1 right-1 size-1.5 rounded-full bg-primary" />
+                ) : null}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuRadioGroup
+                value={status || STATUS_ALL}
+                onValueChange={(v) => setStatus(v === STATUS_ALL ? '' : v)}
+              >
+                <DropdownMenuRadioItem value={STATUS_ALL}>
+                  全部状态
+                </DropdownMenuRadioItem>
+                {STATUS_OPTIONS.map((o) => (
+                  <DropdownMenuRadioItem key={o.value} value={o.value}>
+                    {o.label}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
+        {/* 桌面端状态下拉 */}
         <Select
           value={status || STATUS_ALL}
           onValueChange={(v) => setStatus(v === STATUS_ALL ? '' : v)}
         >
-          <SelectTrigger className="w-32">
+          <SelectTrigger className="w-32 max-sm:hidden">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -178,48 +224,46 @@ export function InstListView({ box, active }: { box: Box; active: boolean }) {
         <EmptyState title="暂无审批单" hint={EMPTY_HINT[box]} />
       ) : (
         <>
-          <div className="rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>标题</TableHead>
-                  <TableHead className="max-sm:hidden">模板</TableHead>
-                  <TableHead>状态</TableHead>
-                  <TableHead className="max-sm:hidden">发起人</TableHead>
-                  <TableHead className="max-sm:hidden">提交时间</TableHead>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>标题</TableHead>
+                <TableHead>模板</TableHead>
+                <TableHead>状态</TableHead>
+                <TableHead>发起人</TableHead>
+                <TableHead className="text-right">提交时间</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {items.map((r) => (
+                <TableRow
+                  key={r.id}
+                  className="cursor-pointer"
+                  onClick={() =>
+                    navigate({
+                      to: '/insts/$id',
+                      params: { id: String(r.id) },
+                      search: { from: `/${box}` },
+                    })
+                  }
+                >
+                  <TableCell className="font-medium">{r.title}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {defNames[r.def_id] ?? `模板#${r.def_id}`}
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge status={r.status} />
+                  </TableCell>
+                  <TableCell>
+                    <UserChip user={userOf(r.initiator_id)} />
+                  </TableCell>
+                  <TableCell className="text-right text-xs text-muted-foreground">
+                    {formatTime(r.created_at)}
+                  </TableCell>
                 </TableRow>
-              </TableHeader>
-              <TableBody>
-                {items.map((r) => (
-                  <TableRow
-                    key={r.id}
-                    className="cursor-pointer"
-                    onClick={() =>
-                      navigate({
-                        to: '/insts/$id',
-                        params: { id: String(r.id) },
-                        search: { from: `/${box}` },
-                      })
-                    }
-                  >
-                    <TableCell className="font-medium">{r.title}</TableCell>
-                    <TableCell className="text-muted-foreground max-sm:hidden">
-                      {defNames[r.def_id] ?? `模板#${r.def_id}`}
-                    </TableCell>
-                    <TableCell>
-                      <StatusBadge status={r.status} />
-                    </TableCell>
-                    <TableCell className="max-sm:hidden">
-                      <UserChip user={userOf(r.initiator_id)} />
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-sm:hidden">
-                      {formatTime(r.created_at)}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+              ))}
+            </TableBody>
+          </Table>
           <ListPager
             total={total}
             page={page}

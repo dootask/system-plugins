@@ -32,7 +32,8 @@ vi.mock('#/lib/dootask-server', () => ({
   },
   getUserPrimaryDept: async () => null,
   makeClient: async () => null,
-  resolveUsers: async () => ({}),
+  resolveUsers: async (ids: Array<number>) =>
+    Object.fromEntries(ids.map((id) => [id, { userid: id, nickname: `用户#${id}` }])),
   resolveRoleMembers: async () => [],
   uploadFile: async () => ({ id: 1, name: 'f' }),
   shareFilesToUsers: async () => undefined,

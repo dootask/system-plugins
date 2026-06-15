@@ -1,14 +1,19 @@
 /**
- * 附件上传/读取 handler（handler 层）。
- * - POST /api/uploads：前端 multipart（字段 file）→ 用 x-user-token 经 DooTaskClient 调
- *   主程序 /api/file/content/upload 拿 file_id → 回前端 { fileId, name, size, ext }。
- *   附件入库（proc_attachment）发生在发起/重提时（formData 里 file 字段携带这些值）。
- * - GET  /api/uploads/:id：经 /api/file/one 取文件元信息与 content_url，供查看/下载。
+ * 附件上传/读取 handler（插件本地存储，参考 crm）。
+ * - POST /api/uploads：前端 multipart（字段 file）→ saveUpload 落盘 → 回 { name, url, size, mime }。
+ * - GET  /api/uploads/:name：内联查看（位图 <img>）或下载（?download&name=原名）。
+ *   读取不强制鉴权：文件名为不可枚举的 UUID，且 <img> 无法携带身份头。
  */
-import { badRequest, ok, requireUser } from '#/lib/auth'
-import { getFileOne, uploadFile } from '#/lib/dootask-server'
+import { existsSync, readFileSync } from 'node:fs'
+import { badRequest, created, notFound, requireUser } from '#/lib/auth'
+import {
+  MAX_UPLOAD_BYTES,
+  resolveUploadPath,
+  saveUpload,
+  sniffImageType,
+} from '#/lib/uploads'
 
-/** POST /api/uploads → 上传单个文件，返回 { fileId, name, size, ext }。 */
+/** POST /api/uploads → 上传单个文件，返回 { name, url, size, mime }。 */
 export async function uploadHandler(request: Request): Promise<Response> {
   const auth = await requireUser(request)
   if (auth instanceof Response) return auth
@@ -20,36 +25,31 @@ export async function uploadHandler(request: Request): Promise<Response> {
     return badRequest('请用 multipart/form-data 上传')
   }
   const file = form.get('file')
-  if (!(file instanceof File)) return badRequest('缺少文件字段 file')
-
-  const token = request.headers.get('x-user-token')
-  try {
-    const buffer = await file.arrayBuffer()
-    const uploaded = await uploadFile(token, {
-      buffer,
-      name: file.name,
-      type: file.type,
-    })
-    return ok({
-      fileId: uploaded.id,
-      name: uploaded.name,
-      size: uploaded.size,
-      ext: uploaded.ext,
-    })
-  } catch (e) {
-    return badRequest(e instanceof Error ? e.message : '上传失败')
+  if (!(file instanceof File) || file.size === 0) {
+    return badRequest('缺少文件字段 file')
   }
+  if (file.size > MAX_UPLOAD_BYTES) return badRequest('文件超过 20MB 上限')
+  return created(await saveUpload(file))
 }
 
-/** GET /api/uploads/:id → 取文件元信息（含 content_url），供前端查看/下载。 */
-export async function getUploadHandler(
-  request: Request,
-  fileId: number,
-): Promise<Response> {
-  const auth = await requireUser(request)
-  if (auth instanceof Response) return auth
-  const token = request.headers.get('x-user-token')
-  const info = await getFileOne(fileId, token)
-  if (!info) return badRequest('文件不存在或无权访问')
-  return ok(info)
+/** GET /api/uploads/:name → 回文件字节（位图内联，其余按附件下载）。 */
+export function serveUploadHandler(request: Request, name: string): Response {
+  const full = resolveUploadPath(name)
+  if (!full || !existsSync(full)) return notFound('文件不存在')
+  const buf = readFileSync(full)
+  const imageType = sniffImageType(buf)
+  const headers: Record<string, string> = {
+    'content-type': imageType || 'application/octet-stream',
+    'content-length': String(buf.length),
+    'cache-control': 'public, max-age=31536000, immutable',
+    'x-content-type-options': 'nosniff',
+  }
+  const sp = new URL(request.url).searchParams
+  // 非图片（或显式 ?download）一律作为附件下载，用回传的原文件名。
+  if (sp.has('download') || !imageType) {
+    const fname = sp.get('name') || name
+    headers['content-disposition'] =
+      `attachment; filename*=UTF-8''${encodeURIComponent(fname)}`
+  }
+  return new Response(new Uint8Array(buf), { headers })
 }

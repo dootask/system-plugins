@@ -10,11 +10,8 @@ import {
 import { getUserPrimaryDept } from '#/lib/dootask-server'
 import { buildEngineDeps, roleIdsOfDef } from '#/lib/engine-deps'
 import { createEngine } from '#/lib/engine'
-import {
-  persistAttachments,
-  resolveCommentImages,
-  syncAttachmentShares,
-} from './attachments'
+import { persistAttachments } from './attachments'
+import { sanitizeAttachments } from '#/lib/uploads'
 import { notifyOnStart } from './notify'
 import { getDef } from '#/lib/repo/defs'
 import { getInst, listByInitiator } from '#/lib/repo/insts'
@@ -91,9 +88,8 @@ export async function createInstHandler(request: Request): Promise<Response> {
     return badRequest(e instanceof Error ? e.message : '发起失败')
   }
 
-  // 附件落库 + 共享给当前参与人（不阻断发起，失败仅记日志）。
-  await persistAttachments(id, schema, formData, auth.userId, token)
-  await syncAttachmentShares(id, token)
+  // 表单 file 字段附件落库（审计/汇总）。
+  persistAttachments(id, schema, formData, auth.userId)
   // 通知：审批人（当前待办）+ 抄送人。
   await notifyOnStart(id, token)
   return created({ id })
@@ -130,6 +126,22 @@ export async function listInstsHandler(request: Request): Promise<Response> {
   const start = (page - 1) * pageSize
   const items = rows.slice(start, start + pageSize).map(instSummary)
   return ok({ items, total })
+}
+
+/**
+ * GET /api/counts → 当前用户各列表数量 { todo, done, cc, mine }（侧边栏角标用）。
+ * 按不同审批单去重计数，不含搜索/状态过滤。
+ */
+export async function listCountsHandler(request: Request): Promise<Response> {
+  const auth = await requireUser(request)
+  if (auth instanceof Response) return auth
+  const uid = auth.userId
+  return ok({
+    todo: new Set(listPendingForUser(uid).map((t) => t.inst_id)).size,
+    done: new Set(listDoneForUser(uid).map((a) => a.inst_id)).size,
+    cc: new Set(listCcForUser(uid).map((a) => a.inst_id)).size,
+    mine: listByInitiator(uid).length,
+  })
 }
 
 function dedupInsts(list: Array<ProcInstRow | undefined>): Array<ProcInstRow> {
@@ -226,8 +238,7 @@ export async function commentInstHandler(
     request,
   )
   const text = body?.comment?.trim()
-  const token = request.headers.get('x-user-token')
-  const attachments = await resolveCommentImages(instId, body?.images, token)
+  const attachments = sanitizeAttachments(body?.images)
   if (!text && attachments.length === 0)
     return badRequest('评论内容不能为空')
 

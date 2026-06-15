@@ -73,14 +73,14 @@ export function StartForm({
   if (loading) return <Loading center />
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div className="mx-auto max-w-5xl">
       <PageHeader
         title={
           <span className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="icon"
-              className="size-7 max-md:hidden"
+              className="size-7"
               onClick={() => navigate({ to: back })}
             >
               <ArrowLeft className="size-4" />
@@ -99,7 +99,7 @@ export function StartForm({
       {error ? <ErrorBar message={error} /> : null}
 
       {detail ? (
-        <div className="space-y-5 rounded-lg border bg-background p-5 max-sm:p-4">
+        <div className="space-y-5">
           <FormRenderer
             schema={detail.form_schema}
             value={value}

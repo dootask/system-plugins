@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import type { ComponentType } from 'react'
-import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
+import { Link, useRouterState } from '@tanstack/react-router'
 import {
-  ArrowLeft,
   BarChart3,
   CheckCircle2,
   Clock,
+  DatabaseBackup,
   FilePlus2,
   Forward,
   SendHorizontal,
@@ -16,7 +16,7 @@ import { cn } from '#/lib/utils'
 import { useDooTask } from '#/lib/dootask'
 import { api } from '#/lib/api'
 import { Avatar, AvatarFallback, AvatarImage } from '#/components/ui/avatar'
-import { Button } from '#/components/ui/button'
+import { Badge } from '#/components/ui/badge'
 
 type Icon = ComponentType<LucideProps>
 
@@ -54,7 +54,19 @@ const SIDEBAR_GROUPS: Array<NavGroup> = [
     label: '管理',
     items: [
       { to: '/stats', label: '数据统计', icon: BarChart3, adminOnly: true },
-      { to: '/admin', label: '审批管理', icon: SlidersHorizontal, adminOnly: true },
+      {
+        to: '/admin',
+        label: '审批管理',
+        icon: SlidersHorizontal,
+        adminOnly: true,
+        exact: true,
+      },
+      {
+        to: '/admin/backup',
+        label: '数据备份',
+        icon: DatabaseBackup,
+        adminOnly: true,
+      },
     ],
   },
 ]
@@ -62,7 +74,12 @@ const SIDEBAR_GROUPS: Array<NavGroup> = [
 // 移动端底部 Tab。
 const BOTTOM_TABS: Array<NavItem> = [
   { to: '/', label: '发起申请', icon: FilePlus2, exact: true },
-  { to: '/todo', label: '我审批的', icon: CheckCircle2, match: ['/todo', '/done', '/cc'] },
+  {
+    to: '/todo',
+    label: '我审批的',
+    icon: CheckCircle2,
+    match: ['/todo', '/done', '/cc'],
+  },
   { to: '/mine', label: '已提交', icon: SendHorizontal },
   { to: '/stats', label: '数据统计', icon: BarChart3, adminOnly: true },
   { to: '/admin', label: '管理', icon: SlidersHorizontal, adminOnly: true },
@@ -75,6 +92,18 @@ const ROOT_PATHS = ['/', '/todo', '/done', '/cc', '/mine', '/stats', '/admin']
 function normalize(pathname: string): string {
   const p = pathname.replace(/^\/apps\/approve/, '')
   return p === '' ? '/' : p
+}
+
+// 子页（发起表单 / 详情 / 模板编辑）归属到哪个顶层导航高亮：
+// - /start/*    → 发起申请（/）
+// - /admin/defs/* → 审批管理（/admin）
+// - /insts/*    → 来源列表（from，仅当为已知顶层路径），否则不高亮
+function effectivePath(pathname: string, from?: string): string {
+  if (pathname.startsWith('/start/')) return '/'
+  if (pathname.startsWith('/admin/defs/')) return '/admin'
+  if (pathname.startsWith('/insts/'))
+    return from && ROOT_PATHS.includes(from) ? from : pathname
+  return pathname
 }
 
 function titleOf(pathname: string): string {
@@ -100,8 +129,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const isAdmin = useIsAdmin(status === 'ready')
   const raw = useRouterState({ select: (s) => s.location.pathname })
   const pathname = normalize(raw)
-  const navigate = useNavigate()
   const search = useRouterState({ select: (s) => s.location.search })
+  const from = typeof search.from === 'string' ? search.from : undefined
+  // 子页高亮归属的顶层路径（侧边栏 / 底部 Tab 据此判定激活）。
+  const eff = effectivePath(pathname, from)
   const nickname = user?.nickname || (user ? `用户#${user.userid}` : '')
   const avatar = (user?.userimg as string | undefined) || undefined
 
@@ -128,41 +159,39 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [status])
 
+  // 各列表数量（侧边栏角标）。随握手就绪与路由变化刷新，保持大致实时。
+  const [counts, setCounts] = useState<Record<string, number>>({})
+  useEffect(() => {
+    if (status !== 'ready') return
+    let cancelled = false
+    api<{ todo: number; done: number; cc: number; mine: number }>('/counts')
+      .then((c) => {
+        if (!cancelled)
+          setCounts({
+            '/todo': c.todo,
+            '/done': c.done,
+            '/cc': c.cc,
+            '/mine': c.mine,
+          })
+      })
+      .catch(() => {
+        /* 角标拉取失败忽略 */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [status, pathname])
+
   const shellVars = {
     '--sat': `${safe.top}px`,
     '--sab': `${safe.bottom}px`,
   } as React.CSSProperties
 
-  // 返回：子页应用内后退；顶层页退出微应用回 DooTask。
-  async function handleBack() {
-    if (!ROOT_PATHS.includes(pathname)) {
-      // 子页：优先回到来源列表（from），否则浏览器后退。
-      if (search.from) navigate({ to: search.from as '/' })
-      else window.history.back()
-      return
-    }
-    try {
-      const t = await import('@dootask/tools')
-      await t.closeApp()
-    } catch {
-      /* 独立环境无 host，忽略 */
-    }
-  }
-
   return (
     <div className="flex min-h-screen bg-muted/30" style={shellVars}>
       {/* 桌面端左侧边栏 */}
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r bg-background md:flex">
-        <div className="flex h-14 items-center gap-1 border-b px-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8"
-            onClick={handleBack}
-            aria-label="返回"
-          >
-            <ArrowLeft className="size-4" />
-          </Button>
+        <div className="flex h-14 items-center border-b px-4">
           <span className="text-base font-semibold">审批中心</span>
         </div>
         <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
@@ -176,20 +205,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     {group.label}
                   </p>
                 ) : null}
-                {items.map((it) => (
-                  <Link
-                    key={it.to}
-                    to={it.to}
-                    activeOptions={{ exact: it.exact }}
-                    className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition hover:bg-accent hover:text-foreground"
-                    activeProps={{
-                      className: cn('!bg-primary/10 !text-primary'),
-                    }}
-                  >
-                    <it.icon className="size-4" />
-                    {it.label}
-                  </Link>
-                ))}
+                {items.map((it) => {
+                  const active = it.exact
+                    ? eff === it.to
+                    : eff.startsWith(it.to)
+                  return (
+                    <Link
+                      key={it.to}
+                      to={it.to}
+                      className={cn(
+                        'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium transition',
+                        active
+                          ? 'bg-primary/10 text-primary'
+                          : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                      )}
+                    >
+                      <it.icon className="size-4 shrink-0" />
+                      <span className="flex-1 truncate">{it.label}</span>
+                      {counts[it.to] ? (
+                        <Badge
+                          variant="secondary"
+                          className="h-5 min-w-5 justify-center rounded-full px-1.5 text-xs tabular-nums"
+                        >
+                          {counts[it.to]}
+                        </Badge>
+                      ) : null}
+                    </Link>
+                  )
+                })}
               </div>
             )
           })}
@@ -211,20 +254,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* 主内容区 */}
       <main className="min-w-0 flex-1 pb-[calc(4rem+var(--sab,0px))] md:pb-0">
-        {/* 移动端顶部标题栏（带返回）；替代被隐藏的胶囊。h-14 与桌面端表头同高。 */}
+        {/* 移动端顶部标题栏（仅标题；返回交由各子页自身的返回控件 / 胶囊）。h-14 与桌面端表头同高。 */}
         <div className="sticky top-0 z-30 border-b bg-background/95 pt-[var(--sat,0px)] backdrop-blur md:hidden">
-          <div className="flex h-14 items-center gap-1 px-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleBack}
-              aria-label="返回"
-            >
-              <ArrowLeft className="size-5" />
-            </Button>
-            <span className="text-base font-semibold">
-              {titleOf(pathname)}
-            </span>
+          <div className="flex h-13 items-center px-4">
+            <span className="text-base font-semibold">{titleOf(pathname)}</span>
           </div>
         </div>
         <div className="mx-auto max-w-5xl px-4 pb-6 pt-5 max-sm:px-3">
@@ -236,10 +269,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t bg-background pb-[var(--sab,0px)] md:hidden">
         {BOTTOM_TABS.filter((t) => !t.adminOnly || isAdmin).map((t) => {
           const active = t.match
-            ? t.match.includes(pathname)
+            ? t.match.includes(eff)
             : t.exact
-              ? pathname === t.to
-              : pathname.startsWith(t.to)
+              ? eff === t.to
+              : eff.startsWith(t.to)
           return (
             <Link
               key={t.to}

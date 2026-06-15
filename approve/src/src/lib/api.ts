@@ -3,6 +3,7 @@
 //
 // 注意：服务端不信任 x-user-id，而是用 x-user-token 反查主程序确认身份
 // （见 lib/auth.ts requireUser）。x-user-id 仅作为辅助/调试信息透传。
+import type { Attachment } from '#/lib/types'
 
 const API_BASE = '/apps/approve/api'
 
@@ -81,37 +82,44 @@ export async function api<T = unknown>(
   return (payload as { data?: T } | null)?.data as T
 }
 
-/** 上传单个文件到主程序（经 /api/uploads），返回 { fileId, name, size, ext }。 */
-export async function uploadFile(file: File): Promise<{
-  fileId: number
-  name: string
-  size?: number
-  ext?: string
-}> {
-  const fd = new FormData()
-  fd.append('file', file)
+/**
+ * 鉴权下载：带身份头取文件流并触发浏览器下载。
+ * 下载接口无法用自定义请求头（<a>/window.open 不带头），而本插件鉴权走 x-user-token 头，
+ * 故这里用 fetch 带头取回 blob 再用临时链接下载。
+ */
+export async function downloadAuthed(
+  path: string,
+  filename: string,
+): Promise<void> {
   await _authReady
-  // 注意：multipart 不要手动设 content-type，让浏览器带上 boundary。
-  const res = await fetch(`${API_BASE}/uploads`, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: fd,
-  })
-  let payload: unknown = null
-  try {
-    payload = await res.json()
-  } catch {
-    /* 无 body */
-  }
+  const res = await fetch(`${API_BASE}${path}`, { headers: authHeaders() })
   if (!res.ok) {
-    const msg =
-      (payload as { error?: string } | null)?.error ||
-      `上传失败 (${res.status})`
+    let msg = `下载失败 (${res.status})`
+    try {
+      const p = (await res.json()) as { error?: string } | null
+      if (p?.error) msg = p.error
+    } catch {
+      /* 无 body */
+    }
     throw new ApiError(msg, res.status)
   }
-  return (
-    payload as {
-      data: { fileId: number; name: string; size?: number; ext?: string }
-    }
-  ).data
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
+/**
+ * 上传单个文件到插件本地存储（经 POST /api/uploads），返回 { name, url, size, mime }。
+ * FormData 不手动设 content-type（api 会让浏览器自带 multipart boundary）。
+ */
+export async function uploadFile(file: File): Promise<Attachment> {
+  const fd = new FormData()
+  fd.append('file', file)
+  return api<Attachment>('/uploads', { method: 'POST', body: fd })
 }

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { ArrowLeft, AlertCircle, ImagePlus, Loader2, X } from 'lucide-react'
 import { api, ApiError, uploadFile } from '#/lib/api'
+import { confirmAction, warnMessage } from '#/lib/dootask'
 import { FormRenderer } from '#/components/form/FormRenderer'
 import { pickUsers } from '#/lib/form/picker'
 import { useUsers } from '#/lib/use-users'
@@ -150,6 +151,8 @@ export function InstDetailView({
 
   async function withdraw(): Promise<void> {
     if (!activeTaskId) return
+    if (!(await confirmAction('确认撤回该审批单？撤回后流程结束，不可恢复。')))
+      return
     setBusy(true)
     setActionError(null)
     try {
@@ -201,7 +204,10 @@ export function InstDetailView({
 
   async function postComment(): Promise<void> {
     const text = comment.trim()
-    if (!text && images.length === 0) return
+    if (!text && images.length === 0) {
+      await warnMessage('请先填写评论内容或添加图片')
+      return
+    }
     setBusy(true)
     setActionError(null)
     try {
@@ -307,14 +313,19 @@ export function InstDetailView({
               </Button>
               <Button
                 variant="destructive"
-                onClick={() => runAct('reject')}
+                onClick={async () => {
+                  if (await confirmAction('确认拒绝该审批？')) runAct('reject')
+                }}
                 disabled={busy}
               >
                 拒绝
               </Button>
               <Button
                 variant="outline"
-                onClick={() => runAct('return', { returnTo: 'initiator' })}
+                onClick={async () => {
+                  if (await confirmAction('确认退回给发起人修改？'))
+                    runAct('return', { returnTo: 'initiator' })
+                }}
                 disabled={busy}
               >
                 退回
@@ -337,7 +348,7 @@ export function InstDetailView({
               重新提交
             </Button>
           ) : null}
-          <Button variant="ghost" onClick={postComment} disabled={busy}>
+          <Button variant="secondary" onClick={postComment} disabled={busy}>
             仅评论
           </Button>
         </div>
@@ -440,7 +451,7 @@ function CommentThumbs({ images }: { images: Array<CommentImage> }) {
   )
 }
 
-/** 评论/意见图片选择器：选取即上传到主程序（回填 fileId），本地 objectURL 预览。 */
+/** 评论/意见图片选择器：选取即上传到插件本地存储（回填 url），直接用 url 预览。 */
 function CommentImageInput({
   images,
   onChange,
@@ -452,7 +463,6 @@ function CommentImageInput({
 }) {
   const [uploading, setUploading] = useState(0)
   const [error, setError] = useState<string | null>(null)
-  const previews = useRef<Map<number, string>>(new Map())
   const valueRef = useRef(images)
   valueRef.current = images
 
@@ -463,16 +473,13 @@ function CommentImageInput({
     setError(null)
     setUploading((n) => n + files.length)
     for (const f of files) {
-      const localUrl = URL.createObjectURL(f)
       try {
         const up = await uploadFile(f)
-        previews.current.set(up.fileId, localUrl)
         onChange([
           ...valueRef.current,
-          { fileId: up.fileId, name: up.name, size: up.size, ext: up.ext },
+          { name: up.name, url: up.url, size: up.size, mime: up.mime },
         ])
       } catch (err) {
-        URL.revokeObjectURL(localUrl)
         setError(err instanceof ApiError ? err.message : `「${f.name}」上传失败`)
       } finally {
         setUploading((n) => Math.max(0, n - 1))
@@ -481,14 +488,6 @@ function CommentImageInput({
   }
 
   const remove = (i: number) => {
-    const img = images[i]
-    if (img.fileId != null) {
-      const u = previews.current.get(img.fileId)
-      if (u) {
-        URL.revokeObjectURL(u)
-        previews.current.delete(img.fileId)
-      }
-    }
     onChange(images.filter((_, j) => j !== i))
   }
 
@@ -496,31 +495,26 @@ function CommentImageInput({
     <div className="mt-2 space-y-2">
       {images.length > 0 || uploading > 0 ? (
         <div className="flex flex-wrap gap-2">
-          {images.map((img, i) => {
-            const url = img.fileId != null ? previews.current.get(img.fileId) : undefined
-            return (
-              <div
-                key={`${img.fileId}-${i}`}
-                className="group relative size-16 overflow-hidden rounded-md border"
+          {images.map((img, i) => (
+            <div
+              key={`${img.url}-${i}`}
+              className="group relative size-16 overflow-hidden rounded-md border"
+            >
+              <img
+                src={img.url}
+                alt={img.name}
+                className="size-full object-cover"
+              />
+              <button
+                type="button"
+                onClick={() => remove(i)}
+                className="absolute right-0 top-0 hidden rounded-bl bg-black/60 p-0.5 text-white group-hover:block"
+                aria-label="移除"
               >
-                {url ? (
-                  <img src={url} alt={img.name} className="size-full object-cover" />
-                ) : (
-                  <div className="flex size-full items-center justify-center bg-muted px-1 text-center text-[10px] text-muted-foreground">
-                    {img.name}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => remove(i)}
-                  className="absolute right-0 top-0 hidden rounded-bl bg-black/60 p-0.5 text-white group-hover:block"
-                  aria-label="移除"
-                >
-                  <X className="size-3" />
-                </button>
-              </div>
-            )
-          })}
+                <X className="size-3" />
+              </button>
+            </div>
+          ))}
           {uploading > 0 ? (
             <div className="flex size-16 items-center justify-center rounded-md border">
               <Loader2 className="size-4 animate-spin text-muted-foreground" />
@@ -548,7 +542,7 @@ function BackLink({ to }: { to?: string }) {
   return (
     <Link
       to={to || '/'}
-      className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground max-md:hidden"
+      className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
     >
       <ArrowLeft className="size-4" />
       返回

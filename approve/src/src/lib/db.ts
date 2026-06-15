@@ -169,11 +169,13 @@ export function migrate(db: Database.Database) {
       id          INTEGER PRIMARY KEY AUTOINCREMENT,
       inst_id     INTEGER NOT NULL REFERENCES proc_inst(id) ON DELETE CASCADE,
       field_key   TEXT,
-      file_id     INTEGER,    -- 主程序 File id(优先方案)
+      file_id     INTEGER,    -- 旧：主程序 File id（历史数据，新上传不再用）
       local_path  TEXT,       -- 或插件自存路径(备选)
+      url         TEXT,       -- 新：插件本地上传访问 URL(/apps/approve/api/uploads/<uuid>)
       name        TEXT,
       size        INTEGER,
       ext         TEXT,
+      mime        TEXT,
       uploaded_by INTEGER NOT NULL,
       created_at  TEXT NOT NULL DEFAULT (datetime('now'))
     );
@@ -274,6 +276,8 @@ export function migrate(db: Database.Database) {
     'INTEGER NOT NULL DEFAULT 0',
   )
   addColumnIfMissing(db, 'proc_event', 'attachments', 'TEXT')
+  addColumnIfMissing(db, 'proc_attachment', 'url', 'TEXT')
+  addColumnIfMissing(db, 'proc_attachment', 'mime', 'TEXT')
 }
 
 /** 若表缺少某列则追加（幂等，用于已存在的数据库升级）。 */

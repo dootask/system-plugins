@@ -91,3 +91,34 @@ export function useDooTask(): DooTaskState {
 
   return state
 }
+
+/**
+ * 重要操作确认：微前端环境用主程序的 modalConfirm（统一风格、聚焦父窗）；
+ * 独立浏览器环境回退到原生 window.confirm。返回是否确认。
+ */
+export async function confirmAction(message: string): Promise<boolean> {
+  try {
+    const tools = await import('@dootask/tools')
+    if (await tools.isMicroApp()) return await tools.modalConfirm(message)
+  } catch {
+    /* 取不到 host 时落到下方回退 */
+  }
+  return typeof window === 'undefined' ? true : window.confirm(message)
+}
+
+/**
+ * 轻量警告提示（如表单校验不通过）：微前端用主程序 messageWarning；
+ * 独立环境回退到原生 alert。
+ */
+export async function warnMessage(message: string): Promise<void> {
+  try {
+    const tools = await import('@dootask/tools')
+    if (await tools.isMicroApp()) {
+      await tools.messageWarning(message)
+      return
+    }
+  } catch {
+    /* 取不到 host 时落到下方回退 */
+  }
+  if (typeof window !== 'undefined') window.alert(message)
+}

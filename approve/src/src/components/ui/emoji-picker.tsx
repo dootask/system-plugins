@@ -34,7 +34,7 @@ export function EmojiPicker({
         <Button
           type="button"
           variant="outline"
-          className={cn('h-10 w-16 text-xl', className)}
+          className={cn('h-9 w-11 text-xl', className)}
         >
           {value || '📄'}
         </Button>

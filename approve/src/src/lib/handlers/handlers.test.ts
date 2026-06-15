@@ -25,7 +25,8 @@ vi.mock('#/lib/dootask-server', () => ({
   // 引擎 deps / 部门解析在测试环境返回空（无 SDK）。
   getUserPrimaryDept: async () => null,
   makeClient: async () => null,
-  resolveUsers: async () => ({}),
+  resolveUsers: async (ids: Array<number>) =>
+    Object.fromEntries(ids.map((id) => [id, { userid: id, nickname: `用户#${id}` }])),
   resolveRoleMembers: async () => [],
   // 附件 / 通知在测试环境为 no-op（无 SDK，不发真消息）。
   uploadFile: async () => ({ id: 1, name: 'f' }),

@@ -1,3 +1,6 @@
+import { mkdtempSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import Database from 'better-sqlite3'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { closeDb, setDbForTesting } from '#/lib/db'
@@ -19,7 +22,8 @@ vi.mock('#/lib/dootask-server', () => ({
   },
   getUserPrimaryDept: async () => null,
   makeClient: async () => null,
-  resolveUsers: async () => ({}),
+  resolveUsers: async (ids: Array<number>) =>
+    Object.fromEntries(ids.map((id) => [id, { userid: id, nickname: `用户#${id}` }])),
   resolveRoleMembers: async () => [],
   uploadFile: async (_t: unknown, f: { name: string }) => ({
     id: 777,
@@ -34,6 +38,9 @@ vi.mock('#/lib/dootask-server', () => ({
   buildDetailCard: () => '> card',
   sendApproveCard: async () => null,
 }))
+
+// 附件本地存储写到临时目录，避免污染仓库 ./data。
+process.env.APPROVE_UPLOAD_DIR = mkdtempSync(join(tmpdir(), 'approve-up-'))
 
 beforeEach(() => setDbForTesting(new Database(':memory:')))
 afterEach(() => {
@@ -78,7 +85,7 @@ describe('uploads handler', () => {
     expect(res.status).toBe(401)
   })
 
-  it('上传成功 → 返回 fileId', async () => {
+  it('上传成功 → 返回本地 url', async () => {
     const fd = new FormData()
     fd.append('file', new Blob(['hello'], { type: 'text/plain' }), 'a.pdf')
     const res = await uploadHandler(
@@ -88,16 +95,18 @@ describe('uploads handler', () => {
         body: fd,
       }),
     )
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(201)
     const { data } = await res.json()
-    expect(data.fileId).toBe(777)
     expect(data.name).toBe('a.pdf')
+    expect(data.size).toBe(5)
+    expect(data.url).toMatch(/^\/apps\/approve\/api\/uploads\/[a-f0-9-]+$/)
   })
 })
 
 describe('发起时落库附件', () => {
-  it('file 字段带 fileId → 写入 proc_attachment', async () => {
+  it('file 字段带 url → 写入 proc_attachment', async () => {
     const defId = seedDef()
+    const url = '/apps/approve/api/uploads/00000000-0000-4000-8000-000000000000'
     const res = await createInstHandler(
       new Request(`${BASE}/insts`, {
         method: 'POST',
@@ -106,7 +115,7 @@ describe('发起时落库附件', () => {
           defId,
           formData: {
             title: '差旅',
-            files: [{ fileId: 777, name: 'a.pdf', size: 12, ext: 'pdf' }],
+            files: [{ name: 'a.pdf', url, size: 12, mime: 'application/pdf' }],
           },
         }),
       }),
@@ -115,7 +124,7 @@ describe('发起时落库附件', () => {
     const { data } = await res.json()
     const atts = listAttachmentsByInst(data.id)
     expect(atts).toHaveLength(1)
-    expect(atts[0].file_id).toBe(777)
+    expect(atts[0].url).toBe(url)
     expect(atts[0].field_key).toBe('files')
   })
 })

@@ -8,9 +8,11 @@ export interface ProcAttachmentInput {
   field_key?: string | null
   file_id?: number | null
   local_path?: string | null
+  url?: string | null
   name?: string | null
   size?: number | null
   ext?: string | null
+  mime?: string | null
   uploaded_by: number
 }
 
@@ -18,18 +20,20 @@ export function addAttachment(input: ProcAttachmentInput): ProcAttachmentRow {
   const info = getDb()
     .prepare(
       `INSERT INTO proc_attachment
-         (inst_id, field_key, file_id, local_path, name, size, ext, uploaded_by)
+         (inst_id, field_key, file_id, local_path, url, name, size, ext, mime, uploaded_by)
        VALUES
-         (@inst_id, @field_key, @file_id, @local_path, @name, @size, @ext, @uploaded_by)`,
+         (@inst_id, @field_key, @file_id, @local_path, @url, @name, @size, @ext, @mime, @uploaded_by)`,
     )
     .run({
       inst_id: input.inst_id,
       field_key: input.field_key ?? null,
       file_id: input.file_id ?? null,
       local_path: input.local_path ?? null,
+      url: input.url ?? null,
       name: input.name ?? null,
       size: input.size ?? null,
       ext: input.ext ?? null,
+      mime: input.mime ?? null,
       uploaded_by: input.uploaded_by,
     })
   return getDb()
