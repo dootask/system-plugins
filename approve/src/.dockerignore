@@ -1,9 +1,11 @@
-go-workflow.exe
-server.crt
-server.key
-
-# 减小构建上下文：以下内容均在镜像内重新生成，无需带入
+node_modules
+.output
+.nitro
+.tanstack
+data
+dist
+dist-ssr
+*.local
+.env
 .git
-main
-workflow-vue3/node_modules
-workflow-vue3/dist
+.DS_Store

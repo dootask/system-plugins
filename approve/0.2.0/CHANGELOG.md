@@ -1,0 +1,10 @@
+### Approval Center rewrite
+
+- **New foundation**: The Approval Center has been fully rewritten from the legacy Go/Flowable engine into a self-contained full-stack plugin (TanStack Start + React 19 + SQLite). Submitting, approving, lists, details, and flow/form design all live inside the plugin and no longer depend on the host database or pages.
+- **Custom forms**: Supports field types including single/multi-line text, number, money, date, date-time (down to the minute), date range, select, multi-select, user, department, line-item sub-table, and attachments, all rendered and validated dynamically from configuration.
+- **New interface and navigation**: The start page presents templates as a searchable, category-grouped grid (Attendance / Administration / Finance / HR / Other); a left sidebar on desktop (Received · Submitted · Management) and a bottom tab bar on mobile, all built with shadcn UI.
+- **Thoughtful details**: Member avatars are shown across lists, details, participants, and the process timeline; approval opinions and comments support image uploads viewable inline in the timeline; date-time uses two separate controls (date + time) with Leave/Overtime start/end precise to the minute; opening a detail from a list returns to that same list.
+- **Unified table lists**: To-do / Done / CC'd / Submitted and template management all use tables with search, filters, and pagination (total count and page size), making large datasets easier to browse.
+- **Built-in templates out of the box**: Ships with Leave, Overtime, Reimbursement, Travel, and Review templates, seeded automatically on first launch and freely copyable. Reimbursement escalates to higher-level approval automatically based on amount.
+- **Bot notifications**: Approval to-dos, CC notices, and results are pushed as cards by the "Approval Assistant" bot (display only); approvers act inside the Approval Center.
+- **Automatic legacy migration and seamless continuation**: On first launch, legacy approval data is migrated into the new database once; finished records are kept as history and in-progress flows continue under the new engine, so upgrades work with no manual steps.

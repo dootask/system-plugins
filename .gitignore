@@ -5,3 +5,4 @@ dootask-plugin.tar.gz
 .playwright-mcp/
 node_modules/
 dist/
+.legacy-go/

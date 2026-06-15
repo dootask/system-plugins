@@ -1,0 +1,21 @@
+services:
+  approve:
+    image: "dootask/approve:${PLUGIN_VERSION}"
+    restart: unless-stopped
+    environment:
+      - TZ=${TIMEZONE:-PRC}
+      - APPROVE_ADMIN_USER_IDS=${APPROVE_ADMIN_USER_IDS}
+      - APPROVE_VERSION=${PLUGIN_VERSION}
+      # 以下旧 MySQL 连接信息当前不使用，仅为 M5 数据迁移预留：
+      # 迁移脚本届时只读连旧库把历史审批数据导入本插件的 SQLite，平时不连。
+      - DB_HOST=${DB_HOST}
+      - DB_PORT=${DB_PORT}
+      - DB_DATABASE=${DB_DATABASE}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - DB_PREFIX=${DB_PREFIX}
+    volumes:
+      - approve-data:/app/data
+
+volumes:
+  approve-data:
