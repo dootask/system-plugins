@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, ApiError } from '#/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
-import { ErrorBar, Loading, PageHeader } from '#/components/ui/misc'
+import { ErrorBar, Loading } from '#/components/ui/misc'
 
 interface Stats {
   scope: 'all' | 'mine'
@@ -52,7 +52,7 @@ export function StatsView() {
 
   return (
     <div>
-      <PageHeader title="数据统计" />
+      <h1 className="mb-4 text-lg font-semibold max-md:hidden">数据统计</h1>
       {error ? <ErrorBar message={error} /> : null}
       {stats ? (
         <div className="space-y-5">

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Link } from '@tanstack/react-router'
-import { ArrowLeft, AlertCircle, ImagePlus, Loader2, X } from 'lucide-react'
+import { AlertCircle, ImagePlus, Loader2, X } from 'lucide-react'
 import { api, ApiError, uploadFile } from '#/lib/api'
 import { confirmAction, warnMessage } from '#/lib/dootask'
 import { FormRenderer } from '#/components/form/FormRenderer'
@@ -14,6 +13,7 @@ import { Badge } from '#/components/ui/badge'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
 import {
+  BackLink,
   ErrorBar,
   Loading,
   StatusBadge,
@@ -538,14 +538,3 @@ function CommentImageInput({
   )
 }
 
-function BackLink({ to }: { to?: string }) {
-  return (
-    <Link
-      to={to || '/'}
-      className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-    >
-      <ArrowLeft className="size-4" />
-      返回
-    </Link>
-  )
-}

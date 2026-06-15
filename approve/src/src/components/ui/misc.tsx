@@ -1,21 +1,20 @@
-import { AlertCircle } from 'lucide-react'
+import { AlertCircle, ArrowLeft } from 'lucide-react'
+import { Link } from '@tanstack/react-router'
 import { cn } from '#/lib/utils'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Badge } from '#/components/ui/badge'
 import { Skeleton } from '#/components/ui/skeleton'
 
-export function PageHeader({
-  title,
-  action,
-}: {
-  title: React.ReactNode
-  action?: React.ReactNode
-}) {
+/** 子页（详情 / 发起 / 模板编辑）左上角统一返回链接，回到来源列表（缺省回首页）。 */
+export function BackLink({ to }: { to?: string }) {
   return (
-    <div className="mb-4 flex items-center justify-between gap-3">
-      <h1 className="text-lg font-semibold">{title}</h1>
-      {action}
-    </div>
+    <Link
+      to={to || '/'}
+      className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+    >
+      <ArrowLeft className="size-4" />
+      返回
+    </Link>
   )
 }
 

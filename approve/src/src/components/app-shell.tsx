@@ -106,11 +106,24 @@ function effectivePath(pathname: string, from?: string): string {
   return pathname
 }
 
+// 顶层路由的移动端标题栏文案。桌面端各页自身 h1 显示标题、移动端 h1 隐藏（max-md:hidden），
+// 统一由顶部标题栏据当前路径显示，避免移动端各页都只显示「审批中心」。
+const PAGE_TITLE: Record<string, string> = {
+  '/': '发起申请',
+  '/todo': '待处理',
+  '/done': '已处理',
+  '/cc': '抄送我的',
+  '/mine': '已提交',
+  '/stats': '数据统计',
+  '/admin': '审批管理',
+  '/admin/backup': '数据备份',
+}
+
 function titleOf(pathname: string): string {
   if (pathname.startsWith('/insts/')) return '审批详情'
   if (pathname.startsWith('/start/')) return '发起申请'
   if (pathname.startsWith('/admin/defs/')) return '模板编辑'
-  return '审批中心'
+  return PAGE_TITLE[pathname] ?? '审批中心'
 }
 
 function useIsAdmin(ready: boolean): boolean {

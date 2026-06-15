@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { ArrowLeft } from 'lucide-react'
 import { api, ApiError } from '#/lib/api'
 import { FormRenderer } from '#/components/form/FormRenderer'
 import { initialFormValue, validateForm } from '#/lib/form'
 import { Button } from '#/components/ui/button'
-import { ErrorBar, Loading, PageHeader } from '#/components/ui/misc'
+import { BackLink, ErrorBar, Loading } from '#/components/ui/misc'
 import type { FormErrors, FormSchema } from '#/lib/form/types'
 
 interface DefDetail {
@@ -73,29 +72,18 @@ export function StartForm({
   if (loading) return <Loading center />
 
   return (
-    <div className="mx-auto max-w-5xl">
-      <PageHeader
-        title={
-          <span className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-7"
-              onClick={() => navigate({ to: back })}
-            >
-              <ArrowLeft className="size-4" />
-            </Button>
-            {detail ? (
-              <>
-                {detail.icon ? <span>{detail.icon}</span> : null}
-                {detail.name}
-              </>
-            ) : (
-              '发起申请'
-            )}
-          </span>
-        }
-      />
+    <div className="space-y-6">
+      <BackLink to={back} />
+      <h1 className="flex items-center gap-2 text-lg font-semibold">
+        {detail ? (
+          <>
+            {detail.icon ? <span>{detail.icon}</span> : null}
+            {detail.name}
+          </>
+        ) : (
+          '发起申请'
+        )}
+      </h1>
       {error ? <ErrorBar message={error} /> : null}
 
       {detail ? (
