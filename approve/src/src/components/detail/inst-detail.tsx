@@ -415,8 +415,13 @@ function StepDot({ status }: { status: StepStatus }) {
     )
   if (status === 'active')
     return (
-      <span className={cn(base, 'border-primary bg-primary/15')}>
-        <span className="size-2 rounded-full bg-primary" />
+      <span
+        className={cn(
+          base,
+          'border-primary bg-primary text-primary-foreground',
+        )}
+      >
+        <Loader2 className="size-3 animate-spin" />
       </span>
     )
   return <span className={cn(base, 'border-muted-foreground/30 bg-background')} />
