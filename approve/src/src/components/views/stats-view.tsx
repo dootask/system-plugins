@@ -87,12 +87,10 @@ export function StatsView() {
       {stats?.scope === 'all' ? (
         <div className="mb-4 flex">
           <Button
-            variant="outline"
-            size="sm"
             className="ml-auto"
             onClick={() => setExportOpen(true)}
           >
-            <Download className="size-4" /> 导出
+            <Download className="size-4" /> 导出审批
           </Button>
         </div>
       ) : null}
