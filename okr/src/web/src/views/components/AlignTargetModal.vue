@@ -34,6 +34,7 @@ const props = defineProps({
 })
 
 
+
 const emit = defineEmits(['close', 'upData', 'openSelectAlignment', 'openDetail'])
 
 

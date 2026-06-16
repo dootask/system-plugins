@@ -3,7 +3,7 @@
         v-model:show="show"
         :on-after-enter="showDrawer"
         :on-after-leave="closeDrawer"
-        :z-index="nextZIndex()"
+       
         class="okr"
         style="--n-body-padding:16px 20px 24px 34px;max-width: 600px;width: 90%;"
         :trap-focus="false">
@@ -28,11 +28,11 @@
 </template>
 <script setup lang="ts">
 import AddOkrsMain from '@/views/components/AddOkrsMain.vue';
-import { nextZIndex } from "@dootask/tools"
 
 const loadIng = ref(false)
 const show = ref(false)
 const AddOkrsRef = ref(null)
+
 
 const emit = defineEmits(['close', 'upData'])
 

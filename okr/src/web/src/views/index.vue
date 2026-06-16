@@ -33,6 +33,7 @@
                         placement="bottom"
                         trigger="click"
                         raw
+                       
                         :show-arrow="true">
                         <template #trigger>
                             <i v-if="inMicroApp" class="ivu-icon ivu-icon-ios-more font-bold"></i>
@@ -109,11 +110,11 @@ import { useRouter, useRoute } from 'vue-router'
 import TipsModal from '@/views/components/TipsModal.vue';
 import { getUserInfo } from '@/api/modules/user'
 import { UserStore } from '@/store/user'
-import { isMicroApp } from "@dootask/tools"
+import { useMicroFlag } from "@/utils/dootask"
 
 const isAdmin = UserStore().auth().isAdmin
 const isDepartmentOwner = UserStore().auth().isDepartmentOwner
-const inMicroApp = computed(() => isMicroApp() ? 1 : 0)
+const inMicroApp = useMicroFlag()
 
 const router = useRouter()
 const pageTitle = ref("管理")

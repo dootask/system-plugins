@@ -1,5 +1,5 @@
 import utils from "./utils"
-import { getAppData } from "@dootask/tools"
+import { systemApiUrl, systemOrigin as cachedSystemOrigin } from "./dootask"
 /**
  * 页面专用
  */
@@ -19,7 +19,7 @@ const webTs = {
         ) {
             return str
         }
-        const systemUrl = getAppData('props.systemInfo.apiUrl')
+        const systemUrl = systemApiUrl()
         if (typeof systemUrl === "string") {
             str = systemUrl + str
         } else {
@@ -227,7 +227,7 @@ const webTs = {
             str.substring(0, 1) === "/") {
             return str;
         }
-        const systemOrigin = getAppData('props.systemInfo.origin')
+        const systemOrigin = cachedSystemOrigin()
         if (typeof systemOrigin === "string") {
             str = systemOrigin + str;
         } else {

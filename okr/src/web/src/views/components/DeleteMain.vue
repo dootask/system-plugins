@@ -143,8 +143,8 @@ import OkrDetailsModal from '@/views/components/OkrDetailsModal.vue';
 import  WarningPopup from './WarningPopup.vue';
 import { ResultDialog } from "@/api"
 import { getUserInfo } from '@/api/modules/user';
-import { isMicroApp } from "@dootask/tools"
-const inMicroApp = computed(() => isMicroApp() ? 1 : 0)
+import { useMicroFlag } from "@/utils/dootask"
+const inMicroApp = useMicroFlag()
 
 const emit = defineEmits(['close'])
 

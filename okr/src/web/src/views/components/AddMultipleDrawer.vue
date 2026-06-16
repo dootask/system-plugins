@@ -4,7 +4,7 @@
         style="max-width: 948px;width: 90%;" 
         :on-after-leave="closeDrawer"
          @after-enter="showDrawer" 
-        :z-index="nextZIndex()"
+       
         :trap-focus="false" 
         :on-update-show="()=>{emit('close') }" 
         class="okr">
@@ -22,9 +22,10 @@
 </template>
 <script setup lang="ts">
 import AddMultipleMain from './AddMultipleMain.vue';
-import { nextZIndex } from "@dootask/tools"
+
 
 const show = ref(false)
+
 const loadIng = ref(false)
 const AddMultipleMainRef = ref(null)
 

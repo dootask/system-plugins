@@ -89,6 +89,7 @@ import utils from "@/utils/utils";
 import notSearchSvg from "@/assets/images/icon/notSearch.svg";
 import notDataSvg from "@/assets/images/icon/notData.svg";
 
+
 const props = defineProps({
     value: {
         type: Boolean,
@@ -99,6 +100,7 @@ const props = defineProps({
         default: null,
     },
 })
+
 
 
 const emit = defineEmits(['close', 'submit'])

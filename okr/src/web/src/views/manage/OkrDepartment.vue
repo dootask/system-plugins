@@ -30,11 +30,8 @@
 
                 <div class="flex items-center" :class="(userInfo == 'admin' || okrAdminOwner) ? 'flex-1' :'' ">
                     <div class="mr-8 ml-16 whitespace-nowrap text-text-li font-medium">{{ $t('时间') }}</div>
-                    <div v-if="showDatePickers" :class="(userInfo == 'admin' || okrAdminOwner) ? '' :'max-w-[225px] ' " class="okr-date-picker-waps ">
-                        <DatePickers />
-                    </div>
-                    <n-date-picker v-else :class="(userInfo == 'admin' || okrAdminOwner) ? '' :'max-w-[225px] ' " v-model:value="daterange" value-format="yyyy.MM.dd HH:mm:ss"
-                        type="daterange" clearable size="medium" />
+                    <n-date-picker :class="(userInfo == 'admin' || okrAdminOwner) ? '' :'max-w-[225px] ' " v-model:value="daterange" value-format="yyyy-MM-dd"
+                        type="daterange" clearable size="medium" :shortcuts="shortcuts" />
                 </div>
 
                 <n-button :loading="isloading" type="primary" size="small" class="ml-16 rounded px-16"
@@ -98,11 +95,12 @@
             </div>
         </div>
 
-        <n-drawer 
-            v-model:show="active" 
-            default-height="442px" 
-            placement="bottom" 
-            resizable>
+        <n-drawer
+            v-model:show="active"
+            default-height="442px"
+            placement="bottom"
+            resizable
+           >
             <n-drawer-content class="screen-d">
                 <template #header>
                     <div class="flex w-full items-center justify-between text-text-li text-16 md:text-18">
@@ -143,11 +141,8 @@
                     <div class="mt-16 whitespace-nowrap mb-4 text-text-li">
                         {{ $t('时间') }}
                     </div>
-                    <div v-if="showDatePickers" class="okr-date-picker-waps">
-                        <DatePickers />
-                    </div>
-                    <n-date-picker v-else class="h-[36px]" v-model:value="daterange" value-format="yyyy.MM.dd HH:mm:ss"
-                        type="daterange" clearable size="medium" />
+                    <n-date-picker class="h-[36px]" v-model:value="daterange" value-format="yyyy-MM-dd"
+                        type="daterange" clearable size="medium" :shortcuts="shortcuts" />
 
 
                     <div
@@ -177,9 +172,9 @@ import { getUserInfo } from '@/api/modules/user'
 import utils from '@/utils/utils'
 import { UserStore } from '@/store/user'
 import OkrLoading from '../components/OkrLoading.vue'
-import { getAppData, isMicroApp } from "@dootask/tools"
+import { dateRangeShortcuts } from "@/utils/datePresets"
 
-const datePickerApps = ref([])
+const shortcuts = dateRangeShortcuts()
 const active = ref(false)
 const loadIng = ref(false)
 const isloading = ref(false)
@@ -195,14 +190,12 @@ const list = ref([])
 const departmentsvalue = ref(null)
 const principalvalue = ref(null)
 const types = ref(null);
-const daterange = ref<[number, number]>([0,0])
+const daterange = ref<any>(null)
 const completednotrated = ref(false)
 const searchTime = ref(null)
 const keyWord = ref('')
 
 const emit = defineEmits(['edit'])
-
-const showDatePickers = computed(() => isMicroApp() ? 1 : 0)
 
 const departments = ref([
     { label: $t('全部'), value: null },
@@ -231,16 +224,8 @@ watch(() => props.searchObject, (newValue) => {
     }, 300)
 }, { deep: true })
 
-watch(() => active.value, (newValue) => {
-    if (newValue) {
-        loadDatePickers()
-    } else {
-        unmountDatePickerApps()
-    }
-})
-
 const searchActive = computed(() => {
-    return departmentsvalue.value != null || principalvalue.value != null || types.value != null || daterange.value[0] != 0 || daterange.value[1] != 0
+    return departmentsvalue.value != null || principalvalue.value != null || types.value != null || (daterange.value?.[0] ?? 0) != 0 || (daterange.value?.[1] ?? 0) != 0
 })
 
 const getUser = (keyword) => {
@@ -311,11 +296,11 @@ const getList = (type) => {
         const sendata = {
             completed: completednotrated.value ? 1 : 0,
             department_id: departmentsvalue.value,
-            end_at: daterange.value[1] ? utils.TimeHandle(daterange.value[1]) : '',
+            end_at: daterange.value?.[1] ? utils.TimeHandle(daterange.value[1]) : '',
             objective: props.searchObject,
             page: type == 'updata' ? 1 : page.value,
             page_size: type == 'updata' ?  page.value * 20 : 20,
-            start_at: daterange.value[0] ? utils.TimeHandle(daterange.value[0],2) : '',
+            start_at: daterange.value?.[0] ? utils.TimeHandle(daterange.value[0],2) : '',
             type: types.value == "0" ? null : types.value,
             userid: principalvalue.value,
         }
@@ -387,7 +372,7 @@ const handleReset = () => {
     departmentsvalue.value = null
     principalvalue.value = null
     types.value = null
-    daterange.value = [0,0]
+    daterange.value = null
     loadingstatus.value = false
     active.value = false
     page.value = 1
@@ -430,68 +415,10 @@ const onScroll = (e) => {
     }
 }
 
+
 // 加载时间组件
-const loadDatePickers = () => {
-    nextTick(() => {
-        if (!isMicroApp()) return false;
-        unmountDatePickerApps()
-        document.querySelectorAll('datepickers').forEach(e => {
-            const instance = getAppData('instance')
-            const app = new instance.Vue({
-                el: document.querySelector('DatePickers'),
-                store: instance.store,
-                render: (h: any) => {
-                    return h(instance.components?.DatePicker, {
-                        class: "okr-app-date-pickers",
-                        props: {
-                            editable: false,
-                            placeholder: $t("请选择时间"),
-                            format: "yyyy-MM-dd",
-                            type: "daterange",
-                            placement: "bottom-end",
-                            confirm: true,
-                            options: {shortcuts: getAppData('methods.extraCallA')?.('timeOptionShortcuts')}
-                        },
-                        on: {
-                            "on-change": (e: any) => {
-                                daterange.value = e
-                            }
-                        }
-                    })
-                }
-            });
-            datePickerApps.value.push(app);
-        })
-    })
-}
-// 卸载时间组件
-const unmountDatePickerApps = () => {
-    if (datePickerApps.value) {
-        datePickerApps.value.forEach(app => {
-            app.$el.replaceWith(document.createElement("DatePickers"));
-            app.$destroy()
-        })
-        datePickerApps.value = [];
-    }
-}
-
-// 重载
-window.addEventListener('resize', function () {
-    loadDatePickers()
-})
-
-// 卸载
-window.addEventListener('apps-unmount', function () {
-    unmountDatePickerApps()
-})
-
-onBeforeUnmount(() => {
-    unmountDatePickerApps()
-})
-
 onMounted(() => {
     init()
-    loadDatePickers()
     getList('search')
     handleGetUserInfo();
 })

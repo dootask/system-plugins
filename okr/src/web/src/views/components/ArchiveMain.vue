@@ -54,10 +54,10 @@ import OkrDetailsModal from '@/views/components/OkrDetailsModal.vue';
 import { getOkrArchive, okrArchiveRestore, okrDelete } from '@/api/modules/okrList'
 import utils from '@/utils/utils';
 import { useMessage } from "@/utils/messageAll"
-import { isMicroApp } from "@dootask/tools"
+import { useMicroFlag } from "@/utils/dootask"
 
 const message = useMessage()
-const inMicroApp = computed(() => isMicroApp() ? 1 : 0)
+const inMicroApp = useMicroFlag()
 
 const loadIng = ref(false)
 const objective = ref('')

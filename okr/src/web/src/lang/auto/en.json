@@ -417,5 +417,10 @@
     "被对齐": "Aligned",
     "对齐的OKR进度将会同步至当前OKR": "Aligned OKR progress will be synchronized to the current OKR",
     "进度自动更新": "Progress Auto Update",
-    "注：进度一旦修改，将不再自动同步进度": "Note: Once progress is modified, it will no longer be automatically synchronized"
+    "注：进度一旦修改，将不再自动同步进度": "Note: Once progress is modified, it will no longer be automatically synchronized",
+    "本月": "This Month",
+    "本季度": "This Quarter",
+    "本年": "This Year",
+    "打开讨论": "Open Discussion",
+    "讨论在主程序会话中进行": "Discussion takes place in the main app conversation"
 }

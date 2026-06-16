@@ -3,7 +3,7 @@
         v-model:show="show" 
         :on-after-enter="showDrawer" 
         :on-after-leave="closeDrawer" 
-        :z-index="nextZIndex()" 
+        
         class="okr" 
         style="--n-body-padding:16px 20px 24px 24px;max-width: 998px;width: 90%;"
         :trap-focus="false">
@@ -18,10 +18,11 @@
 </template>
 <script setup lang="ts">
 import ArchiveMain from './ArchiveMain.vue';
-import { nextZIndex } from "@dootask/tools"
+
 
 
 const show = ref(false)
+
 
 const emit = defineEmits(['close', 'upData'])
 

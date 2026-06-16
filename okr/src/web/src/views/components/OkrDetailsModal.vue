@@ -5,7 +5,7 @@
         :mask-closable="false"
         @after-leave="closeDrawer"
         @after-enter="showDrawer"
-        :z-index="nextZIndex()"
+       
         :trap-focus="false">
         <n-card
             class="w-[90%] max-w-[1200px] max-md:fixed max-md:inset-0 max-md:w-full max-md:h-full max-md:rounded-none max-md:overflow-hidden"
@@ -27,7 +27,7 @@
 </template>
 <script setup lang="ts">
 import OkrDetailsMain from '@/views/components/OkrDetailsMain.vue';
-import { nextZIndex } from "@dootask/tools"
+
 
 const emit = defineEmits(['close', 'edit', 'upData','getList','openDetail'])
 
@@ -43,6 +43,7 @@ const props = defineProps({
         default: 0,
     },
 })
+
 
 // 关闭
 const closeDrawer = () => {

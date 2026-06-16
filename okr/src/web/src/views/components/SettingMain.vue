@@ -2,8 +2,17 @@
     <div class="setting-main-okr">
 
         <p class="font-medium text-[#303133]">{{ $t('评分部门') }} OKR</p>
-        <div class="mt-16" v-if="showUserSelect">
-            <UserSelects/>
+        <div class="mt-16">
+            <UserSelectField
+                :value="formModel.score_department_user ? [formModel.score_department_user] : []"
+                :title="$t('选择用户')"
+                :placeholder="$t('选择用户')"
+                :avatar-size="36"
+                :multiple-max="1"
+                avatar-name
+                show-disable
+                :add-icon="false"
+                @change="(ids) => formModel.score_department_user = ids[0] || 0" />
         </div>
         <p class="mt-8 text-xs text-[#515A6E] opacity-50">{{ $t('单选：指定可评分部门及部门负责人OKR的人员。') }}</p>
 
@@ -35,13 +44,11 @@
 <script setup lang="ts">
 import { useMessage } from "@/utils/messageAll"
 import { okrSetting } from '@/api/modules/system'
-import { getAppData, isMicroApp } from "@dootask/tools"
+import UserSelectField from "./UserSelectField.vue"
 
 const message = useMessage()
 const emit = defineEmits(['close', 'loadIng','submit'])
 
-const showUserSelect = ref(getAppData('instance.components.UserSelect') ? 1 : 0)
-const userSelectApps = ref([]);
 const loadIng = ref(false);
 const formModel = ref({
     score_department_user: 0,
@@ -49,56 +56,6 @@ const formModel = ref({
     superior_score_weight: 0,
     type: 'save'
 })
-
-// 加载选择用户组件
-const loadUserSelects = () => {
-    unmountUserSelectsApps()
-    nextTick(() => {
-        if (!isMicroApp()) return false;
-        document.querySelectorAll('userselects').forEach(e => {
-            const instance = getAppData('instance')
-            const app = new instance.Vue({
-                el: e,
-                store: instance.store,
-                render: (h: any) => {
-                    return h(instance.components?.UserSelect, {
-                        class: "okr-user-selects",
-                        props: {
-                            value: formModel.value.score_department_user ? [formModel.value.score_department_user] : [],
-                            title: $t('选择用户'),
-                            border: false,
-                            avatarSize: 36,
-                            addIcon: false,
-                            avatarName: true,
-                            showDisable: true,
-                            multipleMax: 1,
-                        },
-                        on: {
-                            "on-show-change": (show: any) => {
-                                if (!show) {
-                                    formModel.value.score_department_user = app.$children[0].values[0]
-                                }
-                            }
-                        }
-                    })
-                },
-            });
-            userSelectApps.value.push(app)
-        })
-    })
-}
-
-// 卸载用户组件
-const unmountUserSelectsApps = () => {
-    if(userSelectApps.value){
-        userSelectApps.value.forEach(app => {
-            let dom = document.createElement("UserSelects")
-            app.$el.replaceWith(dom);
-            app.$destroy()
-        })
-        userSelectApps.value = [];
-    }
-}
 
 // 监听输入
 const onSelfScoreWeight = (val: number) => {
@@ -146,7 +103,6 @@ const handleSubmit = (type) => {
             formModel.value.score_department_user = data.score_department_user
             formModel.value.self_score_weight = data.self_score_weight
             formModel.value.superior_score_weight = data.superior_score_weight
-            loadUserSelects()
         }
     })
     .catch(({ msg }) => {
@@ -165,7 +121,6 @@ const showDrawer = () => {
 
 // 关闭Drawer
 const closeDrawer = () => {
-    unmountUserSelectsApps()
     emit('close')
 }
 
@@ -180,9 +135,7 @@ onBeforeUnmount(() => {
 //
 onMounted(() => {
     nextTick(()=>{
-        showUserSelect.value = getAppData('instance.components.UserSelect') ? 1 : 0
         handleSubmit('get')
-        loadUserSelects()
     })
 })
 

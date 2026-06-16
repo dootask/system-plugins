@@ -16,10 +16,11 @@
 import { onMounted } from "vue"
 import { GlobalStore } from "@/store"
 import AddMultipleDrawer from "@/views/components/AddMultipleDrawer.vue"
-import { getAppData } from "@dootask/tools"
+import { getMicroProps } from "@/utils/dootask"
 import { initAppData } from "@/microapp"
 
-const show = ref(!(getAppData('props.type') === "details" || getAppData('props.open_type') === "details"))
+const microProps = getMicroProps()
+const show = ref(!(microProps?.type === "details" || microProps?.open_type === "details"))
 const globalStore = GlobalStore()
 const cleanupAppData = ref(null)
 const { addMultipleShow, multipleId, addMultipleData } = globalStore.multipleSetup()

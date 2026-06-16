@@ -1,7 +1,7 @@
 import localforage from "localforage"
 import webTs from "./web"
 import { GlobalStore } from "@/store"
-import { getAppData } from "@dootask/tools"
+import { systemVersion } from "./dootask"
 
 localforage.config({ name: 'DooTask', storeName: 'common' })
 
@@ -702,7 +702,7 @@ const utils = {
                 }
             }
             if (utils.rightExists(url, '.js')) {
-                script.src = url + "?hash=" + getAppData('props.systemInfo.version')
+                script.src = url + "?hash=" + systemVersion()
             } else {
                 script.src = url
             }
@@ -770,7 +770,7 @@ const utils = {
             }
             script.rel = 'stylesheet'
             if (utils.rightExists(url, '.css')) {
-                script.href = url + "?hash=" + getAppData('props.systemInfo.version')
+                script.href = url + "?hash=" + systemVersion()
             } else {
                 script.href = url
             }

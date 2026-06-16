@@ -11,7 +11,7 @@
         <div class="md:flex-1 flex flex-col relative md:overflow-hidden bg-white px-16 pt-16 md:pt-0 md:px-0">
             <div class="flex max-md:hidden min-h-[44px] items-center justify-between pb-[15px] border-solid border-0 border-b-[1px] border-[#F2F3F5] relative md:mr-24">
                 <div class="flex items-center gap-4">
-                    <n-popover class="okr-more-button-popover hidden md:flex" placement="bottom" :show="showPopover" trigger="manual" @clickoutside="handleClosePopover(1)" :z-index="modalZIndex" raw :show-arrow="true">
+                    <n-popover class="okr-more-button-popover hidden md:flex" placement="bottom" :show="showPopover" trigger="manual" @clickoutside="handleClosePopover(1)" raw :show-arrow="true">
                         <template #trigger>
                             <div @click="showPopover = !showPopover">
                                 <div v-if="detailData.completed == '0' && detailData.canceled == '0'" class="flex items-center justify-center w-[16px] h-[16px] overflow-hidden rounded-full border-[1px] border-solid cursor-pointer" :class="detailData.completed == '0' ? 'border-[#A8ACB6]' : 'border-primary-color bg-primary-color'"></div>
@@ -41,7 +41,7 @@
                         <img class="mr-8" :src="utils.apiUrl(fenSvg)" />
                         <p class=" text-title-color text-12">{{ detailData.score }}{{ $t('分') }}</p>
                     </div>
-                    <n-popover class="okr-more-button-popover" placement="bottom" :show="showMorePopover" trigger="manual" @clickoutside="handleClosePopover(2)" :z-index="modalZIndex" raw :show-arrow="true">
+                    <n-popover class="okr-more-button-popover" placement="bottom" :show="showMorePopover" trigger="manual" @clickoutside="handleClosePopover(2)" raw :show-arrow="true">
                         <template #trigger>
                             <i @click="showMorePopover = !showMorePopover" class="ivu-icon ivu-icon-ios-more cursor-pointer text-[#A7ACB6] text-[25px]"></i>
                         </template>
@@ -62,7 +62,7 @@
                 <div class="md:mr-24">
                     <h3 id="detailTop" class="relative text-text-li mt-[24px] max-md:mt-[8px] max-md:mr-[104px] break-all text-18 md:text-24 leading-[1.4] font-medium md:min-h-[40px]">
                         {{ detailData.title }}
-                        <n-popover placement="bottom-end" :show="showPopover" :z-index="modalZIndex" @clickoutside="showPopover = false">
+                        <n-popover placement="bottom-end" :show="showPopover" @clickoutside="showPopover = false">
                             <template #trigger>
                                 <i @click="showPopover = !showPopover" class="okrfont text-18 ml-8 z-[2] md:hidden">&#xe779;</i>
                             </template>
@@ -75,7 +75,7 @@
                             </div>
                         </n-popover>
                     </h3>
-                    <div class="mt-16 md:mt-24 flex flex-col gap-4" :class="navActive == 0 ? 'navActive' : ''">
+                    <div class="mt-16 md:mt-24 flex flex-col gap-4">
                         <div class="flex items-center">
                             <p class="flex items-center w-[115px]">
                                 <i v-if="detailData.ascription == '2'" class="okrfont icon-item text-[#BBBBBB]">&#xe6e4;</i>
@@ -130,11 +130,16 @@
                             <div class="flex items-center justify-between mt-4">
                                 <div class="flex items-center mr-24">
                                     <div class="flex items-start gap-2 max-w-[104px] h-[26px] overflow-hidden">
-                                        <div v-if="showUserSelect && detailData.completed == '0' && detailData.canceled == '0' || item.participant != ''" class="relative">
-                                            <div v-if="userInfo.userid != detailData.userid || detailData.canceled == '1' || detailData.completed == '1' || item.score > -1 || item.superior_score > -1" class="absolute top-0 bottom-0 left-0 right-0 cursor-not-allowed z-[2]"></div>
-                                            <UserSelects class="relative z-[1]" :formkey="index" />
+                                        <div v-if="inMicroApp && detailData.completed == '0' && detailData.canceled == '0' || item.participant != ''" class="relative">
+                                            <UserSelectField
+                                                class="relative z-[1]"
+                                                :value="participantIds(item)"
+                                                :title="$t('选择参与人')"
+                                                :avatar-size="20"
+                                                :disabled="participantDisabled(item)"
+                                                @change="(ids) => onParticipantChange(item, index, ids)" />
                                         </div>
-                                        <n-avatar v-if="!showUserSelect" round :size="20" src="https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg" />
+                                        <n-avatar v-if="!inMicroApp" round :size="20" src="https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg" />
                                     </div>
                                     <div v-if="item.participant.split(',').length > 4" class="w-[20px] h-[20px] rounded-full bg-primary-color flex items-center justify-center text-white text-12 ">
                                         <span class="scale-[0.8333] origin-center whitespace-nowrap">+{{item.participant.split(',').length - 4 }}</span>
@@ -245,12 +250,16 @@
                                     <div class="flex items-center justify-between">
                                         <div class="flex items-center">
                                             <div class="flex items-start gap-2 max-w-[104px] h-[26px] overflow-hidden">
-                                                <div v-if="showUserSelect && detailData.completed == '0' && detailData.canceled == '0'" class="relative">
-                                                    <div v-if="userInfo.userid != detailData.userid || detailData.canceled == '1' || detailData.completed == '1' || item.score > -1 || item.superior_score > -1" class="absolute top-0 bottom-0 left-0 right-0 cursor-not-allowed z-[2]">
-                                                    </div>
-                                                    <UserSelects class="relative z-[1]" :formkey="index" />
+                                                <div v-if="inMicroApp && detailData.completed == '0' && detailData.canceled == '0'" class="relative">
+                                                    <UserSelectField
+                                                        class="relative z-[1]"
+                                                        :value="participantIds(item)"
+                                                        :title="$t('选择参与人')"
+                                                        :avatar-size="20"
+                                                        :disabled="participantDisabled(item)"
+                                                        @change="(ids) => onParticipantChange(item, index, ids)" />
                                                 </div>
-                                                <n-avatar v-if="!showUserSelect" round :size="20" src="https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg" />
+                                                <n-avatar v-if="!inMicroApp" round :size="20" src="https://07akioni.oss-cn-beijing.aliyuncs.com/07akioni.jpeg" />
                                             </div>
                                             <div v-if="item.participant.split(',').length > 4" class="w-[20px] h-[20px] rounded-full bg-primary-color flex items-center justify-center text-white text-12 " :class="item.participant.split(',').length == 4 ? 'ml-6' : ''">
                                                 <span class="scale-[0.8333] origin-center whitespace-nowrap">+{{item.participant.split(',').length - 4 }}</span>
@@ -297,11 +306,14 @@
                         <AlignTarget ref="AlignTargetRef" :value="props.show" :id="props.id" :progressShow="true" :cancelShow="detailData.canceled == '0' && detailData.completed == '0' && userInfo.userid == detailData.userid" @unalign="handleUnalign" @openDetail="openDetail">
                         </AlignTarget>
                     </div>
-                    <div class="text-center flex-1" v-show="navActive == 0">
-                        <span v-if="!showDialogWrapper">{{ $t('子应用无法加载') }}</span>
-                        <div v-else class="text-left absolute top-0 md:-top-[20px] -bottom-[16px] left-0 right-0">
-                            <DialogWrappers />
-                        </div>
+                    <div class="text-center flex-1 flex flex-col items-center justify-center gap-6 mt-16 md:mt-0" v-show="navActive == 0">
+                        <span v-if="!inMicroApp" class="text-text-tips text-14">{{ $t('子应用无法加载') }}</span>
+                        <template v-else>
+                            <span class="text-text-tips text-14">{{ $t('讨论在主程序会话中进行') }}</span>
+                            <n-button type="primary" ghost :disabled="!detailData.dialog_id" @click="openComment">
+                                {{ $t('打开讨论') }}
+                            </n-button>
+                        </template>
                     </div>
                     <n-scrollbar class="mt-16 md:mt-0 px-16 md:px-0" v-if="navActive == 1" :on-scroll="onScrollLogList">
                         <div class="flex text-start mb-[24px] md:pl-24 pr-[10px] " v-for="item in logList" v-if="logList.length">
@@ -411,17 +423,17 @@ import { GlobalStore } from '@/store';
 import { UserStore } from '@/store/user'
 import webTs from '@/utils/web';
 import fenSvg from '@/assets/images/icon/fen.svg';
-import {getAppData, getBaseUrl, popoutWindow, isMicroApp, nextZIndex} from "@dootask/tools"
+import { getBaseUrl, popoutWindow, openDialog, isElectron as getIsElectron } from "@dootask/tools"
+import { useMicroFlag } from "@/utils/dootask"
+import UserSelectField from "./UserSelectField.vue"
 
-const isElectron = computed(() => getAppData('props.isElectron') ? 1 : 0)
-const showDialogWrapper = computed(() => getAppData('instance.components.DialogWrapper') ? 1 : 0)
-const showUserSelect = computed(() => getAppData('instance.components.UserSelect') ? 1 : 0)
+// micro-app 下才能使用主程序选人、打开会话能力
+const inMicroApp = useMicroFlag()
+const isElectron = ref(0)
 
 const userInfo = UserStore().info
 const globalStore = GlobalStore()
-const userSelectApps = ref([]);
 const navActive = ref(0)
-const dialogWrappersApp = ref()
 const loadIng = ref(false)
 const loadIngR = ref(false)
 const showPopover = ref(false)
@@ -474,7 +486,6 @@ const canSuperiorUpdateScore = ref(false)
 const nowInterval = ref<any>(null)
 const nowTime = ref(0)
 
-const modalZIndex = nextZIndex()
 
 const emit = defineEmits(['close', 'edit', 'upData', 'isFollow', 'canceled', 'getList', 'openDetail', 'getDetail'])
 
@@ -569,9 +580,6 @@ const handleFollowOkr = () => {
 //
 const handleNav = (index) => {
     navActive.value = index
-    if (navActive.value == 0 && window.innerWidth < 768) {
-        loadDialogWrappers()
-    }
     if (navActive.value == 1) {
         logListPage.value = 1
         logList.value = []
@@ -581,13 +589,6 @@ const handleNav = (index) => {
         replayListPage.value = 1
         replayList.value = []
         handleGetReplayList()
-    }
-    if (navActive.value == 3) {
-
-        nextTick(() => {
-            loadUserSelects()
-        })
-
     }
 }
 
@@ -1033,17 +1034,10 @@ const handleUnalign = () => {
 // 点击对齐目标跳转
 const openDetail = (id, userid) => {
     emit('openDetail', id, userid)
-    userSelectApps.value.forEach(app => {
-        let dom = document.createElement("UserSelects")
-        dom.setAttribute('formkey', app._vnode.data.formkey)
-        app.$el.replaceWith(dom);
-        app.$destroy()
-    })
     nextTick(() => {
         scrollbarRef.value.scrollTo({ top: 0 })
         getDetail('')
         AlignTargetRef.value.getList()
-        loadDialogWrappers();
         if (window.innerWidth < 768) {
             navActive.value = 3
         }
@@ -1053,28 +1047,12 @@ const openDetail = (id, userid) => {
     })
 }
 
-// 加载聊天组件
-const loadDialogWrappers = () => {
-    dialogWrappersApp.value && (dialogWrappersApp.value.$children[0].allMsgs = [])
-    nextTick(() => {
-        if (!isMicroApp()) return false;
-        if (dialogWrappersApp.value) {
-            dialogWrappersApp.value.$el.replaceWith(document.createElement("DialogWrappers"));
-            dialogWrappersApp.value.$destroy()
-        }
-        const instance = getAppData('instance')
-        dialogWrappersApp.value = new instance.Vue({
-            el: document.querySelector('DialogWrappers'),
-            store: instance.store,
-            render: (h: any) => {
-                return h(instance.components?.DialogWrapper, {
-                    props: {
-                        dialogId: detailData.value.dialog_id
-                    }
-                }, [h("div", { slot: "head" })])
-            }
-        });
-    })
+// 打开讨论会话（1.x 起无法内嵌聊天，改为在主程序中打开对应会话）
+const openComment = () => {
+    if (!detailData.value.dialog_id) {
+        return
+    }
+    openDialog(detailData.value.dialog_id).catch(() => {})
 }
 
 //添加复盘
@@ -1103,45 +1081,27 @@ const handleCheckMultiple = (id) => {
 }
 
 
-// 加载选择用户组件
-const loadUserSelects = () => {
-    nextTick(() => {
-        if (!isMicroApp()) return false;
-        document.querySelectorAll('userselects').forEach(e => {
-            const instance = getAppData('instance')
-            const index = e.getAttribute('formkey')
-            const item = detailData.value.key_results[e.getAttribute('formkey')];
-            const app = new instance.Vue({
-                el: e,
-                store: instance.store,
-                render: (h: any) => {
-                    return h(instance.components?.UserSelect, {
-                        class: "okr-user-selects",
-                        formkey: index,
-                        props: {
-                            value: ((item.participant).split(',').map(h => Number(h))).filter(value => value !== 0),
-                            title: $t('选择参与人'),
-                            border: false,
-                            avatarSize: 20,
-                            addIcon: ((item.participant).split(',').map(h => Number(h))).filter(value => value !== 0).length == 0,
-                        },
-                        on: {
-                            "on-show-change": (show: any) => {
-                                if (!show) {
-                                    let values = app.$children[0].values;
-                                    if (item.participant != values.join(',')) {
-                                        item.participant = values.join(',');
-                                        participantChange(item, e.getAttribute('formkey'))
-                                    }
-                                }
-                            }
-                        }
-                    })
-                },
-            });
-            userSelectApps.value.push(app)
-        })
-    })
+// 选人字段（UserSelectField）选择完成后回填参与人
+const onParticipantChange = (item, index, ids) => {
+    const value = (ids || []).join(',')
+    if (item.participant != value) {
+        item.participant = value
+        participantChange(item, index)
+    }
+}
+
+// KR 参与人 id 数组（供 UserSelectField 显示）
+const participantIds = (item) => {
+    return (item.participant || '').split(',').map((h) => Number(h)).filter((v) => v !== 0)
+}
+
+// 当前用户是否可编辑该 KR 的参与人
+const participantDisabled = (item) => {
+    return userInfo.userid != detailData.value.userid
+        || detailData.value.canceled == '1'
+        || detailData.value.completed == '1'
+        || item.score > -1
+        || item.superior_score > -1
 }
 
 
@@ -1226,9 +1186,10 @@ const colorStatus = (color) => {
 }
 
 // 新窗口打开
-const openNewWin = () => {
+const openNewWin = async () => {
+    const base = await getBaseUrl().catch(() => "")
     popoutWindow({
-        url: `${getBaseUrl()}apps/okr/okrDetails?id=${props.id}`,
+        url: `${base}apps/okr/okrDetails?id=${props.id}`,
         title: $t('OKR明细'),
         titleFixed: true,
         width: Math.min(window.screen.availWidth, 1024),
@@ -1251,13 +1212,10 @@ onBeforeUnmount(() => {
 
 // 关闭
 const closeDrawer = () => {
-    dialogWrappersApp.value && (dialogWrappersApp.value.$children[0].allMsgs = []);
     nextTick(() => {
-        dialogWrappersApp.value && dialogWrappersApp.value.$destroy() && (dialogWrappersApp.value = null);
         navActive.value = 0
         detailData.value = {};
         loadIng.value = true;
-        userSelectApps.value.forEach(app => app.$destroy())
     })
 
 }
@@ -1278,18 +1236,15 @@ watch(() => props.id, (newValue) => {
     }
 })
 
-watch(() => detailData.value.dialog_id, (newValue) => {
-    if (newValue) {
-        loadUserSelects()
-        if (window.innerWidth >= 768) {
-            loadDialogWrappers()
-        }
+
+
+
+onMounted(async () => {
+    try {
+        isElectron.value = (await getIsElectron()) ? 1 : 0
+    } catch {
+        isElectron.value = 0
     }
-}, { immediate: true })
-
-
-
-onMounted(() => {
     nextTick(() => {
         if (window.innerWidth < 768 && !globalStore.doubleSkip) {
             navActive.value = 3

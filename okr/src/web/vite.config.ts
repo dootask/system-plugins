@@ -38,13 +38,7 @@ export default defineConfig(({ command, mode }) => {
             ],
         },
         plugins: [
-            vue({
-                template: {
-                    compilerOptions: {
-                        isCustomElement: (tag) => tag.includes('DialogWrappers') || tag.includes('UserSelects') || tag.includes('DatePickers') ,
-                    }
-                }
-            }),
+            vue(),
             AutoImport({
                 imports: [
                     'vue',

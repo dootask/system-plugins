@@ -54,10 +54,7 @@
                 </n-form-item>
 
                 <n-form-item :label="$t('周期')" path="time">
-                    <div v-if="showDatePickers" class="okr-date-picker-waps w-[100%]">
-                        <DatePickers type="cycle" />
-                    </div>
-                    <n-date-picker v-else class="w-full" v-model:value="formValue.time" value-format="yyyy.MM.dd HH:mm:ss" type="daterange" clearable size="medium" />
+                    <n-date-picker class="w-full" v-model:value="formValue.time" value-format="yyyy-MM-dd HH:mm:ss" type="daterange" clearable size="medium" :shortcuts="shortcuts" />
                 </n-form-item>
 
                 <n-form-item :label="$t('可见范围')">
@@ -120,28 +117,21 @@
                                 </n-form-item-gi>
 
                                 <n-form-item-gi :span="4" :label="$t('时间')" path="time">
-                                    <div v-if="showDatePickers" class="okr-date-picker-waps w-[100%]">
-                                        <DatePickers type="time" :formkey="index" />
-                                    </div>
-                                    <n-date-picker v-else class="w-full" v-model:value="item.time" type="daterange" clearable size="medium" />
+                                    <n-date-picker class="w-full" v-model:value="item.time" value-format="yyyy-MM-dd HH:mm:ss" type="daterange" clearable size="medium" :shortcuts="shortcuts" />
                                 </n-form-item-gi>
 
                                 <!-- pc -->
                                 <n-form-item-gi class="hidden md:block" :span="2" :label="$t('参与人')">
-                                    <div v-if="showUserSelect" class="w-full min-h-[32px] bg-[#fff] border-[1px] border-[#e8e8e8] border-solid rounded-[4px] cursor-pointer"
-                                        @click="onParticipantClick">
-                                        <UserSelects :formkey="index" />
+                                    <div class="w-full min-h-[32px] bg-[#fff] border-[1px] border-[#e8e8e8] border-solid rounded-[4px] px-8 py-4">
+                                        <UserSelectField v-model:value="item.participant" :title="$t('选择参与人')" :placeholder="$t('请选择参与人')" :avatar-size="23" />
                                     </div>
-                                    <UserList :edit="props.edit" v-if="!showUserSelect" v-model:value="item.participant"></UserList>
                                 </n-form-item-gi>
 
                                 <!-- app -->
                                 <n-form-item-gi class="block md:hidden" :span="4" :label="$t('参与人')">
-                                    <div v-if="showUserSelect" class="w-full min-h-[32px] bg-[#fff] border-[1px] border-[#e8e8e8] border-solid rounded-[4px] cursor-pointer"
-                                        @click="onParticipantClick">
-                                        <UserSelects :formkey="index" />
+                                    <div class="w-full min-h-[32px] bg-[#fff] border-[1px] border-[#e8e8e8] border-solid rounded-[4px] px-8 py-4">
+                                        <UserSelectField v-model:value="item.participant" :title="$t('选择参与人')" :placeholder="$t('请选择参与人')" :avatar-size="23" />
                                     </div>
-                                    <UserList :edit="props.edit" v-if="!showUserSelect" v-model:value="item.participant"></UserList>
                                 </n-form-item-gi>
 
                                 <n-form-item-gi class="hidden md:block" :span="2" :label="$t('信心')">
@@ -169,13 +159,13 @@ import { watch, ref } from 'vue';
 
 import SelectAlignment from '@/views/components/SelectAlignment.vue'
 import ItemList from "./ItemList.vue";
-import UserList from "./UserList.vue";
+import UserSelectField from "./UserSelectField.vue";
 import { addOkr, upDateOkr } from '@/api/modules/created'
 import { useMessage } from "@/utils/messageAll"
 import utils from "@/utils/utils";
 import { UserStore } from '@/store/user'
 import { AlertCircleOutline } from '@vicons/ionicons5'
-import { getAppData, isMicroApp } from "@dootask/tools"
+import { dateRangeShortcuts } from "@/utils/datePresets"
 
 const emit = defineEmits(['close', 'loadIng', 'submit'])
 
@@ -187,10 +177,7 @@ const loadIng = ref(false)
 const formRef = ref()
 const formRefs = ref()
 const selectAlignmentShow = ref(false)
-const userSelectApps = ref([]);
-const datePickerApps = ref([])
-const showUserSelect = ref(getAppData('instance.components.UserSelect') ? 1 : 0)
-const showDatePickers = ref(getAppData('instance.components.DatePicker') ? 1 : 0)
+const shortcuts = dateRangeShortcuts()
 
 const props = defineProps({
     edit: {
@@ -403,53 +390,6 @@ const handleSubmit = () => {
     }).catch(_ => { })
 }
 
-// 加载选择用户组件
-const loadUserSelects = () => {
-    nextTick(() => {
-        if (!isMicroApp()) return false;
-        document.querySelectorAll('userselects').forEach(e => {
-            const instance = getAppData('instance')
-            const item = formKRValue.value[e.getAttribute('formkey')];
-            const app = new instance.Vue({
-                el: e,
-                store: instance.store,
-                render: (h: any) => {
-                    return h(instance.components?.UserSelect, {
-                        class: "okr-user-selects",
-                        formkey: e.getAttribute('formkey'),
-                        props: {
-                            value: item.participant || [],
-                            title: $t('选择参与人'),
-                            border: true,
-                            avatarSize: 23,
-                        },
-                        on: {
-                            "on-show-change": (show: any) => {
-                                if (!show) {
-                                    item.participant = app.$children[0].values;
-                                }
-                            }
-                        }
-                    })
-                },
-            });
-            userSelectApps.value.push(app)
-        })
-    })
-}
-// 卸载用户组件
-const unmountUserSelectsApps = () => {
-    if (userSelectApps.value) {
-        userSelectApps.value.forEach(app => {
-            let dom = document.createElement("UserSelects")
-            dom.setAttribute('formkey', app._vnode.data.formkey)
-            app.$el.replaceWith(dom);
-            app.$destroy()
-        })
-        userSelectApps.value = [];
-    }
-}
-
 // 清除数据
 const handleClear = () => {
     formValue.value = {
@@ -485,18 +425,12 @@ const handleAddKr = () => {
             score: -1,
         },
     )
-    loadUserSelects()
-    loadDatePickers()
 }
 
 // 删除kr
 const handleRemoveKr = (index) => {
     if (formKRValue.value.length == 1) return message.warning($t('至少需要一个KR！'))
     formKRValue.value.splice(index, 1)
-    unmountUserSelectsApps()
-    unmountDatePickerApps()
-    loadUserSelects()
-    loadDatePickers()
 }
 
 // 对齐目标
@@ -504,117 +438,9 @@ const handleGoal = () => {
     selectAlignmentShow.value = true
 }
 
-// 点击参与人
-const onParticipantClick = (e) => {
-    e.target?.querySelector(".add-icon")?.dispatchEvent(new Event('click'));
-}
-
-
-// 加载时间组件
-const loadDatePickers = () => {
-    nextTick(() => {
-        if (!isMicroApp()) return false;
-        document.querySelectorAll('datepickers').forEach(e => {
-            const instance = getAppData('instance')
-            const type = e.getAttribute('type');
-            const item = formKRValue.value[e.getAttribute('formkey')];
-            const app = new instance.Vue({
-                el: document.querySelector('DatePickers'),
-                store: instance.store,
-                data() {
-                    return {
-                        value: ((type == 'cycle' ? formValue.value.time : item.time) || []).map((h: any, key: number) => utils.TimeHandle(h, key))
-                    }
-                },
-                render: function (h: any) {
-                    return h(instance.components?.DatePicker, {
-                        class: "okr-app-date-pickers",
-                        type: type,
-                        formkey: e.getAttribute('formkey'),
-                        props: {
-                            value: this.value,
-                            editable: false,
-                            placeholder: $t("请选择时间"),
-                            format: "yyyy/MM/dd HH:mm",
-                            type: "datetimerange",
-                            placement: "top-end",
-                            confirm: true,
-                            transfer: true,
-                            options: {shortcuts: getAppData('methods.extraCallA')?.('timeOptionShortcuts')}
-                        },
-                        on: {
-                            "on-change": (value: any) => {
-                                this.value = value.map((h: any, key: number) => utils.TimeHandle(h, key))
-                                if (type == 'cycle') {
-                                    if (this.value[0] && this.value[1]) {
-                                        formValue.value.time = this.value;
-                                    } else {
-                                        formValue.value.time = null
-                                    }
-                                    nextTick(() => {
-                                        formRef.value?.validate((errors) => {
-                                            if (errors) {
-                                                const errorList = (document as any).querySelectorAll('.n-form-item-feedback--error')
-                                                errorList[0].scrollIntoView({
-                                                    block: 'center',
-                                                    behavior: 'smooth',
-                                                })
-                                                return false
-                                            };
-                                        }).catch(_ => { })
-                                    })
-                                }
-                                else {
-                                    if (this.value[0] && this.value[1]) {
-                                        item.time = this.value;
-                                    } else {
-                                        item.time = null
-                                    }
-
-                                    nextTick(() => {
-                                        formRefs.value?.forEach(element => {
-                                            element.validate((errors) => {
-                                                if (errors) {
-                                                    const errorList = (document as any).querySelectorAll('.n-form-item-feedback--error')
-                                                    errorList[0].scrollIntoView({
-                                                        block: 'center',
-                                                        behavior: 'smooth',
-                                                    })
-                                                    return false;
-                                                }
-                                            }).catch(_ => { })
-                                        });
-                                    })
-                                }
-
-                            }
-                        }
-                    })
-                }
-            });
-            datePickerApps.value.push(app);
-        })
-    })
-}
-// 卸载时间组件
-const unmountDatePickerApps = () => {
-    if (datePickerApps.value) {
-        datePickerApps.value.forEach(app => {
-            let dom = document.createElement("DatePickers")
-            dom.setAttribute('formkey', app._vnode.data.formkey)
-            dom.setAttribute('type', app._vnode.data.type)
-            app.$el.replaceWith(dom);
-            app.$destroy()
-        })
-        datePickerApps.value = [];
-    }
-}
-
 // 关闭Drawer
 const closeDrawer = () => {
     handleClear()
-    unmountUserSelectsApps()
-    unmountDatePickerApps()
     emit('close')
 }
 
@@ -638,12 +464,6 @@ onMounted(() => {
         if (!departmentOwner.value) {
             formValue.value.ascription = 2
         }
-
-        showUserSelect.value = getAppData('instance.components.UserSelect') ? 1 : 0
-        showDatePickers.value = getAppData('instance.components.DatePicker') ? 1 : 0
-
-        loadUserSelects()
-        loadDatePickers()
     })
 })
 
