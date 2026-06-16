@@ -374,12 +374,18 @@ function Drawer({
   onClose: () => void
   children: React.ReactNode
 }) {
-  // 右侧抽屉（shadcn Drawer / vaul）。面板挂载即打开，关闭时回调 onClose 卸载。
+  // 右侧抽屉（shadcn Drawer / vaul）。挂载即打开。
+  // 关闭不能直接 onClose——父级会立刻卸载本组件，vaul 来不及播放滑出动画（表现为「直接隐藏」）。
+  // 改为：关闭先把 open 置 false 让 vaul 播放滑出，待 onAnimationEnd(false) 动画结束再 onClose 卸载。
+  const [open, setOpen] = React.useState(true)
   return (
     <DrawerRoot
-      open
+      open={open}
       direction="right"
       onOpenChange={(o) => {
+        if (!o) setOpen(false)
+      }}
+      onAnimationEnd={(o) => {
         if (!o) onClose()
       }}
     >
