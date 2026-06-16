@@ -535,11 +535,12 @@ export async function sendApproveCard(
 
 /**
  * 拼一条「点开审批详情」的 open-micro-app 卡片（markdown 引用行，照 asset-hub）。
- * 点击后主程序以 iframe 微应用打开本工程详情页；url 用 {system_lang}/{system_theme}
- * 占位由主程序运行时替换，详情路由对齐本工程 `insts/$id`。
+ * 点击后主程序读 data-app-config 以 iframe 微应用打开本工程详情页（DialogWrapper
+ * 的 handleOpenMicroApp）。{system_theme}/{system_lang} 占位由主程序运行时替换；
+ * 本工程路由无 lang 路径段，故 lang/theme 走 query（对齐 config.yml 菜单 url）。
  */
 export function buildDetailCard(instId: number, label: string): string {
-  const url = `/apps/approve/{system_lang}/insts/${instId}?theme={system_theme}`
+  const url = `/apps/approve/insts/${instId}?theme={system_theme}&lang={system_lang}`
   const appConfig = JSON.stringify({
     id: 'approve',
     name: 'approve-detail',

@@ -1,23 +1,24 @@
 /**
  * 消息中心对接（handler 层）：以「审批助手(approval-alert)」机器人身份，向相关人推送
- * 还原的旧版审批模板卡片（approve_reviewer/notifier/submitter）。卡片仅展示、不与旧审批系统
- * 数据关联（主程序 /api/dialog/msg/sendapprove + 还原的 approve-*.vue 渲染）。
+ * **可点击**的审批卡片——markdown 文本 + open-micro-app 引用行，点击后主程序打开本工程
+ * 详情页 `insts/$id`（对齐资产管理插件做法，DialogWrapper.handleOpenMicroApp）。
+ * 不再使用旧 approve-*.vue 模板卡片（sendapprove），那套底部按钮不可点、只剩状态意义。
  *
  * 触发点（引擎动作完成后由 handler 调用，据 DB 当前状态算通知对象）：
- * - notifyOnStart：发起后 → 当前待办审批人(approve_reviewer) + 抄送人(approve_notifier)。
- * - notifyOnAdvance：推进到新节点后 → 新的待办审批人(approve_reviewer)。
- * - notifyResult：通过/驳回 → 通知发起人结果(approve_submitter)。撤回由发起人本人发起，不再通知。
+ * - notifyOnStart：发起后 → 当前待办审批人 + 抄送人。
+ * - notifyOnAdvance：推进到新节点后 → 新的待办审批人。
+ * - notifyResult：通过/驳回 → 通知发起人结果（含状态/处理人）。撤回由发起人本人发起，不通知。
  *
- * 卡片 data 贴合请假/加班（起止时间/事由/类型）；其它模板相关字段留空，模板已做 v-if 隐藏。
+ * 摘要字段贴合请假/加班（起止时间/事由/类型），其它模板缺这些字段时自动略过对应行。
  * 发送失败只记日志，绝不抛错阻断审批主流程。
  */
 import { getInst } from '#/lib/repo/insts'
 import { getDef } from '#/lib/repo/defs'
 import { getActiveTask } from '#/lib/repo/tasks'
 import { listActorsByInst, listPendingByTask } from '#/lib/repo/actors'
+import { listEventsByInst } from '#/lib/repo/events'
 import { addMsg } from '#/lib/repo/msgs'
-import { resolveUsers, sendApproveCard } from '#/lib/dootask-server'
-import type { ApproveCardType } from '#/lib/dootask-server'
+import { buildDetailCard, resolveUsers, sendBotDirectMessage } from '#/lib/dootask-server'
 import { isNotifyEnabled } from '#/lib/repo/settings'
 import type { ProcInstRow } from '#/lib/types'
 
@@ -36,40 +37,45 @@ function str(v: unknown): string {
   return typeof v === 'string' ? v : ''
 }
 
-/** 组装卡片 data（请假/加班相关字段；其它模板留空由模板隐藏）。 */
-function buildData(inst: ProcInstRow, defName: string, applicant: string) {
+/** 表单摘要行（类型/起止/事由；缺字段则略过）。不含申请人，由调用方按场景前置。 */
+function formLines(inst: ProcInstRow): Array<string> {
   let form: Record<string, unknown> = {}
   try {
     form = JSON.parse(inst.form_data || '{}') as Record<string, unknown>
   } catch {
     form = {}
   }
-  return {
-    id: inst.id,
-    nickname: applicant,
-    start_nickname: applicant,
-    proc_def_name: defName,
-    department: '',
-    type: str(form.leaveType),
-    start_time: str(form.startTime),
-    start_day_of_week: weekOf(form.startTime),
-    end_time: str(form.endTime),
-    end_day_of_week: weekOf(form.endTime),
-    description: str(form.reason) || str(form.description),
-  }
+  const lines: Array<string> = []
+  // 类型字段各模板 key 不一（请假为 type，部分为 leaveType），取其一。
+  const type = str(form.leaveType) || str(form.type)
+  if (type) lines.push(`- 类型：${type}`)
+  const st = str(form.startTime)
+  if (st) lines.push(`- 开始：${st}${weekOf(st) ? ` (${weekOf(st)})` : ''}`)
+  const et = str(form.endTime)
+  if (et) lines.push(`- 结束：${et}${weekOf(et) ? ` (${weekOf(et)})` : ''}`)
+  const desc = str(form.reason) || str(form.description)
+  if (desc) lines.push(`- 事由：${desc}`)
+  return lines
 }
 
-async function notify(
+/** 发一条可点击 markdown 卡片：**标题** + 摘要行 + 「查看详情」引用行。 */
+async function sendCard(
   inst: ProcInstRow,
   userid: number,
-  type: ApproveCardType,
-  data: Record<string, unknown>,
-  opts: { action?: string | null; isFinished?: boolean; title?: string },
+  title: string,
+  bodyLines: Array<string>,
   kind: string,
   token: string | null,
   taskId?: number | null,
 ): Promise<void> {
-  const sent = await sendApproveCard(userid, type, data, opts, token)
+  const text = [
+    `**${title}**`,
+    bodyLines.join('\n'),
+    buildDetailCard(inst.id, '查看详情：点击查看审批详情'),
+  ]
+    .filter(Boolean)
+    .join('\n\n')
+  const sent = await sendBotDirectMessage(userid, text, token)
   if (sent) {
     addMsg({
       inst_id: inst.id,
@@ -82,13 +88,10 @@ async function notify(
   }
 }
 
-async function nameOf(
-  initiatorId: number,
-  token: string | null,
-): Promise<string> {
+async function nameOf(userId: number, token: string | null): Promise<string> {
   // resolveUsers 对每个请求 id 均回填（含失败占位「用户#<id>」），故必有该键。
-  const names = await resolveUsers([initiatorId], token)
-  return names[initiatorId].nickname
+  const names = await resolveUsers([userId], token)
+  return names[userId].nickname
 }
 
 /** 发起后：通知当前待办审批人 + 抄送人。 */
@@ -107,28 +110,26 @@ export async function notifyOnStart(
   const ccs = actors.filter((a) => a.role === 'cc').map((a) => a.userid)
 
   const applicant = await nameOf(inst.initiator_id, token)
-  const data = buildData(inst, defName, applicant)
+  const body = [`- 申请人：${applicant}`, ...formLines(inst)]
 
   await Promise.all([
     ...approvers.map((uid) =>
-      notify(
+      sendCard(
         inst,
         uid,
-        'approve_reviewer',
-        data,
-        { action: 'start', title: `${applicant} 提交的「${defName}」待你审批` },
+        `${applicant} 提交的「${defName}」待你审批`,
+        body,
         'reviewer',
         token,
         task?.id,
       ),
     ),
     ...ccs.map((uid) =>
-      notify(
+      sendCard(
         inst,
         uid,
-        'approve_notifier',
-        data,
-        { title: `抄送 ${applicant} 的「${defName}」` },
+        `抄送你：${applicant} 提交的「${defName}」`,
+        body,
         'cc',
         token,
       ),
@@ -153,15 +154,14 @@ export async function notifyOnAdvance(
   const def = getDef(inst.def_id)
   const defName = def?.name ?? ''
   const applicant = await nameOf(inst.initiator_id, token)
-  const data = buildData(inst, defName, applicant)
+  const body = [`- 申请人：${applicant}`, ...formLines(inst)]
   await Promise.all(
     approvers.map((uid) =>
-      notify(
+      sendCard(
         inst,
         uid,
-        'approve_reviewer',
-        data,
-        { action: 'start', title: `${applicant} 提交的「${defName}」待你审批` },
+        `${applicant} 提交的「${defName}」待你审批`,
+        body,
         'reviewer',
         token,
         task.id,
@@ -170,7 +170,7 @@ export async function notifyOnAdvance(
   )
 }
 
-/** 通过/驳回后：通知发起人结果（撤回由发起人本人发起，不再通知）。 */
+/** 通过/驳回后：通知发起人结果（含状态/处理人）。撤回由发起人本人发起，不再通知。 */
 export async function notifyResult(
   instId: number,
   token: string | null,
@@ -178,25 +178,29 @@ export async function notifyResult(
   if (!isNotifyEnabled()) return
   const inst = getInst(instId)
   if (!inst) return
-  let action: string
-  if (inst.state === STATE_APPROVED) action = 'pass'
-  else if (inst.state === STATE_REJECTED) action = 'refuse'
+  let passed: boolean
+  if (inst.state === STATE_APPROVED) passed = true
+  else if (inst.state === STATE_REJECTED) passed = false
   else return
 
   const def = getDef(inst.def_id)
   const defName = def?.name ?? ''
-  const applicant = await nameOf(inst.initiator_id, token)
-  const data = buildData(inst, defName, applicant)
-  const title =
-    action === 'pass'
-      ? `您发起的「${defName}」已通过`
-      : `您发起的「${defName}」被拒绝`
-  await notify(
+  // 处理人：最后一条 approve/reject 事件的操作人。
+  const last = [...listEventsByInst(instId)]
+    .reverse()
+    .find((e) => e.action === 'approve' || e.action === 'reject')
+  const handler = last ? await nameOf(last.actor_id, token) : ''
+
+  const body = [
+    `- 状态：${passed ? '已通过' : '已拒绝'}`,
+    handler ? `- 处理人：${handler}` : '',
+    ...formLines(inst),
+  ].filter(Boolean)
+  await sendCard(
     inst,
     inst.initiator_id,
-    'approve_submitter',
-    data,
-    { action, isFinished: true, title },
+    `你发起的「${defName}」${passed ? '已通过' : '被拒绝'}`,
+    body,
     'result',
     token,
   )
