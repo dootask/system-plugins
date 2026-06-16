@@ -36,6 +36,13 @@ function normalizeAvatar(raw?: string): string | undefined {
 type DTClient = {
   get: <T = unknown>(api: string, params?: unknown) => Promise<T>
   post: <T = unknown>(api: string, body?: unknown) => Promise<T>
+  sendBotMessage: <T = unknown>(message: {
+    userid: number
+    text: string
+    bot_type?: string
+    bot_name?: string
+    silence?: boolean
+  }) => Promise<T>
   getUserBasic: (userid: number) => Promise<{
     userid: number
     nickname?: string
@@ -486,6 +493,34 @@ export async function sendBotDirectMessage(
       '[approve] sendBotDirectMessage failed:',
       (e as Error).message,
     )
+    return null
+  }
+}
+
+/**
+ * 用「审批」机器人（approval-alert，旧审批系统同款）向某用户发一条 markdown 卡片。
+ * 直接用 @dootask/tools 的 client.sendBotMessage（内部走 /api/dialog/msg/sendbot，
+ * 以操作人 token 鉴权、botGetOrCreate('approval-alert') 身份发 type=md），不自建机器人。
+ * 失败返回 null，绝不抛错。
+ */
+export async function sendApprovalCard(
+  toUserId: number,
+  text: string,
+  operatorToken: string | null,
+): Promise<{ dialogId: number | null; msgId: number | null } | null> {
+  if (!operatorToken) return null
+  try {
+    const client = await makeClient(operatorToken)
+    if (!client) return null
+    const res = await client.sendBotMessage<{ id?: number; dialog_id?: number }>(
+      { userid: toUserId, text, bot_type: 'approval-alert' },
+    )
+    return {
+      dialogId: Number(res?.dialog_id) || null,
+      msgId: Number(res?.id) || null,
+    }
+  } catch (e) {
+    console.error('[approve] sendApprovalCard failed:', (e as Error).message)
     return null
   }
 }

@@ -1,8 +1,8 @@
 /**
- * 消息中心对接（handler 层）：以「审批助手(approval-alert)」机器人身份，向相关人推送
- * **可点击**的审批卡片——markdown 文本 + open-micro-app 引用行，点击后主程序打开本工程
+ * 消息中心对接（handler 层）：以「审批」机器人（approval-alert，旧审批系统同款）向相关人
+ * 推送**可点击**的审批卡片——markdown 文本 + open-micro-app 引用行，点击后主程序打开本工程
  * 详情页 `insts/$id`（对齐资产管理插件做法，DialogWrapper.handleOpenMicroApp）。
- * 不再使用旧 approve-*.vue 模板卡片（sendapprove），那套底部按钮不可点、只剩状态意义。
+ * 沿用旧审批机器人，仅改消息内容/格式；不再用旧 approve-*.vue 模板卡片（底部按钮不可点）。
  *
  * 触发点（引擎动作完成后由 handler 调用，据 DB 当前状态算通知对象）：
  * - notifyOnStart：发起后 → 当前待办审批人 + 抄送人。
@@ -18,7 +18,7 @@ import { getActiveTask } from '#/lib/repo/tasks'
 import { listActorsByInst, listPendingByTask } from '#/lib/repo/actors'
 import { listEventsByInst } from '#/lib/repo/events'
 import { addMsg } from '#/lib/repo/msgs'
-import { buildDetailCard, resolveUsers, sendBotDirectMessage } from '#/lib/dootask-server'
+import { buildDetailCard, resolveUsers, sendApprovalCard } from '#/lib/dootask-server'
 import { isNotifyEnabled } from '#/lib/repo/settings'
 import type { ProcInstRow } from '#/lib/types'
 
@@ -75,7 +75,7 @@ async function sendCard(
   ]
     .filter(Boolean)
     .join('\n\n')
-  const sent = await sendBotDirectMessage(userid, text, token)
+  const sent = await sendApprovalCard(userid, text, token)
   if (sent) {
     addMsg({
       inst_id: inst.id,

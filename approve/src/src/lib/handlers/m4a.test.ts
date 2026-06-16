@@ -35,6 +35,7 @@ vi.mock('#/lib/dootask-server', () => ({
   getFileOne: async () => null,
   ensureApproveBot: async () => null,
   sendBotDirectMessage: async () => null,
+  sendApprovalCard: async () => null,
   buildDetailCard: () => '> card',
   sendApproveCard: async () => null,
 }))
