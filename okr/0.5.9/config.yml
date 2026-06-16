@@ -14,15 +14,3 @@ menu_items:
     capsule:
       top: 20
       right: 20
-
-  - location: application/admin
-    label:
-      en: OKR Analysis
-      zh: OKR 结果
-    url: apps/okr/analysis
-    type: inline
-    icon: ./icon/analysis.svg
-    visible_to: admin
-    capsule:
-      top: 20
-      right: 20

@@ -16,12 +16,3 @@ menu_items:
     url_type: inline
     icon: ./logo.svg
 
-  - location: application/admin
-    label:
-      en: OKR Analysis
-      zh: OKR 结果
-    url: apps/okr/analysis
-    url_type: inline
-    icon: ./icon/analysis.svg
-    visible_to: admin
-

@@ -6,7 +6,7 @@
                 <div :class="searchShow ? 'title-active' : ''" class="okr-app-refresh" v-if="!loadIng" @click="reLoadList"><i class="okrfont">&#xe6ae;</i></div>
             </div>
             <div class="okr-right z-[2]">
-                <n-button class="search-button" @mouseover="() => { searchShow = true }" @mouseout="() => { searchShow = false }"
+                <n-button v-if="!isAnalysisTab" class="search-button" @mouseover="() => { searchShow = true }" @mouseout="() => { searchShow = false }"
                     :class="searchShow || searchObject ? 'search-active' : ''" circle>
                     <span class="search-button-span border-[rgba(142,142,143,0.5)] h-[16px] leading-4" v-show="searchShow || searchObject">{{ inputName }}</span>
                     <n-input
@@ -19,7 +19,7 @@
                     <i v-if="inMicroApp" class="ivu-icon ivu-icon-ios-search"></i>
                     <i v-else class="okrfont">&#xe6f8;</i>
                 </n-button>
-                <n-button class="add-button" type="tertiary" @click="handleAdd" circle>
+                <n-button v-if="!isAnalysisTab" class="add-button" type="tertiary" @click="handleAdd" circle>
                     <n-spin size="small" :show="btnLoading>0">
                         <i v-if="inMicroApp" class="ivu-icon ivu-icon-md-add"></i>
                         <i v-else class="okrfont">&#xe6f2;</i>
@@ -75,6 +75,11 @@
                         <OkrReplay ref="OkrReplayRef" :searchObject="searchObject" @edit="handleEdit"/>
                     </div>
                 </n-tab-pane>
+                <n-tab-pane v-if="isAdmin" :tab="'OKR ' + $t('结果分析')" name="analysis">
+                    <div class="okr-scrollbar">
+                        <Analysis ref="OkrAnalysisRef" embed/>
+                    </div>
+                </n-tab-pane>
             </n-tabs>
         </div>
     </div>
@@ -106,6 +111,7 @@ import OkrReplay from '@/views/manage/OkrReplay.vue'
 import OkrFollow from '@/views/manage/OkrFollow.vue'
 import OkrParticipant from '@/views/manage/OkrParticipant.vue'
 import OkrDepartment from './manage/OkrDepartment.vue';
+import Analysis from '@/views/analysis.vue'
 import { useRouter, useRoute } from 'vue-router'
 import TipsModal from '@/views/components/TipsModal.vue';
 import { getUserInfo } from '@/api/modules/user'
@@ -127,6 +133,10 @@ const OkrParticipantRef = ref(null)
 const OkrDepartmentRef = ref(null)
 const OkrFollowRef = ref(null)
 const OkrReplayRef = ref(null)
+const OkrAnalysisRef = ref(null)
+
+// 分析（OKR 结果）标签页：搜索框 / 新增按钮对该页无意义，需隐藏
+const isAnalysisTab = computed(() => tabsName.value === 'analysis')
 
 const addShow = ref(false)
 const archiveShow = ref(false)
@@ -217,6 +227,9 @@ const reLoadList = () => {
     }
     if (tabsName.value == 'review') {
         OkrReplayRef.value.resetGetList('search')
+    }
+    if (tabsName.value == 'analysis') {
+        OkrAnalysisRef.value?.refresh()
     }
     setTimeout(()=>{
         loadIng.value = false;

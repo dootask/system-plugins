@@ -1,17 +1,18 @@
 <template>
-    <div class="page-okr-analysis" ref="pageOkrAnalysisRef">
-        <div class="flex-1 h-0 flex flex-col">
-            <div class="page-title">
-                <div class="flex items-center">
-                    <h2>{{ pageTitle }}</h2>
-                    <div class="okr-app-refresh" v-if="!loadIng" @click="getData"><i class="okrfont">&#xe6ae;</i></div>
-                </div>
+    <div class="page-okr-analysis" :class="{ 'is-embed': embed }" ref="pageOkrAnalysisRef">
+        <div class="page-title" v-if="!embed">
+            <div class="flex items-center">
+                <h2>{{ pageTitle }}</h2>
+                <div class="okr-app-refresh" v-if="!loadIng" @click="getData"><i class="okrfont">&#xe6ae;</i></div>
             </div>
-            <n-tabs v-if="(departments.length) > 1" class="ml-[2px] mt-[-10px]" type="line" animated :value="tabsValue" :on-update:value="(e)=>{ tabsValue = e }">
+        </div>
+        <div class="dept-tabs" v-if="(departments.length) > 1">
+            <n-tabs type="line" animated :value="tabsValue" :on-update:value="(e)=>{ tabsValue = e }">
                 <n-tab-pane v-for="item in departments" :name="item.id" :tab="item.id == 0 ? $t(item.name) : item.name"></n-tab-pane>
             </n-tabs>
-            <div v-if="!deptLoadIng" class="flex overflow-hidden">
-                <n-scrollbar>
+        </div>
+        <div class="analysis-body" v-if="!deptLoadIng">
+            <n-scrollbar>
                     <n-grid x-gap="24" cols="1 600:2 800:3">
 
                         <!-- 整体平均完成度 -->
@@ -44,10 +45,13 @@
                                         <div class="mt-20" v-else v-for="item in analyzeDatas.deptCompletes">
                                             <p class="progress-name max-w-[calc(100%-50px)] line-clamp-1">
                                                 {{ item.department_name }}</p>
-                                            <n-progress type="line" color="#8BCF70"
-                                                :percentage="calculatingProgress(item.complete, item.total)">
-                                                <span class="text-[#8BCF70] w-[50px] block text-right">{{calculatingProgress(item.complete, item.total) }}%</span>
-                                            </n-progress>
+                                            <div class="custom-progres">
+                                                <div class="progres h-[16px] leading-4">
+                                                    <p class="bg-[#8BCF70]"
+                                                        :style="{ width: calculatingProgress(item.complete, item.total) + '%' }"></p>
+                                                </div>
+                                                <div class="collect">{{ calculatingProgress(item.complete, item.total) }}%</div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -185,7 +189,6 @@
 
                     </n-grid>
                 </n-scrollbar>
-            </div>
         </div>
     </div>
 </template>
@@ -195,6 +198,11 @@ import * as echarts from 'echarts';
 import * as http from "@/api/modules/analysis";
 import utils from '@/utils/utils';
 import tipsSvgfrom from '@/assets/images/icon/tips.svg';
+
+// embed=true 时作为「OKR 管理」页内的标签页嵌入，隐藏自带的页面大标题与外层
+// 留白，让内容直接填充进 tab 的滚动容器；独立路由 /analysis 仍按原样渲染。
+const props = defineProps<{ embed?: boolean }>()
+const embed = props.embed === true
 
 const pageTitle = 'OKR ' + $t('结果分析')
 const deptLoadIng = ref(false)
@@ -417,6 +425,11 @@ watch(tabsValue, (value) => {
 nextTick(() => {
     getDepartment()
 })
+
+// 供「OKR 管理」页顶部刷新按钮调用（embed 模式）
+defineExpose({
+    refresh: () => getData(),
+})
 </script>
 
 <style lang="less" scoped>
@@ -431,6 +444,64 @@ nextTick(() => {
     &:after {
         content: "";
         height: var(--navigation-bar-height, 0);
+    }
+
+    // 嵌入「OKR 管理」标签页时：不使用绝对定位（与「我创建的」等其它标签页一致，
+    // 它们的根节点都是普通流，由父级 .okr-scrollbar 提供尺寸），按普通流填满 tab
+    // 滚动容器，避免绝对定位带来的层叠/对齐问题。
+    &.is-embed {
+        position: static;
+        height: 100%;
+        @apply p-0 bg-transparent;
+
+        &:before,
+        &:after {
+            height: 0;
+        }
+
+        // 二级（部门）菜单：与上方主标签栏拉开间距，与下方卡片留白
+        .dept-tabs {
+            @apply mt-24 md:mt-40 mb-16;
+        }
+
+        // 没有二级菜单（部门<=1）时，内容区自身留出顶部间距
+        .analysis-body:first-child {
+            @apply pt-24 md:pt-40;
+        }
+    }
+
+    // 部门二级菜单：固定高度、可横向滚动（移动端部门多时不换行、不撑破布局）
+    .dept-tabs {
+        flex: 0 0 auto;
+        @apply min-w-0;
+
+        :deep(.n-tabs) {
+            margin-left: 2px;
+        }
+
+        // 移动端隐藏滚动条但保留横向滑动
+        :deep(.n-tabs-nav-scroll-content) {
+            @apply overflow-x-auto;
+            scrollbar-width: none;
+
+            &::-webkit-scrollbar {
+                display: none;
+            }
+        }
+    }
+
+    // 独立路由（非嵌入）下二级菜单上提，紧贴标题
+    &:not(.is-embed) .dept-tabs {
+        margin-top: -10px;
+    }
+
+    // 内容区：占满剩余高度并满宽，n-scrollbar 在此区域内纵向滚动
+    .analysis-body {
+        @apply flex-1 min-h-0;
+
+        :deep(.n-scrollbar) {
+            @apply h-full;
+        }
     }
 
     .page-title {
