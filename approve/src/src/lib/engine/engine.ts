@@ -301,7 +301,8 @@ class Engine implements ApprovalEngine {
   ): void {
     if (!task) throw new Error('当前无待办任务')
     const actor = this.requirePendingActor(task.id, actorId)
-    setActorAction(actor.id, 'rejected', opts.comment ?? null)
+    // 退回是「打回发起人改」，区别于一票否决的拒绝：参与人状态记 'returned'（详情显示「已退回」）。
+    setActorAction(actor.id, 'returned', opts.comment ?? null)
     finishTask(task.id, 'rejected', opts.comment ?? null)
     addEvent({
       inst_id: row.id,

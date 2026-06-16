@@ -58,7 +58,13 @@ const ACTION_META: Record<string, { label: string; cls: string }> = {
     label: '已拒绝',
     cls: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
   },
+  returned: {
+    label: '已退回',
+    cls: 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300',
+  },
   withdrawn: { label: '已撤回', cls: 'bg-muted text-muted-foreground' },
+  // 节点已收口（被拒/退回/整单终态）后，未表态的会签/依次审批人显示「未处理」而非「待处理」。
+  skipped: { label: '未处理', cls: 'bg-muted text-muted-foreground' },
 }
 
 function ActionBadge({ action }: { action: string }) {
@@ -414,14 +420,11 @@ function StepDot({ status }: { status: StepStatus }) {
       </span>
     )
   if (status === 'active')
+    // 进行中：蓝色实心点 + 向外扩散的波纹环（animate-ping），安静的「进行中」语义。
     return (
-      <span
-        className={cn(
-          base,
-          'border-primary bg-primary text-primary-foreground',
-        )}
-      >
-        <Loader2 className="size-3 animate-spin" />
+      <span className={cn(base, 'relative border-transparent')}>
+        <span className="absolute inset-0 animate-ping rounded-full bg-blue-500 opacity-60" />
+        <span className="relative size-2.5 rounded-full bg-blue-500" />
       </span>
     )
   return <span className={cn(base, 'border-muted-foreground/30 bg-background')} />
@@ -453,20 +456,35 @@ function FlowProgress({
   userOf: (id: number) => UserLite
 }) {
   const { flow, cur_node_seq_idx, actors, tasks, inst } = data
-  const actorsAt = (i: number) =>
-    actors.filter(
+  const instClosed =
+    inst.state === 2 || inst.state === 3 || inst.state === 4
+  // 同一节点可能因「退回→重新提交」多轮重开（多条 proc_task）；进度只取最新一轮，
+  // 否则历史轮次的参与人会与当前轮叠加，呈现重复 + 过期状态。
+  const latestTaskAt = (i: number) => {
+    let latest: (typeof tasks)[number] | undefined
+    for (const t of tasks)
+      if (t.node_seq_idx === i && (!latest || t.id > latest.id)) latest = t
+    return latest
+  }
+  const actorsAt = (i: number) => {
+    const lt = latestTaskAt(i)
+    return actors.filter(
       (a) =>
         a.node_seq_idx === i &&
-        (a.role === 'approver' || a.role === 'addsign'),
+        (a.role === 'approver' || a.role === 'addsign') &&
+        (lt ? a.task_id === lt.id : true),
     )
-  const taskAt = (i: number) => tasks.find((t) => t.node_seq_idx === i)
+  }
   const nodeStatus = (i: number): StepStatus => {
     if (actorsAt(i).some((a) => a.action === 'rejected')) return 'rejected'
-    if (taskAt(i)?.is_finished) return 'done'
+    if (latestTaskAt(i)?.is_finished) return 'done'
     if (i < cur_node_seq_idx) return 'done'
     if (i === cur_node_seq_idx && inst.state === STATE_RUNNING) return 'active'
     return 'future'
   }
+  // 节点已收口（最新任务已结束 / 整单终态）后，剩余 pending 的会签人显示「未处理」。
+  const nodeClosed = (i: number) =>
+    latestTaskAt(i)?.is_finished === 1 || instClosed
 
   const steps: Array<FlowStep> = []
   flow.forEach((node, i) => {
@@ -494,10 +512,12 @@ function FlowProgress({
     }
     // approver（含自审自动通过 isSystem）
     const reached = actorsAt(i)
+    const closed = nodeClosed(i)
     const people: Array<StepPerson> = reached.length
       ? reached.map((a) => ({
           uid: a.userid,
-          action: a.action,
+          // 节点已收口仍 pending = 没轮到表态就结束了 → 未处理（而非待处理）。
+          action: a.action === 'pending' && closed ? 'skipped' : a.action,
           role: a.role,
           comment: a.comment,
         }))
