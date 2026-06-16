@@ -420,11 +420,11 @@ function StepDot({ status }: { status: StepStatus }) {
       </span>
     )
   if (status === 'active')
-    // 进行中：蓝色实心点 + 向外扩散的波纹环（animate-ping），安静的「进行中」语义。
+    // 进行中：蓝色实心点（与已完成/已拒绝同径，连线才贴合不留缝）+ 向外扩散的波纹环。
     return (
-      <span className={cn(base, 'relative border-transparent')}>
-        <span className="absolute inset-0 animate-ping rounded-full bg-blue-500 opacity-60" />
-        <span className="relative size-2.5 rounded-full bg-blue-500" />
+      <span className="relative flex size-5 shrink-0 items-center justify-center">
+        <span className="absolute inline-flex size-full animate-ping rounded-full bg-blue-500 opacity-60" />
+        <span className={cn(base, 'border-blue-500 bg-blue-500')} />
       </span>
     )
   return <span className={cn(base, 'border-muted-foreground/30 bg-background')} />
