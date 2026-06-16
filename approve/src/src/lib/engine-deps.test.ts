@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { leaderTiers, type DeptRow } from './engine-deps'
+import { leaderTiers } from './engine-deps'
+import type { DeptRow } from './engine-deps'
 
 // 组织结构（对齐真机）：人力行政部(1) ⊂ 总经办(342)；E2E部门(284) owner 阿胖 + 管理员[30,75,201]。
 const D = (
