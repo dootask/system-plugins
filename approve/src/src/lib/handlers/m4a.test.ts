@@ -31,13 +31,9 @@ vi.mock('#/lib/dootask-server', () => ({
     size: 12,
     ext: 'pdf',
   }),
-  shareFilesToUsers: async () => undefined,
   getFileOne: async () => null,
-  ensureApproveBot: async () => null,
-  sendBotDirectMessage: async () => null,
   sendApprovalCard: async () => null,
   buildDetailCard: () => '> card',
-  sendApproveCard: async () => null,
 }))
 
 // 附件本地存储写到临时目录，避免污染仓库 ./data。

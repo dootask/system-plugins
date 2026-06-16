@@ -36,13 +36,9 @@ vi.mock('#/lib/dootask-server', () => ({
     Object.fromEntries(ids.map((id) => [id, { userid: id, nickname: `用户#${id}` }])),
   resolveRoleMembers: async () => [],
   uploadFile: async () => ({ id: 1, name: 'f' }),
-  shareFilesToUsers: async () => undefined,
   getFileOne: async () => null,
-  ensureApproveBot: async () => null,
-  sendBotDirectMessage: async () => null,
   sendApprovalCard: async () => null,
   buildDetailCard: () => '> card',
-  sendApproveCard: async () => null,
 }))
 
 beforeEach(() => setDbForTesting(new Database(':memory:')))

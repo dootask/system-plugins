@@ -30,13 +30,9 @@ vi.mock('#/lib/dootask-server', () => ({
   resolveRoleMembers: async () => [],
   // 附件 / 通知在测试环境为 no-op（无 SDK，不发真消息）。
   uploadFile: async () => ({ id: 1, name: 'f' }),
-  shareFilesToUsers: async () => undefined,
   getFileOne: async () => null,
-  ensureApproveBot: async () => null,
-  sendBotDirectMessage: async () => null,
   sendApprovalCard: async () => null,
   buildDetailCard: () => '> card',
-  sendApproveCard: async () => null,
 }))
 
 beforeEach(() => setDbForTesting(new Database(':memory:')))
