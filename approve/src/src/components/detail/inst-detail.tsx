@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { AlertCircle, ImagePlus, Loader2, X } from 'lucide-react'
+import { AlertCircle, Check, ImagePlus, Loader2, X } from 'lucide-react'
 import { cn } from '#/lib/utils'
 import { api, ApiError, uploadFile } from '#/lib/api'
 import { confirmAction, previewImage, warnMessage } from '#/lib/dootask'
@@ -44,11 +44,6 @@ const EVENT_LABEL: Record<string, string> = {
   archive: '归档',
 }
 
-const ROLE_LABEL: Record<string, string> = {
-  approver: '审批人',
-  cc: '抄送',
-  addsign: '加签',
-}
 // 参与人处理状态标签 + 配色（不同状态用不同颜色区分）。
 const ACTION_META: Record<string, { label: string; cls: string }> = {
   pending: {
@@ -74,6 +69,21 @@ function ActionBadge({ action }: { action: string }) {
   return (
     <Badge className={cn('border-transparent', meta.cls)}>{meta.label}</Badge>
   )
+}
+
+// 审批方式标签。
+const MODE_LABEL: Record<string, string> = {
+  or: '或签',
+  cosign: '会签',
+  sequence: '依次',
+}
+// 结束节点按实例运行态显示结果。
+const END_NOTE: Record<number, string> = {
+  0: '退回待修改',
+  1: '审批中',
+  2: '已通过',
+  3: '已拒绝',
+  4: '已撤回',
 }
 
 export function InstDetailView({
@@ -292,30 +302,10 @@ export function InstDetailView({
         )}
       </Section>
 
-      {/* 参与人 */}
-      {data.actors.filter((a) => !a.is_system).length > 0 && (
-        <Section title="参与人">
-          <ul className="space-y-2 text-sm">
-            {data.actors
-              .filter((a) => !a.is_system)
-              .map((a) => (
-                <li key={a.id} className="flex flex-wrap items-center gap-2">
-                  <UserChip
-                    user={userOf(a.userid)}
-                    nameClassName="font-medium"
-                  />
-                  <Badge variant="outline">
-                    {ROLE_LABEL[a.role] ?? a.role}
-                  </Badge>
-                  <ActionBadge action={a.action} />
-                  {a.comment ? (
-                    <span className="text-xs text-muted-foreground">
-                      · {a.comment}
-                    </span>
-                  ) : null}
-                </li>
-              ))}
-          </ul>
+      {/* 流程进度 */}
+      {data.flow.length > 0 && (
+        <Section title="流程进度">
+          <FlowProgress data={data} userOf={userOf} />
         </Section>
       )}
 
@@ -403,6 +393,175 @@ function Section({ title, children }: { title: string; children: ReactNode }) {
       </CardHeader>
       <CardContent>{children}</CardContent>
     </Card>
+  )
+}
+
+type StepStatus = 'done' | 'active' | 'rejected' | 'future'
+
+function StepDot({ status }: { status: StepStatus }) {
+  const base =
+    'flex size-5 shrink-0 items-center justify-center rounded-full border-2'
+  if (status === 'done')
+    return (
+      <span className={cn(base, 'border-green-500 bg-green-500 text-white')}>
+        <Check className="size-3" />
+      </span>
+    )
+  if (status === 'rejected')
+    return (
+      <span className={cn(base, 'border-red-500 bg-red-500 text-white')}>
+        <X className="size-3" />
+      </span>
+    )
+  if (status === 'active')
+    return (
+      <span className={cn(base, 'border-primary bg-primary/15')}>
+        <span className="size-2 rounded-full bg-primary" />
+      </span>
+    )
+  return <span className={cn(base, 'border-muted-foreground/30 bg-background')} />
+}
+
+interface StepPerson {
+  uid: number
+  action: string
+  role?: string
+  comment?: string | null
+  /** 仅展示用户、不显示动作徽标（发起人/抄送人）。 */
+  plain?: boolean
+}
+interface FlowStep {
+  key: string
+  title: string
+  mode?: string
+  status: StepStatus
+  note?: string
+  people: Array<StepPerson>
+}
+
+/** 流程进度：按 node_sequence 渲染竖向步骤条（含未到节点），每节点显示审批人与状态。 */
+function FlowProgress({
+  data,
+  userOf,
+}: {
+  data: InstDetailData
+  userOf: (id: number) => UserLite
+}) {
+  const { flow, cur_node_seq_idx, actors, tasks, inst } = data
+  const actorsAt = (i: number) =>
+    actors.filter(
+      (a) =>
+        a.node_seq_idx === i &&
+        (a.role === 'approver' || a.role === 'addsign'),
+    )
+  const taskAt = (i: number) => tasks.find((t) => t.node_seq_idx === i)
+  const nodeStatus = (i: number): StepStatus => {
+    if (actorsAt(i).some((a) => a.action === 'rejected')) return 'rejected'
+    if (taskAt(i)?.is_finished) return 'done'
+    if (i < cur_node_seq_idx) return 'done'
+    if (i === cur_node_seq_idx && inst.state === STATE_RUNNING) return 'active'
+    return 'future'
+  }
+
+  const steps: Array<FlowStep> = []
+  flow.forEach((node, i) => {
+    if (node.type === 'start') {
+      steps.push({
+        key: `s${i}`,
+        title: '发起',
+        status: 'done',
+        people: [{ uid: inst.initiator_id, action: '', plain: true }],
+      })
+      return
+    }
+    if (node.type === 'notifier') {
+      const reached = actorsAt(i)
+      const ids = reached.length
+        ? reached.map((a) => a.userid)
+        : node.approverIds
+      steps.push({
+        key: `n${i}`,
+        title: '抄送',
+        status: i <= cur_node_seq_idx ? 'done' : 'future',
+        people: ids.map((uid) => ({ uid, action: '', plain: true })),
+      })
+      return
+    }
+    // approver（含自审自动通过 isSystem）
+    const reached = actorsAt(i)
+    const people: Array<StepPerson> = reached.length
+      ? reached.map((a) => ({
+          uid: a.userid,
+          action: a.action,
+          role: a.role,
+          comment: a.comment,
+        }))
+      : node.approverIds.map((uid) => ({ uid, action: 'pending' }))
+    steps.push({
+      key: `a${i}`,
+      title: node.name || '审批',
+      mode: people.length > 1 ? node.approveMode : undefined,
+      status: nodeStatus(i),
+      note: node.isSystem ? '自动通过' : undefined,
+      people,
+    })
+  })
+  steps.push({
+    key: 'end',
+    title: '结束',
+    status:
+      inst.state === 2 ? 'done' : inst.state === 3 || inst.state === 4 ? 'rejected' : 'future',
+    note: END_NOTE[inst.state],
+    people: [],
+  })
+
+  return (
+    <ol>
+      {steps.map((step, idx) => (
+        <li key={step.key} className="relative flex gap-3 pb-5 last:pb-0">
+          {idx < steps.length - 1 ? (
+            <span className="absolute left-2.5 top-5 h-[calc(100%-0.5rem)] w-px -translate-x-1/2 bg-border" />
+          ) : null}
+          <StepDot status={step.status} />
+          <div className="-mt-0.5 min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-sm font-medium">{step.title}</span>
+              {step.mode ? (
+                <Badge variant="outline" className="text-xs">
+                  {MODE_LABEL[step.mode] ?? step.mode}
+                </Badge>
+              ) : null}
+              {step.note ? (
+                <span className="text-xs text-muted-foreground">{step.note}</span>
+              ) : null}
+            </div>
+            {step.people.length > 0 ? (
+              <ul className="mt-1.5 space-y-1">
+                {step.people.map((p, j) => (
+                  <li
+                    key={`${p.uid}-${j}`}
+                    className="flex flex-wrap items-center gap-2 text-sm"
+                  >
+                    <UserChip user={userOf(p.uid)} />
+                    {p.role === 'addsign' ? (
+                      <Badge variant="outline" className="text-xs">
+                        加签
+                      </Badge>
+                    ) : null}
+                    {p.plain ? null : <ActionBadge action={p.action} />}
+                    {p.comment ? (
+                      <span className="text-xs text-muted-foreground">
+                        · {p.comment}
+                      </span>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        </li>
+      ))}
+    </ol>
   )
 }
 

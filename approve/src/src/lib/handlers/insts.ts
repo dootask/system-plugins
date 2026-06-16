@@ -186,6 +186,14 @@ export async function getInstDetail(request: Request): Promise<Response> {
     formSchema = []
   }
 
+  // 展开后的线性流程（含未到节点），供详情页流程进度图。
+  let flow: Array<unknown> = []
+  try {
+    flow = JSON.parse(row.node_sequence || '[]') as Array<unknown>
+  } catch {
+    flow = []
+  }
+
   const activeTask = getActiveTask(id)
   // 当前用户可处置的待办：自己是当前 task 的 pending approver。
   const canAct =
@@ -210,6 +218,8 @@ export async function getInstDetail(request: Request): Promise<Response> {
     tasks: listTasksByInst(id),
     active_task: activeTask ?? null,
     actors,
+    flow,
+    cur_node_seq_idx: row.cur_node_seq_idx,
     can_act: canAct,
     is_initiator: row.initiator_id === auth.userId,
   })

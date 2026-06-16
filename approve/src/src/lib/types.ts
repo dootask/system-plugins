@@ -165,6 +165,20 @@ export interface DefSummary {
   sort_order: number
 }
 
+/** 流程进度节点（node_sequence 的前端视图，NodeInfo 子集）。 */
+export interface FlowStepNode {
+  nodeId: string
+  /** start / approver / notifier。 */
+  type: string
+  name?: string
+  /** or 或签 / cosign 会签 / sequence 依次（approver 有意义）。 */
+  approveMode?: string
+  settype?: string
+  /** 展开定死的审批/抄送人 id。 */
+  approverIds: Array<number>
+  isSystem: boolean
+}
+
 /** 审批单详情（GET /api/insts/:id）。 */
 export interface InstDetail {
   inst: InstSummary & { def_version: number; dept_id: number | null }
@@ -174,6 +188,10 @@ export interface InstDetail {
   tasks: Array<ProcTaskRow>
   active_task: ProcTaskRow | null
   actors: Array<ProcActorRow>
+  /** 展开后的线性流程（含未到节点），用于详情页流程进度图。 */
+  flow: Array<FlowStepNode>
+  /** 当前指针（= flow 索引）。 */
+  cur_node_seq_idx: number
   can_act: boolean
   is_initiator: boolean
 }
