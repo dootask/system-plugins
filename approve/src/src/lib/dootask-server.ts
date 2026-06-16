@@ -319,6 +319,35 @@ export async function resolveRoleMembers(
   return [...set]
 }
 
+// ───────────────────────── 部门：id → 名称（导出用） ─────────────────────────
+
+/**
+ * 取主程序全部部门的 id→名称映射（GET /api/users/department/list，限 DooTask 系统管理员）。
+ * 仅导出场景用（操作人需为系统管理员）；非管理员/不可达时返回空 Map，调用方降级（部门列留空）。
+ */
+export async function fetchDepartmentNames(
+  token: string | null,
+): Promise<Map<number, string>> {
+  const out = new Map<number, string>()
+  if (!token) return out
+  try {
+    const client = await makeClient(token)
+    if (!client) return out
+    const rows = await client.get<Array<{ id?: number; name?: string }>>(
+      '/api/users/department/list',
+    )
+    if (Array.isArray(rows)) {
+      for (const r of rows) {
+        const id = Number(r.id)
+        if (Number.isFinite(id) && r.name) out.set(id, r.name)
+      }
+    }
+  } catch {
+    /* 非管理员或不可达：降级为空 */
+  }
+  return out
+}
+
 // ───────────────────────── 审批机器人：私聊发待办卡片 ─────────────────────────
 
 /**
