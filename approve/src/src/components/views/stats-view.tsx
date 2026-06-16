@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api, ApiError } from '#/lib/api'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
 import { ErrorBar, Loading } from '#/components/ui/misc'
+import { AdminTabs } from '#/components/admin-tabs'
 
 interface Stats {
   scope: 'all' | 'mine'
@@ -52,6 +53,7 @@ export function StatsView() {
 
   return (
     <div>
+      <AdminTabs />
       <h1 className="mb-4 text-lg font-semibold max-md:hidden">数据统计</h1>
       {error ? <ErrorBar message={error} /> : null}
       {stats ? (

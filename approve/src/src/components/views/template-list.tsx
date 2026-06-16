@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from '@tanstack/react-router'
-import { Plus, Search } from 'lucide-react'
+import { ListFilter, Plus, Search } from 'lucide-react'
 import { api, ApiError } from '#/lib/api'
 import { confirmAction, useDooTask } from '#/lib/dootask'
+import { cn } from '#/lib/utils'
 import { Button } from '#/components/ui/button'
 import { Badge } from '#/components/ui/badge'
 import { Input } from '#/components/ui/input'
@@ -14,6 +15,13 @@ import {
   SelectValue,
 } from '#/components/ui/select'
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '#/components/ui/dropdown-menu'
+import {
   Table,
   TableBody,
   TableCell,
@@ -23,6 +31,7 @@ import {
 } from '#/components/ui/table'
 import { ListPager } from '#/components/ui/list-pager'
 import { EmptyState, ErrorBar, Loading, formatTime } from '#/components/ui/misc'
+import { AdminTabs } from '#/components/admin-tabs'
 
 interface DefRow {
   id: number
@@ -92,6 +101,7 @@ export function TemplateList() {
     if (
       !(await confirmAction(
         `确认删除模板「${d.name}」？已发起的审批单不受影响。`,
+        '删除模板',
       ))
     )
       return
@@ -105,25 +115,77 @@ export function TemplateList() {
 
   return (
     <div>
+      <AdminTabs />
       {/* 桌面端标题独占一行，让右上角留给胶囊 */}
       <h1 className="mb-4 text-lg font-semibold max-md:hidden">模板管理</h1>
 
-      {/* 搜索 + 筛选 + 新建 */}
+      {/* 搜索 + 筛选 + 新建（移动端用筛选图标 + 仅图标新建，桌面端保留下拉与文字按钮） */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative w-full sm:w-64">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={keyword}
-            onChange={(e) => setKeyword(e.target.value)}
-            placeholder="搜索模板名称"
-            className="pl-8"
-          />
+        <div className="flex w-full items-center gap-2 sm:w-auto">
+          <div className="relative flex-1 sm:w-64 sm:flex-none">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              placeholder="搜索模板名称"
+              className="pl-8"
+            />
+          </div>
+          {/* 移动端状态筛选 */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label="按状态筛选"
+                className={cn(
+                  'relative shrink-0 sm:hidden',
+                  statusFilter && 'border-primary text-primary',
+                )}
+              >
+                <ListFilter className="size-4" />
+                {statusFilter ? (
+                  <span className="absolute top-1 right-1 size-1.5 rounded-full bg-primary" />
+                ) : null}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuRadioGroup
+                value={statusFilter || STATUS_ALL}
+                onValueChange={(v) =>
+                  setStatusFilter(v === STATUS_ALL ? '' : v)
+                }
+              >
+                <DropdownMenuRadioItem value={STATUS_ALL}>
+                  全部
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="enabled">
+                  启用
+                </DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value="disabled">
+                  停用
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {/* 移动端新建（仅图标） */}
+          <Button
+            size="icon"
+            aria-label="新建模板"
+            className="shrink-0 sm:hidden"
+            onClick={() =>
+              navigate({ to: '/admin/defs/$id', params: { id: 'new' } })
+            }
+          >
+            <Plus className="size-4" />
+          </Button>
         </div>
+        {/* 桌面端状态下拉 */}
         <Select
           value={statusFilter || STATUS_ALL}
           onValueChange={(v) => setStatusFilter(v === STATUS_ALL ? '' : v)}
         >
-          <SelectTrigger className="w-28">
+          <SelectTrigger className="w-28 max-sm:hidden">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -132,8 +194,9 @@ export function TemplateList() {
             <SelectItem value="disabled">停用</SelectItem>
           </SelectContent>
         </Select>
+        {/* 桌面端新建 */}
         <Button
-          className="ml-auto"
+          className="ml-auto max-sm:hidden"
           onClick={() =>
             navigate({ to: '/admin/defs/$id', params: { id: 'new' } })
           }
@@ -157,7 +220,7 @@ export function TemplateList() {
                 <TableHead>状态</TableHead>
                 <TableHead className="max-sm:hidden">版本</TableHead>
                 <TableHead className="max-sm:hidden">更新时间</TableHead>
-                <TableHead className="text-right">操作</TableHead>
+                <TableHead className="text-right" />
               </TableRow>
             </TableHeader>
             <TableBody>

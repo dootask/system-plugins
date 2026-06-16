@@ -56,7 +56,7 @@ const SIDEBAR_GROUPS: Array<NavGroup> = [
       { to: '/stats', label: '数据统计', icon: BarChart3, adminOnly: true },
       {
         to: '/admin',
-        label: '审批管理',
+        label: '模板管理',
         icon: SlidersHorizontal,
         adminOnly: true,
         exact: true,
@@ -81,8 +81,14 @@ const BOTTOM_TABS: Array<NavItem> = [
     match: ['/todo', '/done', '/cc'],
   },
   { to: '/mine', label: '已提交', icon: SendHorizontal },
-  { to: '/stats', label: '数据统计', icon: BarChart3, adminOnly: true },
-  { to: '/admin', label: '管理', icon: SlidersHorizontal, adminOnly: true },
+  {
+    to: '/admin',
+    label: '管理',
+    icon: SlidersHorizontal,
+    adminOnly: true,
+    // 移动端「管理」合并数据统计 / 模板管理 / 数据备份，内部用分段控件切换（见 AdminTabs）。
+    match: ['/admin', '/admin/backup', '/stats'],
+  },
 ]
 
 // 顶层路由（侧边栏/底部 Tab 可直达）：在这些页点返回 = 退出微应用回 DooTask；
@@ -115,7 +121,7 @@ const PAGE_TITLE: Record<string, string> = {
   '/cc': '抄送我的',
   '/mine': '已提交',
   '/stats': '数据统计',
-  '/admin': '审批管理',
+  '/admin': '模板管理',
   '/admin/backup': '数据备份',
 }
 

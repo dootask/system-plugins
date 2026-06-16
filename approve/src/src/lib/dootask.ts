@@ -95,15 +95,57 @@ export function useDooTask(): DooTaskState {
 /**
  * 重要操作确认：微前端环境用主程序的 modalConfirm（统一风格、聚焦父窗）；
  * 独立浏览器环境回退到原生 window.confirm。返回是否确认。
+ * content 为正文、title 为弹窗标题（modalConfirm 分别对应 content/title 字段）。
  */
-export async function confirmAction(message: string): Promise<boolean> {
+export async function confirmAction(
+  content: string,
+  title = '请确认',
+): Promise<boolean> {
   try {
     const tools = await import('@dootask/tools')
-    if (await tools.isMicroApp()) return await tools.modalConfirm(message)
+    if (await tools.isMicroApp())
+      return await tools.modalConfirm({ title, content })
   } catch {
     /* 取不到 host 时落到下方回退 */
   }
-  return typeof window === 'undefined' ? true : window.confirm(message)
+  return typeof window === 'undefined'
+    ? true
+    : window.confirm(`${title}\n${content}`)
+}
+
+export interface PreviewImageItem {
+  src: string
+  width?: number
+  height?: number
+}
+
+/**
+ * 预览图片：微前端用主程序的图片预览（支持多图左右切换，参考 crm）；
+ * 独立浏览器环境回退到新窗口打开。
+ */
+export async function previewImage(
+  list: Array<PreviewImageItem>,
+  index = 0,
+): Promise<void> {
+  if (list.length === 0) return
+  const fallback = () => {
+    if (typeof window === 'undefined') return
+    try {
+      window.open(list[index]?.src ?? list[0].src, '_blank')
+    } catch {
+      /* 忽略 */
+    }
+  }
+  try {
+    const tools = await import('@dootask/tools')
+    if (!(await tools.isMicroApp())) {
+      fallback()
+      return
+    }
+    await tools.callExtraStore('previewImage', { index, list })
+  } catch {
+    fallback()
+  }
 }
 
 /**

@@ -4,7 +4,7 @@ import { api, ApiError } from '#/lib/api'
 import { FormRenderer } from '#/components/form/FormRenderer'
 import { initialFormValue, validateForm } from '#/lib/form'
 import { Button } from '#/components/ui/button'
-import { BackLink, ErrorBar, Loading } from '#/components/ui/misc'
+import { ErrorBar, Loading, SubPageBreadcrumb } from '#/components/ui/misc'
 import type { FormErrors, FormSchema } from '#/lib/form/types'
 
 interface DefDetail {
@@ -73,17 +73,19 @@ export function StartForm({
 
   return (
     <div className="space-y-6">
-      <BackLink to={back} />
-      <h1 className="flex items-center gap-2 text-lg font-semibold">
-        {detail ? (
-          <>
-            {detail.icon ? <span>{detail.icon}</span> : null}
-            {detail.name}
-          </>
-        ) : (
-          '发起申请'
-        )}
-      </h1>
+      <SubPageBreadcrumb
+        parent={back}
+        current={
+          detail ? (
+            <span className="inline-flex items-center gap-1.5">
+              {detail.icon ? <span>{detail.icon}</span> : null}
+              {detail.name}
+            </span>
+          ) : (
+            '发起申请'
+          )
+        }
+      />
       {error ? <ErrorBar message={error} /> : null}
 
       {detail ? (

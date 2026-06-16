@@ -6,7 +6,7 @@ import { Input } from '#/components/ui/input'
 import { Label } from '#/components/ui/label'
 import { EmojiPicker } from '#/components/ui/emoji-picker'
 import { cn } from '#/lib/utils'
-import { ErrorBar, Loading } from '#/components/ui/misc'
+import { ErrorBar, Loading, SubPageBreadcrumb } from '#/components/ui/misc'
 import { FormDesigner } from '#/components/designer/FormDesigner'
 import { FlowDesigner } from '#/components/designer/FlowDesigner'
 import { validateFormSchema } from '#/lib/form/validate'
@@ -108,45 +108,30 @@ export function TemplateEditor({ idParam }: { idParam: string }) {
   ]
 
   return (
-    <div>
-      {/* 桌面端标题独占一行（移动端顶部标题栏已显示「模板编辑」） */}
-      <h1 className="mb-4 text-lg font-semibold max-md:hidden">
-        {isNew ? '新建模板' : '编辑模板'}
-      </h1>
+    <div className="space-y-4">
+      <SubPageBreadcrumb
+        parent="/admin"
+        current={isNew ? '新建模板' : '编辑模板'}
+      />
       {error ? <ErrorBar message={error} /> : null}
 
-      {/* 页签 + 操作按钮：保存/取消放在页签行右侧，避开右上角胶囊遮挡 */}
-      <div className="mb-4 flex justify-between gap-2 border-b">
-        <div className="flex min-w-0 gap-1 overflow-x-auto">
-          {TABS.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setTab(t.key)}
-              className={cn(
-                'shrink-0 border-b-2 px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors',
-                tab === t.key
-                  ? 'border-primary text-foreground'
-                  : 'border-transparent text-muted-foreground hover:text-foreground',
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-        <div className="-mt-3 flex shrink-0 items-center gap-2 self-center">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate({ to: '/admin' })}
-            disabled={saving}
+      {/* 页签（操作按钮已移到底部浮动操作栏） */}
+      <div className="flex min-w-0 gap-1 overflow-x-auto border-b">
+        {TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setTab(t.key)}
+            className={cn(
+              'shrink-0 border-b-2 px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors',
+              tab === t.key
+                ? 'border-primary text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground',
+            )}
           >
-            取消
-          </Button>
-          <Button size="sm" onClick={save} disabled={saving}>
-            {saving ? '保存中…' : '保存'}
-          </Button>
-        </div>
+            {t.label}
+          </button>
+        ))}
       </div>
 
       {tab === 'basic' ? (
@@ -180,6 +165,20 @@ export function TemplateEditor({ idParam }: { idParam: string }) {
       {tab === 'flow' ? (
         <FlowDesigner value={flow} schema={schema} onChange={setFlow} />
       ) : null}
+
+      {/* 底部操作栏：与发起申请一致，置于内容底部（不浮动） */}
+      <div className="flex justify-end gap-2">
+        <Button
+          variant="outline"
+          onClick={() => navigate({ to: '/admin' })}
+          disabled={saving}
+        >
+          取消
+        </Button>
+        <Button onClick={save} disabled={saving}>
+          {saving ? '保存中…' : '保存'}
+        </Button>
+      </div>
     </div>
   )
 }

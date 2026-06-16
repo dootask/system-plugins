@@ -125,3 +125,28 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* 图片缩略图棋盘格底：透明背景的图片（如带透明的 PNG）能透出方格便于辨识透明区域；
+   不透明图片会完全盖住方格，故无需在后端判定透明与否（approve 未引入 sharp）。 */
+.img-checkerboard {
+  background-color: #fff;
+  background-image:
+    linear-gradient(45deg, #d9d9d9 25%, transparent 25%),
+    linear-gradient(-45deg, #d9d9d9 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #d9d9d9 75%),
+    linear-gradient(-45deg, transparent 75%, #d9d9d9 75%);
+  background-size: 16px 16px;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
+}
+.dark .img-checkerboard {
+  background-color: #1a1a1a;
+  background-image:
+    linear-gradient(45deg, #3a3a3a 25%, transparent 25%),
+    linear-gradient(-45deg, #3a3a3a 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #3a3a3a 75%),
+    linear-gradient(-45deg, transparent 75%, #3a3a3a 75%);
+}

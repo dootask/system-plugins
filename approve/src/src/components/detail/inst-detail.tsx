@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { AlertCircle, ImagePlus, Loader2, X } from 'lucide-react'
+import { cn } from '#/lib/utils'
 import { api, ApiError, uploadFile } from '#/lib/api'
-import { confirmAction, warnMessage } from '#/lib/dootask'
+import { confirmAction, previewImage, warnMessage } from '#/lib/dootask'
 import { FormRenderer } from '#/components/form/FormRenderer'
 import { pickUsers } from '#/lib/form/picker'
 import { useUsers } from '#/lib/use-users'
@@ -13,10 +14,10 @@ import { Badge } from '#/components/ui/badge'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Card, CardContent, CardHeader, CardTitle } from '#/components/ui/card'
 import {
-  BackLink,
   ErrorBar,
   Loading,
   StatusBadge,
+  SubPageBreadcrumb,
   formatTime,
 } from '#/components/ui/misc'
 import type { FileValue } from '#/lib/form/types'
@@ -48,11 +49,31 @@ const ROLE_LABEL: Record<string, string> = {
   cc: '抄送',
   addsign: '加签',
 }
-const ACTION_LABEL: Record<string, string> = {
-  pending: '待处理',
-  approved: '已同意',
-  rejected: '已拒绝',
-  withdrawn: '已撤回',
+// 参与人处理状态标签 + 配色（不同状态用不同颜色区分）。
+const ACTION_META: Record<string, { label: string; cls: string }> = {
+  pending: {
+    label: '待处理',
+    cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
+  },
+  approved: {
+    label: '已同意',
+    cls: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300',
+  },
+  rejected: {
+    label: '已拒绝',
+    cls: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
+  },
+  withdrawn: { label: '已撤回', cls: 'bg-muted text-muted-foreground' },
+}
+
+function ActionBadge({ action }: { action: string }) {
+  const meta = ACTION_META[action] ?? {
+    label: action,
+    cls: 'bg-muted text-muted-foreground',
+  }
+  return (
+    <Badge className={cn('border-transparent', meta.cls)}>{meta.label}</Badge>
+  )
 }
 
 export function InstDetailView({
@@ -105,8 +126,8 @@ export function InstDetailView({
   if (loading) return <Loading center />
   if (error || !data)
     return (
-      <div>
-        <BackLink to={backTo} />
+      <div className="space-y-4">
+        <SubPageBreadcrumb parent={backTo} current={`审批详情 #${instId}`} />
         <ErrorBar message={error ?? '审批单不存在'} />
       </div>
     )
@@ -151,7 +172,12 @@ export function InstDetailView({
 
   async function withdraw(): Promise<void> {
     if (!activeTaskId) return
-    if (!(await confirmAction('确认撤回该审批单？撤回后流程结束，不可恢复。')))
+    if (
+      !(await confirmAction(
+        '确认撤回该审批单？撤回后流程结束，不可恢复。',
+        '撤回审批单',
+      ))
+    )
       return
     setBusy(true)
     setActionError(null)
@@ -230,7 +256,7 @@ export function InstDetailView({
 
   return (
     <div className="space-y-6">
-      <BackLink to={backTo} />
+      <SubPageBreadcrumb parent={backTo} current={`审批详情 #${instId}`} />
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <h1 className="text-lg font-semibold">{inst.title}</h1>
@@ -281,9 +307,7 @@ export function InstDetailView({
                   <Badge variant="outline">
                     {ROLE_LABEL[a.role] ?? a.role}
                   </Badge>
-                  <Badge variant="secondary">
-                    {ACTION_LABEL[a.action] ?? a.action}
-                  </Badge>
+                  <ActionBadge action={a.action} />
                   {a.comment ? (
                     <span className="text-xs text-muted-foreground">
                       · {a.comment}
@@ -314,7 +338,8 @@ export function InstDetailView({
               <Button
                 variant="destructive"
                 onClick={async () => {
-                  if (await confirmAction('确认拒绝该审批？')) runAct('reject')
+                  if (await confirmAction('确认拒绝该审批？', '拒绝审批'))
+                    runAct('reject')
                 }}
                 disabled={busy}
               >
@@ -323,7 +348,7 @@ export function InstDetailView({
               <Button
                 variant="outline"
                 onClick={async () => {
-                  if (await confirmAction('确认退回给发起人修改？'))
+                  if (await confirmAction('确认退回给发起人修改？', '退回修改'))
                     runAct('return', { returnTo: 'initiator' })
                 }}
                 disabled={busy}
@@ -390,9 +415,10 @@ function Timeline({
 }) {
   if (events.length === 0)
     return <p className="text-sm text-muted-foreground">暂无记录</p>
+  // 最新的在最上面（事件本身按时间正序，这里倒序展示）。
   return (
     <ol className="space-y-4">
-      {events.map((e) => (
+      {[...events].reverse().map((e) => (
         <li key={e.id} className="flex gap-3">
           <UserAvatar user={userOf(e.actor_id)} size="sm" className="mt-0.5" />
           <div className="min-w-0 flex-1">
@@ -418,26 +444,34 @@ function Timeline({
   )
 }
 
-/** 时间线里展示评论/意见附带的图片缩略图，点击在新窗口查看原图。 */
+/** 时间线里展示评论/意见附带的图片缩略图，点击用主程序图片预览查看（支持左右切换）。 */
 function CommentThumbs({ images }: { images: Array<CommentImage> }) {
+  const list = images.filter((im) => im.url).map((im) => ({ src: im.url }))
   return (
     <div className="mt-1.5 flex flex-wrap gap-2">
       {images.map((img, i) =>
         img.url ? (
-          <a
+          <button
             key={i}
-            href={img.url}
-            target="_blank"
-            rel="noreferrer"
-            className="block size-20 overflow-hidden rounded-md border"
+            type="button"
+            onClick={() =>
+              previewImage(
+                list,
+                Math.max(
+                  0,
+                  list.findIndex((x) => x.src === img.url),
+                ),
+              )
+            }
+            className="img-checkerboard block size-20 overflow-hidden rounded-md"
           >
             <img
               src={img.url}
               alt={img.name}
               loading="lazy"
-              className="size-full object-cover"
+              className="size-full cursor-zoom-in object-cover"
             />
-          </a>
+          </button>
         ) : (
           <span
             key={i}
@@ -498,12 +532,18 @@ function CommentImageInput({
           {images.map((img, i) => (
             <div
               key={`${img.url}-${i}`}
-              className="group relative size-16 overflow-hidden rounded-md border"
+              className="group img-checkerboard relative size-16 overflow-hidden rounded-md"
             >
               <img
                 src={img.url}
                 alt={img.name}
-                className="size-full object-cover"
+                className="size-full cursor-zoom-in object-cover"
+                onClick={() =>
+                  previewImage(
+                    images.map((im) => ({ src: im.url })),
+                    i,
+                  )
+                }
               />
               <button
                 type="button"

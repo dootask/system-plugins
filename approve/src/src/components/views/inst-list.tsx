@@ -231,7 +231,7 @@ export function InstListView({ box, active }: { box: Box; active: boolean }) {
                 <TableHead>模板</TableHead>
                 <TableHead>状态</TableHead>
                 <TableHead>发起人</TableHead>
-                <TableHead className="text-right">提交时间</TableHead>
+                <TableHead>提交时间</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -257,7 +257,7 @@ export function InstListView({ box, active }: { box: Box; active: boolean }) {
                   <TableCell>
                     <UserChip user={userOf(r.initiator_id)} />
                   </TableCell>
-                  <TableCell className="text-right text-xs text-muted-foreground">
+                  <TableCell className="text-xs text-muted-foreground">
                     {formatTime(r.created_at)}
                   </TableCell>
                 </TableRow>

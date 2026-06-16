@@ -99,20 +99,26 @@ export function FlowDesigner({
   }
 
   return (
-    <div className="flex flex-col items-center overflow-x-auto py-4">
-      <NodeChain
-        node={value}
-        onAddAfter={addAfter}
-        onAddInBranch={addInBranch}
-        onEditNode={setEditNodeId}
-        onEditBranch={setEditBranch}
-        onDeleteNode={(id) => onChange(removeNode(value, id))}
-        onAddBranch={(routeId) => onChange(addBranch(value, routeId))}
-        onDeleteBranch={(routeId, branchId) =>
-          onChange(removeBranch(value, routeId, branchId))
-        }
-        condFields={condFields}
-      />
+    <>
+      {/* 横向溢出时用 w-max + mx-auto：内容窄于容器则居中，宽于容器则靠左且左右都能滚到底
+          （直接 items-center 会把左侧溢出裁掉、滚不到最左）。 */}
+      <div className="overflow-x-auto py-4">
+        <div className="mx-auto flex w-max flex-col items-center px-6">
+          <NodeChain
+            node={value}
+            onAddAfter={addAfter}
+            onAddInBranch={addInBranch}
+            onEditNode={setEditNodeId}
+            onEditBranch={setEditBranch}
+            onDeleteNode={(id) => onChange(removeNode(value, id))}
+            onAddBranch={(routeId) => onChange(addBranch(value, routeId))}
+            onDeleteBranch={(routeId, branchId) =>
+              onChange(removeBranch(value, routeId, branchId))
+            }
+            condFields={condFields}
+          />
+        </div>
+      </div>
 
       {editNodeId ? (
         <NodeConfigPanel
@@ -131,7 +137,7 @@ export function FlowDesigner({
           onChange={(patch) => onChange(updateBranch(value, editBranch, patch))}
         />
       ) : null}
-    </div>
+    </>
   )
 }
 
@@ -243,44 +249,63 @@ function RouteNode(props: ChainProps) {
     condFields,
   } = props
   const branches = node.conditionNodes ?? []
+  // 多分支才画上下两条「合流横线」；横线左右各留 7rem（w-56 的一半），正好落在首/末分支中线。
+  const multi = branches.length > 1
   return (
-    <div className="relative flex items-start gap-4">
+    <div className="flex flex-col items-center">
+      {/* 「添加条件」放在正常流、分支上方，不再绝对定位，避免与上一个「+」重叠 */}
       <button
         type="button"
         onClick={() => onAddBranch(node.nodeId)}
-        className="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full border bg-background px-3 py-1 text-xs hover:bg-accent"
+        className="whitespace-nowrap rounded-full border bg-background px-3 py-1 text-xs hover:bg-accent"
       >
         <Plus className="mr-1 inline size-3" />
         添加条件
       </button>
-      {branches.map((b, i) => (
-        <div key={b.nodeId} className="flex flex-col items-center">
-          <div className="w-56 overflow-hidden rounded-lg border bg-card shadow-sm">
-            <div className="flex items-center bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white">
-              <span className="flex-1">{b.name || `条件${i + 1}`}</span>
+      <div className="h-4 w-px bg-border" />
+      <div className="relative flex items-stretch gap-4">
+        {multi ? (
+          <>
+            <div className="absolute top-0 right-28 left-28 h-px bg-border" />
+            <div className="absolute bottom-0 right-28 left-28 h-px bg-border" />
+          </>
+        ) : null}
+        {branches.map((b, i) => (
+          <div
+            key={b.nodeId}
+            className="relative flex flex-col items-center pt-4"
+          >
+            {/* 顶部竖线：接上方合流横线（或单分支时接「添加条件」竖线） */}
+            <div className="absolute top-0 left-1/2 h-4 w-px -translate-x-1/2 bg-border" />
+            <div className="w-56 overflow-hidden rounded-lg border bg-card shadow-sm">
+              <div className="flex items-center bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white">
+                <span className="flex-1">{b.name || `条件${i + 1}`}</span>
+                <button
+                  type="button"
+                  onClick={() => onDeleteBranch(node.nodeId, b.nodeId)}
+                  className="opacity-80 hover:opacity-100"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
               <button
                 type="button"
-                onClick={() => onDeleteBranch(node.nodeId, b.nodeId)}
-                className="opacity-80 hover:opacity-100"
+                onClick={() => onEditBranch(b.nodeId)}
+                className="block w-full px-3 py-2.5 text-left text-sm text-muted-foreground hover:bg-accent"
               >
-                <X className="size-3.5" />
+                {describeBranch(b, condFields)}
               </button>
             </div>
-            <button
-              type="button"
-              onClick={() => onEditBranch(b.nodeId)}
-              className="block w-full px-3 py-2.5 text-left text-sm text-muted-foreground hover:bg-accent"
-            >
-              {describeBranch(b, condFields)}
-            </button>
+            <AddButton
+              parentId={b.nodeId}
+              onAdd={(k) => onAddInBranch(b.nodeId, k)}
+            />
+            {b.childNode ? <NodeChain {...props} node={b.childNode} /> : null}
+            {/* 底部竖线：用 flex-1 填满到分支行底部，接下方合流横线，使长短不一的分支也对齐合流 */}
+            <div className="w-px flex-1 bg-border" />
           </div>
-          <AddButton
-            parentId={b.nodeId}
-            onAdd={(k) => onAddInBranch(b.nodeId, k)}
-          />
-          {b.childNode ? <NodeChain {...props} node={b.childNode} /> : null}
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   )
 }

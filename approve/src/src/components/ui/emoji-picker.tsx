@@ -34,7 +34,7 @@ export function EmojiPicker({
         <Button
           type="button"
           variant="outline"
-          className={cn('h-9 w-11 text-xl', className)}
+          className={cn('h-9 w-11 text-lg', className)}
         >
           {value || '📄'}
         </Button>
@@ -66,7 +66,7 @@ export function EmojiPicker({
           }}
           className="mt-2 w-full rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
         >
-          清除图标
+          默认图标
         </button>
       </PopoverContent>
     </Popover>

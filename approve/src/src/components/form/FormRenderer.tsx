@@ -1,7 +1,8 @@
 import * as React from 'react'
-import { Loader2, Plus, Trash2, Users } from 'lucide-react'
+import { Loader2, Plus, Trash2, Users, X } from 'lucide-react'
 import { cn } from '#/lib/utils'
 import { ApiError, uploadFile } from '#/lib/api'
+import { previewImage } from '#/lib/dootask'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Textarea } from '#/components/ui/textarea'
@@ -391,7 +392,14 @@ function UserField({
   )
 }
 
-// ───────────────────────── 附件（选取即上传到主程序） ─────────────────────────
+/** 判断附件是否图片：优先看 mime，其次按扩展名兜底（兼容旧数据无 mime）。 */
+function isImageFile(f: FileValue): boolean {
+  if (f.mime && f.mime.startsWith('image/')) return true
+  const s = (f.name || f.url || '').toLowerCase().split('?')[0]
+  return /\.(png|jpe?g|gif|webp|bmp|svg|avif)$/.test(s)
+}
+
+// ──────────── 附件（选取即上传到插件本地存储；图片显示缩略图、点击预览） ────────────
 function FileField({
   value,
   readOnly,
@@ -430,32 +438,93 @@ function FileField({
     }
   }
 
+  const imageFiles = value.filter(isImageFile)
+  const previewList = imageFiles.map((f) => ({ src: f.url }))
+  // 仅一张图片且无其它附件时放大展示（最高 320px、最宽 100%）；否则用缩略图网格 + 文件行。
+  const singleImage = value.length === 1 && imageFiles.length === 1
+
   return (
     <div className="space-y-2">
-      {value.map((f, i) => (
-        <div
-          key={`${f.url}-${i}`}
-          className="flex items-center justify-between rounded-md border px-3 py-1.5 text-sm"
-        >
-          <a
-            href={`${f.url}?download&name=${encodeURIComponent(f.name)}`}
-            target="_blank"
-            rel="noreferrer"
-            className="truncate text-foreground hover:underline"
-          >
-            {f.name}
-          </a>
+      {singleImage ? (
+        <div className="group img-checkerboard relative inline-block max-w-full overflow-hidden rounded-md">
+          <img
+            src={imageFiles[0].url}
+            alt={imageFiles[0].name}
+            className="max-h-80 max-w-full cursor-zoom-in object-contain"
+            onClick={() => previewImage(previewList, 0)}
+          />
           {!readOnly ? (
             <button
               type="button"
-              onClick={() => onChange(value.filter((_, j) => j !== i))}
-              className="text-muted-foreground hover:text-destructive"
+              onClick={() => onChange([])}
+              className="absolute right-0 top-0 hidden rounded-bl bg-black/60 p-0.5 text-white group-hover:block"
+              aria-label="移除"
             >
-              <Trash2 className="size-4" />
+              <X className="size-3" />
             </button>
           ) : null}
         </div>
-      ))}
+      ) : (
+        <>
+          {imageFiles.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {value.map((f, i) =>
+                isImageFile(f) ? (
+                  <div
+                    key={`${f.url}-${i}`}
+                    className="group img-checkerboard relative size-16 overflow-hidden rounded-md"
+                  >
+                    <img
+                      src={f.url}
+                      alt={f.name}
+                      className="size-full cursor-zoom-in object-cover"
+                      onClick={() =>
+                        previewImage(previewList, imageFiles.indexOf(f))
+                      }
+                    />
+                    {!readOnly ? (
+                      <button
+                        type="button"
+                        onClick={() => onChange(value.filter((_, j) => j !== i))}
+                        className="absolute right-0 top-0 hidden rounded-bl bg-black/60 p-0.5 text-white group-hover:block"
+                        aria-label="移除"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null,
+              )}
+            </div>
+          ) : null}
+          {value.map((f, i) =>
+            isImageFile(f) ? null : (
+              <div
+                key={`${f.url}-${i}`}
+                className="flex items-center justify-between rounded-md border px-3 py-1.5 text-sm"
+              >
+                <a
+                  href={`${f.url}?download&name=${encodeURIComponent(f.name)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="truncate text-foreground hover:underline"
+                >
+                  {f.name}
+                </a>
+                {!readOnly ? (
+                  <button
+                    type="button"
+                    onClick={() => onChange(value.filter((_, j) => j !== i))}
+                    className="text-muted-foreground hover:text-destructive"
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
+                ) : null}
+              </div>
+            ),
+          )}
+        </>
+      )}
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
       {!readOnly ? (
         <label className="inline-flex cursor-pointer items-center gap-2 rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground hover:bg-accent">
@@ -505,7 +574,10 @@ function TableField({
           <thead className="bg-muted/50">
             <tr>
               {cols.map((c) => (
-                <th key={c.key} className="px-3 py-2 text-left font-medium">
+                <th
+                  key={c.key}
+                  className="px-3 py-2 text-left font-medium whitespace-nowrap"
+                >
                   {c.label}
                   {c.required ? (
                     <span className="ml-0.5 text-destructive">*</span>
