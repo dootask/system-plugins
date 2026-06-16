@@ -13,11 +13,13 @@ import {
   createTask,
   finishTask,
   getActiveTask,
+  listPendingForUser,
   recordAgree,
 } from '#/lib/repo/tasks'
 import {
   createActor,
   listCcForUser,
+  listDoneForUser,
   listPendingByTask,
   setActorAction,
 } from '#/lib/repo/actors'
@@ -160,6 +162,130 @@ describe('proc_actor repo', () => {
 
     expect(listCcForUser(7).length).toBe(1)
     expect(listCcForUser(5).length).toBe(0)
+  })
+
+  it('待办/已处理按 proc_actor 归类（不依赖 assignee_id，排除系统 actor）', () => {
+    const def = createDef({ name: 'x' }, 1)
+    // 会签节点 [3, 33]，发起人 3 已审、33 待审；assignee_id 只指向首位 3。
+    const inst = createInst({
+      def_id: def.id,
+      def_version: 1,
+      title: '请假',
+      initiator_id: 3,
+    })
+    const task = createTask({
+      inst_id: inst.id,
+      node_id: 'n1',
+      node_seq_idx: 1,
+      approve_mode: 'cosign',
+      assignee_id: 3,
+      total_approvers: 2,
+      pending_count: 1,
+    })
+    // start 节点给发起人写的系统 actor（审计用，非人工处置）。
+    createActor({
+      inst_id: inst.id,
+      node_seq_idx: 0,
+      userid: 3,
+      role: 'approver',
+      action: 'approved',
+      is_system: 1,
+    })
+    const a3 = createActor({
+      inst_id: inst.id,
+      task_id: task.id,
+      node_seq_idx: 1,
+      userid: 3,
+      role: 'approver',
+      action: 'pending',
+    })
+    createActor({
+      inst_id: inst.id,
+      task_id: task.id,
+      node_seq_idx: 1,
+      userid: 33,
+      role: 'approver',
+      action: 'pending',
+    })
+    setActorAction(a3.id, 'approved', 'ok') // 3 人工同意
+
+    // #16：会签第二审批人 33 即便非 assignee 也应出现在待处理。
+    expect(listPendingForUser(33).map((t) => t.inst_id)).toContain(inst.id)
+    // 已审过的 3 不在待处理，且因人工处置进入已处理。
+    expect(listPendingForUser(3)).toHaveLength(0)
+    expect(listDoneForUser(3).map((a) => a.inst_id)).toContain(inst.id)
+    // 33 尚未处置，不在已处理。
+    expect(listDoneForUser(33)).toHaveLength(0)
+  })
+
+  it('发起人 start 系统 actor 不应进入其已处理（#17）', () => {
+    const def = createDef({ name: 'x' }, 1)
+    const inst = createInst({
+      def_id: def.id,
+      def_version: 1,
+      title: '请假',
+      initiator_id: 33,
+    })
+    const task = createTask({
+      inst_id: inst.id,
+      node_id: 'n1',
+      node_seq_idx: 1,
+      approve_mode: 'cosign',
+      assignee_id: 3,
+      total_approvers: 2,
+      pending_count: 2,
+    })
+    createActor({
+      inst_id: inst.id,
+      node_seq_idx: 0,
+      userid: 33,
+      role: 'approver',
+      action: 'approved',
+      is_system: 1,
+    })
+    createActor({
+      inst_id: inst.id,
+      task_id: task.id,
+      node_seq_idx: 1,
+      userid: 33,
+      role: 'approver',
+      action: 'pending',
+    })
+    // 发起人 33 仅有 start 系统 actor 与一条 pending，不应出现在已处理。
+    expect(listDoneForUser(33)).toHaveLength(0)
+    // 但作为会签待审人应出现在待处理。
+    expect(listPendingForUser(33).map((t) => t.inst_id)).toContain(inst.id)
+  })
+
+  it('加签人（role=addsign）计入待办人，可被处置/通知', () => {
+    const def = createDef({ name: 'x' }, 1)
+    const inst = createInst({
+      def_id: def.id,
+      def_version: 1,
+      title: 't',
+      initiator_id: 1,
+    })
+    const task = createTask({
+      inst_id: inst.id,
+      node_id: 'n1',
+      total_approvers: 2,
+    })
+    createActor({
+      inst_id: inst.id,
+      task_id: task.id,
+      userid: 5,
+      role: 'approver',
+    })
+    createActor({
+      inst_id: inst.id,
+      task_id: task.id,
+      userid: 9,
+      role: 'addsign',
+    })
+    const pending = listPendingByTask(task.id).map((a) => a.userid)
+    expect(pending).toContain(5)
+    expect(pending).toContain(9)
+    expect(listPendingForUser(9).map((t) => t.inst_id)).toContain(inst.id)
   })
 })
 

@@ -45,11 +45,12 @@ export function listActorsByInst(instId: number): Array<ProcActorRow> {
     .all(instId) as Array<ProcActorRow>
 }
 
-/** 某任务/节点下仍待处理的审批人（pending）。 */
+/** 某任务/节点下仍待处理的审批人/加签人（pending）。加签人 role='addsign' 同样要能处置。 */
 export function listPendingByTask(taskId: number): Array<ProcActorRow> {
   return getDb()
     .prepare(
-      `SELECT * FROM proc_actor WHERE task_id = ? AND role = 'approver' AND action = 'pending'
+      `SELECT * FROM proc_actor
+         WHERE task_id = ? AND role IN ('approver', 'addsign') AND action = 'pending'
          ORDER BY id ASC`,
     )
     .all(taskId) as Array<ProcActorRow>
@@ -77,12 +78,17 @@ export function listCcForUser(userid: number): Array<ProcActorRow> {
     .all(userid) as Array<ProcActorRow>
 }
 
-/** 已处理：我作为审批人且已处置（action 非 pending）。 */
+/**
+ * 已处理：我作为审批人且**人工**处置过（action 非 pending）。
+ * 排除 is_system=1 的系统记录——发起时给发起人写的 start actor、以及自审/已审过的
+ * 自动通过记录都是系统生成、并非我点过审批，否则会把"我发起的单"误并进我的已处理。
+ */
 export function listDoneForUser(userid: number): Array<ProcActorRow> {
   return getDb()
     .prepare(
       `SELECT * FROM proc_actor
-         WHERE userid = ? AND role = 'approver' AND action != 'pending'
+         WHERE userid = ? AND role = 'approver'
+           AND action != 'pending' AND is_system = 0
          ORDER BY id DESC`,
     )
     .all(userid) as Array<ProcActorRow>

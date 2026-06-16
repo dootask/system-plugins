@@ -93,12 +93,20 @@ export function finishTask(
     .run(state, comment ?? null, taskId)
 }
 
-/** 待我审批：assignee_id = 我 且 pending。 */
+/**
+ * 待我审批：我在某未结束任务里仍是 pending 的审批人/加签人。
+ * 不依赖 proc_task.assignee_id —— 它只记节点首位审批人，会签/或签的非首位审批人、
+ * 转交受让人、加签人都不指向其本人；待办的真实来源是 proc_actor 的 pending 行。
+ */
 export function listPendingForUser(userid: number): Array<ProcTaskRow> {
   return getDb()
     .prepare(
-      `SELECT * FROM proc_task WHERE assignee_id = ? AND state = 'pending'
-         ORDER BY id DESC`,
+      `SELECT DISTINCT t.* FROM proc_task t
+         JOIN proc_actor a ON a.task_id = t.id
+        WHERE a.userid = ? AND a.action = 'pending'
+          AND a.role IN ('approver', 'addsign')
+          AND t.is_finished = 0
+        ORDER BY t.id DESC`,
     )
     .all(userid) as Array<ProcTaskRow>
 }

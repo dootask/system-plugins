@@ -300,6 +300,21 @@ describe('转交 (transfer) / 加签 (addsign)', () => {
     expect(t2.total_approvers).toBe(3)
     expect(t2.pending_count).toBe(3)
   })
+  it('加签的人可处置并参与会签结算', () => {
+    const id = engine().start(
+      def(approver('a', [20, 21], 'cosign')),
+      {},
+      { userId: 10 },
+    )
+    const t = getActiveTask(id)!
+    engine().act(id, 20, 'addsign', { addsignTo: [22] })
+    // 加签人 22 出现在待办，且能成功同意。
+    expect(listPendingByTask(t.id).map((a) => a.userid)).toContain(22)
+    engine().act(id, 20, 'approve')
+    engine().act(id, 21, 'approve')
+    engine().act(id, 22, 'approve')
+    expect(getInst(id)!.state).toBe(InstState.approved)
+  })
 })
 
 describe('归档 (archive)', () => {
