@@ -1,6 +1,7 @@
 /** 审批引擎对外入口。 */
 export { createEngine, Engine } from './engine'
 export type { EngineDeps } from './engine'
+export { EngineError } from './errors'
 export { expandFlow, collectRoleIds, validateFlowTree } from './flow'
 export type {
   FlowNode,

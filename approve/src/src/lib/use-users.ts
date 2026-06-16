@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '#/lib/api'
+import { useT } from '#/lib/i18n/context'
 import type { UserLite } from '#/lib/types'
 
 const globalCache = new Map<number, UserLite>()
@@ -9,6 +10,7 @@ const globalCache = new Map<number, UserLite>()
  * 结果跨组件缓存，未解析到的回退为「用户#<id>」（无头像）。
  */
 export function useUsers(ids: Array<number>) {
+  const t = useT()
   const [, force] = useState(0)
   const key = [...new Set(ids)].sort((a, b) => a - b).join(',')
 
@@ -34,7 +36,10 @@ export function useUsers(ids: Array<number>) {
   }, [key])
 
   return (id: number): UserLite =>
-    globalCache.get(id) ?? { userid: id, nickname: `用户#${id}` }
+    globalCache.get(id) ?? {
+      userid: id,
+      nickname: t('app.userFallback', { id }),
+    }
 }
 
 /** 兼容旧调用：仅取昵称的查询函数。 */

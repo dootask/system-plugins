@@ -1,4 +1,5 @@
 import { createFileRoute, useParams } from '@tanstack/react-router'
+import { useT } from '#/lib/i18n/context'
 import { InstDetailView } from '#/components/detail/inst-detail'
 
 // 详情页：表单只读展示 + 流程时间线 + 参与人 + 操作条 + 评论。
@@ -11,11 +12,12 @@ export const Route = createFileRoute('/insts/$id')({
 })
 
 function InstDetailPage() {
+  const t = useT()
   const { id } = useParams({ from: '/insts/$id' })
   const { from } = Route.useSearch()
   const instId = Number(id)
   if (!Number.isFinite(instId) || instId <= 0) {
-    return <p className="text-sm text-destructive">无效的审批单 id</p>
+    return <p className="text-sm text-destructive">{t('detail.invalidId')}</p>
   }
   return <InstDetailView instId={instId} backTo={from} />
 }

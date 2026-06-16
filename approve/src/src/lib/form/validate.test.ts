@@ -7,6 +7,10 @@ import {
   validateForm,
 } from './validate'
 import type { FormSchema } from './types'
+import { makeT } from '#/lib/i18n/translate'
+
+// 断言基于中文文案，故测试固定用 zh 的 t。
+const t = makeT('zh')
 
 describe('isEmpty', () => {
   it('文本/数字/数组/日期范围按类型判空', () => {
@@ -52,7 +56,7 @@ describe('validateForm', () => {
   ]
 
   it('必填缺失报错', () => {
-    const { valid, errors } = validateForm(schema, {})
+    const { valid, errors } = validateForm(schema, {}, t)
     expect(valid).toBe(false)
     expect(errors.title).toBeTruthy()
     expect(errors.amount).toBeTruthy()
@@ -63,7 +67,7 @@ describe('validateForm', () => {
       title: 't',
       amount: 200,
       note: 'toolong',
-    })
+    }, t)
     expect(errors.amount).toContain('不能大于')
     expect(errors.note).toContain('最多')
   })
@@ -76,7 +80,7 @@ describe('validateForm', () => {
         { name: '', cost: 0 },
         { name: 'ok', cost: 5 },
       ],
-    })
+    }, t)
     expect(valid).toBe(false)
     expect(errors['items[0].name']).toBeTruthy()
     expect(errors['items[0].cost']).toContain('不能小于')
@@ -89,7 +93,7 @@ describe('validateForm', () => {
       amount: 50,
       note: 'ok',
       items: [{ name: 'a', cost: 2 }],
-    })
+    }, t)
     expect(valid).toBe(true)
   })
 
@@ -97,6 +101,7 @@ describe('validateForm', () => {
     const { errors } = validateForm(
       [{ key: 'd', type: 'desc', label: '说明' }],
       {},
+      t,
     )
     expect(Object.keys(errors)).toHaveLength(0)
   })

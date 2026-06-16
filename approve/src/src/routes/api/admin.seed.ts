@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { forbidden, ok, requireUser } from '#/lib/auth'
+import { serverT } from '#/lib/i18n/server'
 import { ensureBuiltinSeeded, seedBuiltinTemplates } from '#/lib/seed/builtin'
 
 // 内置模板播种入口（首启已自动播种；此为管理员手动补播/强制播种的备用入口）。
@@ -11,7 +12,7 @@ export const Route = createFileRoute('/api/admin/seed')({
       POST: async ({ request }: { request: Request }) => {
         const auth = await requireUser(request)
         if (auth instanceof Response) return auth
-        if (!auth.isAdmin) return forbidden('仅管理员可操作')
+        if (!auth.isAdmin) return forbidden(serverT(request)('server.err.adminOnly'))
         const url = new URL(request.url)
         const force = url.searchParams.get('force') === '1'
         const result = force ? seedBuiltinTemplates() : ensureBuiltinSeeded()

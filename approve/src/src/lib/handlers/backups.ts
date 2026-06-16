@@ -16,11 +16,12 @@ import {
   resolveBackupPath,
   restoreBackup,
 } from '#/lib/backup'
+import { serverT } from '#/lib/i18n/server'
 
 async function requireAdmin(request: Request): Promise<Response | null> {
   const auth = await requireUser(request)
   if (auth instanceof Response) return auth
-  if (!auth.isAdmin) return forbidden('仅管理员可操作')
+  if (!auth.isAdmin) return forbidden(serverT(request)('server.err.adminOnly'))
   return null
 }
 
@@ -48,7 +49,7 @@ export async function downloadBackupHandler(
   if (denied) return denied
   const name = nameFromUrl(request)
   const full = resolveBackupPath(name)
-  if (!full) return notFound('备份不存在')
+  if (!full) return notFound(serverT(request)('server.err.backupNotFound'))
   const buf = readFileSync(full)
   return new Response(new Uint8Array(buf), {
     headers: {
@@ -66,13 +67,15 @@ export async function restoreBackupHandler(
 ): Promise<Response> {
   const denied = await requireAdmin(request)
   if (denied) return denied
-  if (!restoreBackup(nameFromUrl(request))) return notFound('备份不存在')
+  if (!restoreBackup(nameFromUrl(request)))
+    return notFound(serverT(request)('server.err.backupNotFound'))
   return ok({ restored: true })
 }
 
 export async function deleteBackupHandler(request: Request): Promise<Response> {
   const denied = await requireAdmin(request)
   if (denied) return denied
-  if (!deleteBackup(nameFromUrl(request))) return notFound('备份不存在')
+  if (!deleteBackup(nameFromUrl(request)))
+    return notFound(serverT(request)('server.err.backupNotFound'))
   return ok({ deleted: true })
 }

@@ -9,6 +9,7 @@ import type {
   FormSchema,
   ValidateResult,
 } from './types'
+import type { TFunc } from '#/lib/i18n/translate'
 
 /** 值是否「为空」（按类型判定，用于 required）。 */
 export function isEmpty(type: FieldType, v: unknown): boolean {
@@ -39,29 +40,31 @@ export function isEmpty(type: FieldType, v: unknown): boolean {
 }
 
 /** 校验单字段（不含 required，仅规则/类型），返回错误信息或 null。 */
-function checkRules(field: FieldDef, v: unknown): string | null {
+function checkRules(field: FieldDef, v: unknown, t: TFunc): string | null {
   const r = field.rules ?? {}
+  const label = field.label
   switch (field.type) {
     case 'number':
     case 'money': {
       const n = Number(v)
-      if (Number.isNaN(n)) return `${field.label}必须是数字`
+      if (Number.isNaN(n)) return t('form.err.number', { label })
       if (r.min !== undefined && n < r.min)
-        return `${field.label}不能小于 ${r.min}`
+        return t('form.err.min', { label, min: r.min })
       if (r.max !== undefined && n > r.max)
-        return `${field.label}不能大于 ${r.max}`
+        return t('form.err.max', { label, max: r.max })
       return null
     }
     case 'text':
     case 'textarea': {
       const s = String(v)
       if (r.minLength !== undefined && s.length < r.minLength)
-        return `${field.label}至少 ${r.minLength} 个字符`
+        return t('form.err.minLength', { label, n: r.minLength })
       if (r.maxLength !== undefined && s.length > r.maxLength)
-        return `${field.label}最多 ${r.maxLength} 个字符`
+        return t('form.err.maxLength', { label, n: r.maxLength })
       if (r.pattern) {
         try {
-          if (!new RegExp(r.pattern).test(s)) return `${field.label}格式不正确`
+          if (!new RegExp(r.pattern).test(s))
+            return t('form.err.pattern', { label })
         } catch {
           /* 非法正则忽略 */
         }
@@ -74,15 +77,15 @@ function checkRules(field: FieldDef, v: unknown): string | null {
     case 'file': {
       const arr = Array.isArray(v) ? v : []
       if (r.minItems !== undefined && arr.length < r.minItems)
-        return `${field.label}至少选择 ${r.minItems} 项`
+        return t('form.err.minItems', { label, n: r.minItems })
       if (r.maxItems !== undefined && arr.length > r.maxItems)
-        return `${field.label}最多选择 ${r.maxItems} 项`
+        return t('form.err.maxItems', { label, n: r.maxItems })
       return null
     }
     case 'daterange': {
       if (Array.isArray(v) && v.length === 2 && v[0] && v[1]) {
         if (String(v[0]) > String(v[1]))
-          return `${field.label}起始日期不能晚于结束日期`
+          return t('form.err.dateRangeOrder', { label })
       }
       return null
     }
@@ -98,6 +101,7 @@ function checkRules(field: FieldDef, v: unknown): string | null {
 export function validateForm(
   schema: FormSchema,
   data: Record<string, unknown>,
+  t: TFunc,
 ): ValidateResult {
   const errors: FormErrors = {}
 
@@ -106,7 +110,7 @@ export function validateForm(
     const v = data[field.key]
 
     if (field.required && isEmpty(field.type, v)) {
-      errors[field.key] = `请填写${field.label}`
+      errors[field.key] = t('form.err.required', { label: field.label })
       continue
     }
     if (isEmpty(field.type, v)) continue // 非必填且为空：跳过规则校验
@@ -120,18 +124,18 @@ export function validateForm(
           const cv = (row as Record<string, unknown> | null)?.[col.key]
           const ekey = `${field.key}[${i}].${col.key}`
           if (col.required && isEmpty(col.type, cv)) {
-            errors[ekey] = `请填写${col.label}`
+            errors[ekey] = t('form.err.required', { label: col.label })
             continue
           }
           if (isEmpty(col.type, cv)) continue
-          const e = checkRules(col, cv)
+          const e = checkRules(col, cv, t)
           if (e) errors[ekey] = e
         }
       })
       continue
     }
 
-    const e = checkRules(field, v)
+    const e = checkRules(field, v, t)
     if (e) errors[field.key] = e
   }
 
@@ -190,29 +194,31 @@ function checkFieldDef(
   raw: unknown,
   seenKeys: Set<string>,
   inTable: boolean,
+  t: TFunc,
 ): string | null {
-  if (!raw || typeof raw !== 'object') return '字段定义无效'
+  if (!raw || typeof raw !== 'object') return t('form.schema.invalidField')
   const f = raw as FieldDef
   if (!f.key || !/^[A-Za-z_][\w]*$/.test(f.key))
-    return `字段标识「${f.key || ''}」非法（需字母/下划线开头）`
-  if (seenKeys.has(f.key)) return `字段标识「${f.key}」重复`
+    return t('form.schema.badKey', { key: f.key || '' })
+  if (seenKeys.has(f.key)) return t('form.schema.dupKey', { key: f.key })
   seenKeys.add(f.key)
-  if (!FIELD_TYPES.has(f.type)) return `字段「${f.key}」类型非法`
+  if (!FIELD_TYPES.has(f.type)) return t('form.schema.badType', { key: f.key })
   if (!(typeof f.label === 'string' && f.label.trim()) && f.type !== 'desc')
-    return `字段「${f.key}」缺少标签`
+    return t('form.schema.noLabel', { key: f.key })
   if (f.type === 'select' || f.type === 'multiselect') {
     if (!Array.isArray(f.options) || f.options.length === 0)
-      return `字段「${f.label || f.key}」需至少一个选项`
+      return t('form.schema.noOptions', { label: f.label || f.key })
   }
   if (f.type === 'table') {
-    if (inTable) return `明细子表不能再嵌套明细子表`
+    if (inTable) return t('form.schema.nestedTable')
     const cols = f.columns ?? []
-    if (cols.length === 0) return `明细子表「${f.label || f.key}」需至少一列`
+    if (cols.length === 0)
+      return t('form.schema.noColumns', { label: f.label || f.key })
     const colKeys = new Set<string>()
     for (const c of cols) {
       if (c.type === 'table' || c.type === 'file')
-        return `明细子表列不支持 ${c.type} 类型`
-      const e = checkFieldDef(c, colKeys, true)
+        return t('form.schema.badColType', { type: c.type })
+      const e = checkFieldDef(c, colKeys, true, t)
       if (e) return e
     }
   }
@@ -220,11 +226,11 @@ function checkFieldDef(
 }
 
 /** 校验整张表单 schema 结构（设计器保存前 / 后端入库前）。返回错误信息或 null。 */
-export function validateFormSchema(schema: unknown): string | null {
-  if (!Array.isArray(schema)) return '表单结构必须是字段数组'
+export function validateFormSchema(schema: unknown, t: TFunc): string | null {
+  if (!Array.isArray(schema)) return t('form.schema.notArray')
   const keys = new Set<string>()
   for (const f of schema) {
-    const e = checkFieldDef(f, keys, false)
+    const e = checkFieldDef(f, keys, false, t)
     if (e) return e
   }
   return null

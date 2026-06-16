@@ -12,6 +12,8 @@
  * 见 FlowNode 注释。M5 迁移时旧 flowable JSON 亦按此结构归一后再展开。
  */
 import type { ApproveMode, NodeInfo, NodeType, SetType } from './types'
+import { EngineError } from './errors'
+import type { TFunc } from '#/lib/i18n/translate'
 
 /**
  * 部门主管解析器：给定层级（1=直属上级，2=再上一级…），返回该层级的全部负责人 userid。
@@ -219,46 +221,52 @@ export function collectRoleIds(root: unknown): Array<number> {
  * 校验设计器产出的流程树结构（设计器保存前 / 后端入库前用）。返回错误信息或 null。
  * 仅做结构合法性检查，不求值条件（条件在 expandFlow 时按 formData 定死）。
  */
-export function validateFlowTree(root: unknown): string | null {
-  if (!root || typeof root !== 'object') return '流程结构无效'
+export function validateFlowTree(root: unknown, t: TFunc): string | null {
+  if (!root || typeof root !== 'object') return t('engine.flow.invalid')
   const r = root as FlowNode
-  if (r.type !== 'start') return '流程根节点必须是发起人（start）'
+  if (r.type !== 'start') return t('engine.flow.rootMustStart')
   let approverCount = 0
 
   const checkNode = (node: FlowNode | null | undefined): string | null => {
     if (!node) return null
     if (node.type === 'approver' || node.type === 'notifier') {
       const settype: SetType = node.settype ?? 'specific'
+      const name = node.name || node.nodeId
       if (
         (node.type === 'notifier' ||
           settype === 'specific' ||
           settype === 'selfSelect') &&
         (!Array.isArray(node.userIds) || node.userIds.length === 0)
       ) {
-        return `节点【${node.name || node.nodeId}】未指定${node.type === 'notifier' ? '抄送' : '审批'}人`
+        return t(
+          node.type === 'notifier'
+            ? 'engine.flow.noNotifier'
+            : 'engine.flow.noApprover',
+          { name },
+        )
       }
       if (
         settype === 'role' &&
         (!Array.isArray(node.roleIds) || node.roleIds.length === 0)
       ) {
-        return `节点【${node.name || node.nodeId}】未指定角色`
+        return t('engine.flow.noRole', { name })
       }
       if (
         settype === 'leader' &&
         node.directorLevel != null &&
         node.directorLevel < 1
       ) {
-        return `节点【${node.name || node.nodeId}】主管层级非法`
+        return t('engine.flow.badLeaderLevel', { name })
       }
       if (node.type === 'approver') approverCount++
     }
     if (node.type === 'route') {
       const branches = node.conditionNodes ?? []
-      if (branches.length < 2) return '条件分支至少需要两个分支'
+      if (branches.length < 2) return t('engine.flow.routeMinBranches')
       const hasDefault = branches.some(
         (b) => !b.conditions || b.conditions.length === 0,
       )
-      if (!hasDefault) return '条件分支需有一个默认（无条件）兜底分支'
+      if (!hasDefault) return t('engine.flow.routeNeedDefault')
       for (const b of branches) {
         const e = checkNode(b.childNode)
         if (e) return e
@@ -269,7 +277,7 @@ export function validateFlowTree(root: unknown): string | null {
 
   const e = checkNode(r.childNode)
   if (e) return e
-  if (approverCount === 0) return '流程至少需要一个审批节点'
+  if (approverCount === 0) return t('engine.flow.needApprover')
   return null
 }
 
@@ -302,7 +310,9 @@ export function expandFlow(
       const branches = cur.conditionNodes ?? []
       const hit = pickBranch(branches, ctx.formData)
       if (!hit) {
-        throw new Error(`流程节点【${cur.nodeId}】找不到符合条件的分支`)
+        throw new EngineError('engine.flow.noMatchBranch', {
+          nodeId: cur.nodeId,
+        })
       }
       // 命中分支的 childNode 接续展平（route 节点自身不进入序列）。
       cur = hit.childNode

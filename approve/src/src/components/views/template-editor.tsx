@@ -14,6 +14,7 @@ import { validateFormSchema } from '#/lib/form/validate'
 // 把服务端专用代码打进客户端 bundle，渲染设计器时报 "o is not a function"。
 import { validateFlowTree } from '#/lib/engine/flow'
 import { makeStart } from '#/lib/designer/utils'
+import { useT } from '#/lib/i18n/context'
 import type { FormSchema } from '#/lib/form/types'
 import type { FlowNode } from '#/lib/engine/flow'
 
@@ -30,6 +31,7 @@ interface DefDetail {
 type Tab = 'basic' | 'form' | 'flow'
 
 export function TemplateEditor({ idParam }: { idParam: string }) {
+  const t = useT()
   const navigate = useNavigate()
   const isNew = idParam === 'new'
   const id = isNew ? null : Number(idParam)
@@ -39,7 +41,7 @@ export function TemplateEditor({ idParam }: { idParam: string }) {
   const [icon, setIcon] = useState('')
   const [category, setCategory] = useState('custom')
   const [schema, setSchema] = useState<FormSchema>([])
-  const [flow, setFlow] = useState<FlowNode>(() => makeStart())
+  const [flow, setFlow] = useState<FlowNode>(() => makeStart(t))
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -53,25 +55,29 @@ export function TemplateEditor({ idParam }: { idParam: string }) {
         setIcon(d.icon ?? '')
         setCategory(d.category)
         setSchema(d.form_schema ?? [])
-        setFlow(d.flow_nodes ?? makeStart())
+        setFlow(d.flow_nodes ?? makeStart(t))
       })
-      .catch((e) => setError(e instanceof ApiError ? e.message : '加载失败'))
+      .catch((e) =>
+        setError(
+          e instanceof ApiError ? e.message : t('designer.tpl.loadFailed'),
+        ),
+      )
       .finally(() => setLoading(false))
   }, [id, isNew])
 
   const save = async () => {
     if (!name.trim()) {
-      setError('请填写模板名称')
+      setError(t('designer.tpl.nameRequired'))
       setTab('basic')
       return
     }
-    const fe = validateFormSchema(schema)
+    const fe = validateFormSchema(schema, t)
     if (fe) {
       setError(fe)
       setTab('form')
       return
     }
-    const ne = validateFlowTree(flow)
+    const ne = validateFlowTree(flow, t)
     if (ne) {
       setError(ne)
       setTab('flow')
@@ -94,7 +100,9 @@ export function TemplateEditor({ idParam }: { idParam: string }) {
       }
       navigate({ to: '/admin' })
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '保存失败')
+      setError(
+        e instanceof ApiError ? e.message : t('designer.tpl.saveFailed'),
+      )
       setSaving(false)
     }
   }
@@ -102,34 +110,36 @@ export function TemplateEditor({ idParam }: { idParam: string }) {
   if (loading) return <Loading center />
 
   const TABS: Array<{ key: Tab; label: string }> = [
-    { key: 'basic', label: '基本信息' },
-    { key: 'form', label: '表单设计' },
-    { key: 'flow', label: '流程设计' },
+    { key: 'basic', label: t('designer.tpl.tabBasic') },
+    { key: 'form', label: t('designer.tpl.tabForm') },
+    { key: 'flow', label: t('designer.tpl.tabFlow') },
   ]
 
   return (
     <div className="space-y-4">
       <SubPageBreadcrumb
         parent="/admin"
-        current={isNew ? '新建模板' : '编辑模板'}
+        current={
+          isNew ? t('designer.tpl.newTemplate') : t('designer.tpl.editTemplate')
+        }
       />
       {error ? <ErrorBar message={error} /> : null}
 
       {/* 页签（操作按钮已移到底部浮动操作栏） */}
       <div className="flex min-w-0 gap-1 overflow-x-auto border-b">
-        {TABS.map((t) => (
+        {TABS.map((tb) => (
           <button
-            key={t.key}
+            key={tb.key}
             type="button"
-            onClick={() => setTab(t.key)}
+            onClick={() => setTab(tb.key)}
             className={cn(
               'shrink-0 border-b-2 px-4 py-2 text-sm font-medium whitespace-nowrap transition-colors',
-              tab === t.key
+              tab === tb.key
                 ? 'border-primary text-foreground'
                 : 'border-transparent text-muted-foreground hover:text-foreground',
             )}
           >
-            {t.label}
+            {tb.label}
           </button>
         ))}
       </div>
@@ -137,7 +147,7 @@ export function TemplateEditor({ idParam }: { idParam: string }) {
       {tab === 'basic' ? (
         <div className="max-w-md space-y-4">
           <div className="space-y-1.5">
-            <Label>模板名称</Label>
+            <Label>{t('designer.tpl.templateName')}</Label>
             {/* 图标（emoji）放输入框前面，与名称合并成一行 */}
             <div className="flex items-center gap-2">
               <EmojiPicker value={icon} onChange={setIcon} />
@@ -149,7 +159,7 @@ export function TemplateEditor({ idParam }: { idParam: string }) {
             </div>
           </div>
           <div className="space-y-1.5">
-            <Label>分类</Label>
+            <Label>{t('designer.tpl.category')}</Label>
             <Input
               value={category}
               onChange={(e) => setCategory(e.target.value)}
@@ -173,10 +183,10 @@ export function TemplateEditor({ idParam }: { idParam: string }) {
           onClick={() => navigate({ to: '/admin' })}
           disabled={saving}
         >
-          取消
+          {t('common.cancel')}
         </Button>
         <Button onClick={save} disabled={saving}>
-          {saving ? '保存中…' : '保存'}
+          {saving ? t('designer.tpl.saving') : t('common.save')}
         </Button>
       </div>
     </div>

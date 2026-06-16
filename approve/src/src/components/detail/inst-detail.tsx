@@ -4,6 +4,8 @@ import { AlertCircle, Check, ImagePlus, Loader2, X } from 'lucide-react'
 import { cn } from '#/lib/utils'
 import { api, ApiError, uploadFile } from '#/lib/api'
 import { confirmAction, previewImage, warnMessage } from '#/lib/dootask'
+import { useT } from '#/lib/i18n/context'
+import type { MsgKey } from '#/lib/i18n/messages'
 import { FormRenderer } from '#/components/form/FormRenderer'
 import { pickUsers } from '#/lib/form/picker'
 import { useUsers } from '#/lib/use-users'
@@ -32,64 +34,68 @@ import type {
 const STATE_RUNNING = 1
 const STATE_RETURNED = 0
 
-const EVENT_LABEL: Record<string, string> = {
-  submit: '发起',
-  approve: '通过',
-  reject: '拒绝',
-  return: '退回',
-  withdraw: '撤回',
-  transfer: '转交',
-  addsign: '加签',
-  comment: '评论',
-  archive: '归档',
+const EVENT_LABEL: Partial<Record<string, MsgKey>> = {
+  submit: 'detail.event.submit',
+  approve: 'detail.event.approve',
+  reject: 'detail.event.reject',
+  return: 'detail.event.return',
+  withdraw: 'detail.event.withdraw',
+  transfer: 'detail.event.transfer',
+  addsign: 'detail.event.addsign',
+  comment: 'detail.event.comment',
+  archive: 'detail.event.archive',
 }
 
 // 参与人处理状态标签 + 配色（不同状态用不同颜色区分）。
-const ACTION_META: Record<string, { label: string; cls: string }> = {
+const ACTION_META: Partial<Record<string, { labelKey: MsgKey; cls: string }>> = {
   pending: {
-    label: '待处理',
+    labelKey: 'detail.action.pending',
     cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
   },
   approved: {
-    label: '已同意',
+    labelKey: 'detail.action.approved',
     cls: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300',
   },
   rejected: {
-    label: '已拒绝',
+    labelKey: 'detail.action.rejected',
     cls: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
   },
   returned: {
-    label: '已退回',
+    labelKey: 'detail.action.returned',
     cls: 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300',
   },
-  withdrawn: { label: '已撤回', cls: 'bg-muted text-muted-foreground' },
+  withdrawn: {
+    labelKey: 'detail.action.withdrawn',
+    cls: 'bg-muted text-muted-foreground',
+  },
   // 节点已收口（被拒/退回/整单终态）后，未表态的会签/依次审批人显示「未处理」而非「待处理」。
-  skipped: { label: '未处理', cls: 'bg-muted text-muted-foreground' },
+  skipped: {
+    labelKey: 'detail.action.skipped',
+    cls: 'bg-muted text-muted-foreground',
+  },
 }
 
 function ActionBadge({ action }: { action: string }) {
-  const meta = ACTION_META[action] ?? {
-    label: action,
-    cls: 'bg-muted text-muted-foreground',
-  }
-  return (
-    <Badge className={cn('border-transparent', meta.cls)}>{meta.label}</Badge>
-  )
+  const t = useT()
+  const meta = ACTION_META[action]
+  const label = meta ? t(meta.labelKey) : action
+  const cls = meta?.cls ?? 'bg-muted text-muted-foreground'
+  return <Badge className={cn('border-transparent', cls)}>{label}</Badge>
 }
 
 // 审批方式标签。
-const MODE_LABEL: Record<string, string> = {
-  or: '或签',
-  cosign: '会签',
-  sequence: '依次',
+const MODE_LABEL: Partial<Record<string, MsgKey>> = {
+  or: 'detail.mode.or',
+  cosign: 'detail.mode.cosign',
+  sequence: 'detail.mode.sequence',
 }
 // 结束节点按实例运行态显示结果。
-const END_NOTE: Record<number, string> = {
-  0: '退回待修改',
-  1: '审批中',
-  2: '已通过',
-  3: '已拒绝',
-  4: '已撤回',
+const END_NOTE: Partial<Record<number, MsgKey>> = {
+  0: 'detail.end.returned',
+  1: 'detail.end.running',
+  2: 'detail.end.approved',
+  3: 'detail.end.rejected',
+  4: 'detail.end.withdrawn',
 }
 
 export function InstDetailView({
@@ -99,6 +105,7 @@ export function InstDetailView({
   instId: number
   backTo?: string
 }) {
+  const t = useT()
   const [data, setData] = useState<InstDetailData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -118,7 +125,7 @@ export function InstDetailView({
       setData(d)
       setEditValue(d.form_data)
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '加载失败')
+      setError(e instanceof ApiError ? e.message : t('detail.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -143,8 +150,11 @@ export function InstDetailView({
   if (error || !data)
     return (
       <div className="space-y-4">
-        <SubPageBreadcrumb parent={backTo} current={`审批详情 #${instId}`} />
-        <ErrorBar message={error ?? '审批单不存在'} />
+        <SubPageBreadcrumb
+          parent={backTo}
+          current={t('detail.title', { id: instId })}
+        />
+        <ErrorBar message={error ?? t('detail.notFound')} />
       </div>
     )
 
@@ -180,7 +190,7 @@ export function InstDetailView({
       setImages([])
       await load()
     } catch (e) {
-      setActionError(e instanceof ApiError ? e.message : '操作失败')
+      setActionError(e instanceof ApiError ? e.message : t('detail.error.action'))
     } finally {
       setBusy(false)
     }
@@ -190,8 +200,8 @@ export function InstDetailView({
     if (!activeTaskId) return
     if (
       !(await confirmAction(
-        '确认撤回该审批单？撤回后流程结束，不可恢复。',
-        '撤回审批单',
+        t('detail.confirm.withdraw'),
+        t('detail.confirm.withdrawTitle'),
       ))
     )
       return
@@ -210,7 +220,9 @@ export function InstDetailView({
       setImages([])
       await load()
     } catch (e) {
-      setActionError(e instanceof ApiError ? e.message : '撤回失败')
+      setActionError(
+        e instanceof ApiError ? e.message : t('detail.error.withdraw'),
+      )
     } finally {
       setBusy(false)
     }
@@ -238,7 +250,9 @@ export function InstDetailView({
       })
       await load()
     } catch (e) {
-      setActionError(e instanceof ApiError ? e.message : '重新提交失败')
+      setActionError(
+        e instanceof ApiError ? e.message : t('detail.error.resubmit'),
+      )
     } finally {
       setBusy(false)
     }
@@ -247,7 +261,7 @@ export function InstDetailView({
   async function postComment(): Promise<void> {
     const text = comment.trim()
     if (!text && images.length === 0) {
-      await warnMessage('请先填写评论内容或添加图片')
+      await warnMessage(t('detail.error.commentEmpty'))
       return
     }
     setBusy(true)
@@ -264,7 +278,7 @@ export function InstDetailView({
       setImages([])
       await load()
     } catch (e) {
-      setActionError(e instanceof ApiError ? e.message : '评论失败')
+      setActionError(e instanceof ApiError ? e.message : t('detail.error.comment'))
     } finally {
       setBusy(false)
     }
@@ -272,7 +286,10 @@ export function InstDetailView({
 
   return (
     <div className="space-y-6">
-      <SubPageBreadcrumb parent={backTo} current={`审批详情 #${instId}`} />
+      <SubPageBreadcrumb
+        parent={backTo}
+        current={t('detail.title', { id: instId })}
+      />
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <h1 className="text-lg font-semibold">{inst.title}</h1>
@@ -284,13 +301,13 @@ export function InstDetailView({
       </div>
 
       {/* 表单 */}
-      <Section title="表单内容">
+      <Section title={t('detail.section.form')}>
         {canResubmit ? (
           <>
             <Alert className="mb-3 border-amber-300 text-amber-800 dark:border-amber-900 dark:text-amber-300 [&>svg]:text-amber-600">
               <AlertCircle />
               <AlertDescription className="text-amber-800 dark:text-amber-300">
-                审批单已退回，请修改后重新提交。
+                {t('detail.returnedHint')}
               </AlertDescription>
             </Alert>
             <FormRenderer
@@ -310,18 +327,18 @@ export function InstDetailView({
 
       {/* 流程进度 */}
       {data.flow.length > 0 && (
-        <Section title="流程进度">
+        <Section title={t('detail.section.progress')}>
           <FlowProgress data={data} userOf={userOf} />
         </Section>
       )}
 
       {/* 操作区 + 评论 */}
-      <Section title="操作">
+      <Section title={t('detail.section.action')}>
         {actionError ? <ErrorBar message={actionError} /> : null}
         <Textarea
           value={comment}
           onChange={(e) => setComment(e.target.value)}
-          placeholder="填写审批意见 / 评论（可选）"
+          placeholder={t('detail.commentPlaceholder')}
           rows={2}
         />
         <CommentImageInput images={images} onChange={setImages} disabled={busy} />
@@ -329,59 +346,69 @@ export function InstDetailView({
           {can_act ? (
             <>
               <Button onClick={() => runAct('approve')} disabled={busy}>
-                同意
+                {t('detail.act.approve')}
               </Button>
               <Button
                 variant="destructive"
                 onClick={async () => {
-                  if (await confirmAction('确认拒绝该审批？', '拒绝审批'))
+                  if (
+                    await confirmAction(
+                      t('detail.confirm.reject'),
+                      t('detail.confirm.rejectTitle'),
+                    )
+                  )
                     runAct('reject')
                 }}
                 disabled={busy}
               >
-                拒绝
+                {t('detail.act.reject')}
               </Button>
               <Button
                 variant="outline"
                 onClick={async () => {
-                  if (await confirmAction('确认退回给发起人修改？', '退回修改'))
+                  if (
+                    await confirmAction(
+                      t('detail.confirm.return'),
+                      t('detail.confirm.returnTitle'),
+                    )
+                  )
                     runAct('return', { returnTo: 'initiator' })
                 }}
                 disabled={busy}
               >
-                退回
+                {t('detail.act.return')}
               </Button>
               <Button variant="outline" onClick={transfer} disabled={busy}>
-                转交
+                {t('detail.act.transfer')}
               </Button>
               <Button variant="outline" onClick={addsign} disabled={busy}>
-                加签
+                {t('detail.act.addsign')}
               </Button>
             </>
           ) : null}
           {canWithdraw ? (
             <Button variant="outline" onClick={withdraw} disabled={busy}>
-              撤回
+              {t('detail.act.withdraw')}
             </Button>
           ) : null}
           {canResubmit ? (
             <Button onClick={resubmit} disabled={busy}>
-              重新提交
+              {t('detail.act.resubmit')}
             </Button>
           ) : null}
           <Button variant="secondary" onClick={postComment} disabled={busy}>
-            仅评论
+            {t('detail.act.commentOnly')}
           </Button>
         </div>
         {!can_act && !canWithdraw && !canResubmit ? (
           <p className="mt-2 text-xs text-muted-foreground">
-            你当前无可执行的审批操作，可留言评论。
+            {t('detail.noAction')}
           </p>
         ) : null}
       </Section>
 
       {/* 时间线 */}
-      <Section title="流程时间线">
+      <Section title={t('detail.section.timeline')}>
         <Timeline events={data.events} userOf={userOf} />
       </Section>
     </div>
@@ -455,6 +482,7 @@ function FlowProgress({
   data: InstDetailData
   userOf: (id: number) => UserLite
 }) {
+  const t = useT()
   const { flow, cur_node_seq_idx, actors, tasks, inst } = data
   const instClosed =
     inst.state === 2 || inst.state === 3 || inst.state === 4
@@ -491,7 +519,7 @@ function FlowProgress({
     if (node.type === 'start') {
       steps.push({
         key: `s${i}`,
-        title: '发起',
+        title: t('detail.node.start'),
         status: 'done',
         people: [{ uid: inst.initiator_id, action: '', plain: true }],
       })
@@ -504,7 +532,7 @@ function FlowProgress({
         : node.approverIds
       steps.push({
         key: `n${i}`,
-        title: '抄送',
+        title: t('detail.node.notifier'),
         status: i <= cur_node_seq_idx ? 'done' : 'future',
         people: ids.map((uid) => ({ uid, action: '', plain: true })),
       })
@@ -524,19 +552,19 @@ function FlowProgress({
       : node.approverIds.map((uid) => ({ uid, action: 'pending' }))
     steps.push({
       key: `a${i}`,
-      title: node.name || '审批',
+      title: node.name || t('detail.node.approve'),
       mode: people.length > 1 ? node.approveMode : undefined,
       status: nodeStatus(i),
-      note: node.isSystem ? '自动通过' : undefined,
+      note: node.isSystem ? t('detail.node.autoApprove') : undefined,
       people,
     })
   })
   steps.push({
     key: 'end',
-    title: '结束',
+    title: t('detail.node.end'),
     status:
       inst.state === 2 ? 'done' : inst.state === 3 || inst.state === 4 ? 'rejected' : 'future',
-    note: END_NOTE[inst.state],
+    note: ((k) => (k ? t(k) : undefined))(END_NOTE[inst.state]),
     people: [],
   })
 
@@ -553,7 +581,7 @@ function FlowProgress({
               <span className="text-sm font-medium">{step.title}</span>
               {step.mode ? (
                 <Badge variant="outline" className="text-xs">
-                  {MODE_LABEL[step.mode] ?? step.mode}
+                  {((k) => (k ? t(k) : step.mode))(MODE_LABEL[step.mode])}
                 </Badge>
               ) : null}
               {step.note ? (
@@ -570,7 +598,7 @@ function FlowProgress({
                     <UserChip user={userOf(p.uid)} />
                     {p.role === 'addsign' ? (
                       <Badge variant="outline" className="text-xs">
-                        加签
+                        {t('detail.act.addsign')}
                       </Badge>
                     ) : null}
                     {p.plain ? null : <ActionBadge action={p.action} />}
@@ -597,8 +625,13 @@ function Timeline({
   events: Array<ProcEventRow>
   userOf: (id: number) => UserLite
 }) {
+  const t = useT()
   if (events.length === 0)
-    return <p className="text-sm text-muted-foreground">暂无记录</p>
+    return (
+      <p className="text-sm text-muted-foreground">
+        {t('detail.timeline.empty')}
+      </p>
+    )
   // 最新的在最上面（事件本身按时间正序，这里倒序展示）。
   return (
     <ol className="space-y-4">
@@ -609,7 +642,7 @@ function Timeline({
             <p className="text-sm">
               <span className="font-medium">{userOf(e.actor_id).nickname}</span>{' '}
               <span className="text-muted-foreground">
-                {EVENT_LABEL[e.action] ?? e.action}
+                {((k) => (k ? t(k) : e.action))(EVENT_LABEL[e.action])}
               </span>
             </p>
             {e.remark ? (
@@ -679,6 +712,7 @@ function CommentImageInput({
   onChange: (v: Array<FileValue>) => void
   disabled?: boolean
 }) {
+  const t = useT()
   const [uploading, setUploading] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const valueRef = useRef(images)
@@ -698,7 +732,11 @@ function CommentImageInput({
           { name: up.name, url: up.url, size: up.size, mime: up.mime },
         ])
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : `「${f.name}」上传失败`)
+        setError(
+          err instanceof ApiError
+            ? err.message
+            : t('detail.error.uploadFailed', { name: f.name }),
+        )
       } finally {
         setUploading((n) => Math.max(0, n - 1))
       }
@@ -733,7 +771,7 @@ function CommentImageInput({
                 type="button"
                 onClick={() => remove(i)}
                 className="absolute right-0 top-0 hidden rounded-bl bg-black/60 p-0.5 text-white group-hover:block"
-                aria-label="移除"
+                aria-label={t('detail.image.remove')}
               >
                 <X className="size-3" />
               </button>
@@ -748,7 +786,7 @@ function CommentImageInput({
       ) : null}
       {error ? <p className="text-xs text-destructive">{error}</p> : null}
       <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
-        <ImagePlus className="size-4" /> 添加图片
+        <ImagePlus className="size-4" /> {t('detail.image.add')}
         <input
           type="file"
           accept="image/*"

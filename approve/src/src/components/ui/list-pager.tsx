@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
+import { useT } from '#/lib/i18n/context'
 
 const PAGE_SIZES = [10, 20, 50]
 
@@ -45,10 +46,13 @@ export function ListPager({
   onPageChange: (p: number) => void
   onPageSizeChange: (s: number) => void
 }) {
+  const t = useT()
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   return (
     <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-      <span className="text-sm text-muted-foreground">共 {total} 条</span>
+      <span className="text-sm text-muted-foreground">
+        {t('ui.pager.total', { n: total })}
+      </span>
       {totalPages > 1 ? (
         <div className="flex items-center gap-3">
           <Select
@@ -61,7 +65,7 @@ export function ListPager({
             <SelectContent>
               {PAGE_SIZES.map((s) => (
                 <SelectItem key={s} value={String(s)}>
-                  {s} 条/页
+                  {t('ui.pager.perPage', { n: s })}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -71,7 +75,7 @@ export function ListPager({
               <PaginationItem>
                 <PaginationLink
                   href="#"
-                  aria-label="上一页"
+                  aria-label={t('ui.pager.prev')}
                   aria-disabled={page <= 1}
                   className={page <= 1 ? 'pointer-events-none opacity-50' : ''}
                   onClick={(e) => {
@@ -105,7 +109,7 @@ export function ListPager({
               <PaginationItem>
                 <PaginationLink
                   href="#"
-                  aria-label="下一页"
+                  aria-label={t('ui.pager.next')}
                   aria-disabled={page >= totalPages}
                   className={
                     page >= totalPages ? 'pointer-events-none opacity-50' : ''

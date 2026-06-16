@@ -27,6 +27,7 @@ import {
 import { addEvent } from '#/lib/repo/events'
 import type { ProcActorRow, ProcInstRow, ProcTaskRow } from '#/lib/types'
 import { isAutoPass, nodeFinished } from './core'
+import { EngineError } from './errors'
 import { expandFlow } from './flow'
 import type { FlowNode, ExpandContext } from './flow'
 import type {
@@ -57,8 +58,8 @@ class Engine implements ApprovalEngine {
     const db = getDb()
     const tx = db.transaction((): number => {
       const def = getDef(defId)
-      if (!def) throw new Error(`流程定义 ${defId} 不存在`)
-      if (def.status !== 'enabled') throw new Error('该流程已停用，无法发起')
+      if (!def) throw new EngineError('engine.defMissing', { id: defId })
+      if (def.status !== 'enabled') throw new EngineError('engine.defDisabled')
 
       const root = JSON.parse(def.flow_nodes || '{}') as FlowNode
       const ctx: ExpandContext = {
@@ -111,9 +112,9 @@ class Engine implements ApprovalEngine {
     const db = getDb()
     const tx = db.transaction((): void => {
       const row = getInst(instId)
-      if (!row) throw new Error('审批单不存在')
+      if (!row) throw new EngineError('engine.instNotFound')
       if (row.state !== InstState.pending && row.state !== InstState.running) {
-        throw new Error('审批单已结束，无法操作')
+        throw new EngineError('engine.instFinished')
       }
       const seq = parseSeq(row)
       const task = getActiveTask(instId)
@@ -132,7 +133,7 @@ class Engine implements ApprovalEngine {
         case 'addsign':
           return this.doAddsign(row, task, actorId, opts)
         default:
-          throw new Error(`不支持的动作: ${action as string}`)
+          throw new EngineError('engine.badAction', { action: action as string })
       }
     })
     tx()
@@ -142,9 +143,9 @@ class Engine implements ApprovalEngine {
     const db = getDb()
     db.transaction(() => {
       const row = getInst(instId)
-      if (!row) throw new Error('审批单不存在')
+      if (!row) throw new EngineError('engine.instNotFound')
       if (row.state !== InstState.approved)
-        throw new Error('仅通过的审批单可归档')
+        throw new EngineError('engine.archiveApprovedOnly')
       updateInst(instId, { status: 'archived' })
       addEvent({ inst_id: instId, actor_id: by, action: 'archive' })
     })()
@@ -161,11 +162,11 @@ class Engine implements ApprovalEngine {
     const db = getDb()
     db.transaction(() => {
       const row = getInst(instId)
-      if (!row) throw new Error('审批单不存在')
+      if (!row) throw new EngineError('engine.instNotFound')
       if (row.state !== InstState.pending)
-        throw new Error('仅退回待发起人修改的单可重新提交')
+        throw new EngineError('engine.resubmitReturnedOnly')
       const def = getDef(row.def_id)
-      if (!def) throw new Error('流程定义不存在')
+      if (!def) throw new EngineError('engine.defNotFound')
       const fd =
         formData ??
         (JSON.parse(row.form_data || '{}') as Record<string, unknown>)
@@ -231,7 +232,7 @@ class Engine implements ApprovalEngine {
     actorId: number,
     opts: ActOptions,
   ): void {
-    if (!task) throw new Error('当前无待办任务')
+    if (!task) throw new EngineError('engine.noActiveTask')
     const actor = this.requirePendingActor(task.id, actorId)
     const node = seq[task.node_seq_idx]
     const mode =
@@ -273,7 +274,7 @@ class Engine implements ApprovalEngine {
     actorId: number,
     opts: ActOptions,
   ): void {
-    if (!task) throw new Error('当前无待办任务')
+    if (!task) throw new EngineError('engine.noActiveTask')
     const actor = this.requirePendingActor(task.id, actorId)
     setActorAction(actor.id, 'rejected', opts.comment ?? null)
     finishTask(task.id, 'rejected', opts.comment ?? null)
@@ -299,7 +300,7 @@ class Engine implements ApprovalEngine {
     actorId: number,
     opts: ActOptions,
   ): void {
-    if (!task) throw new Error('当前无待办任务')
+    if (!task) throw new EngineError('engine.noActiveTask')
     const actor = this.requirePendingActor(task.id, actorId)
     // 退回是「打回发起人改」，区别于一票否决的拒绝：参与人状态记 'returned'（详情显示「已退回」）。
     setActorAction(actor.id, 'returned', opts.comment ?? null)
@@ -330,12 +331,12 @@ class Engine implements ApprovalEngine {
     _opts: ActOptions,
   ): void {
     // 撤回：仅发起人本人、且当前节点尚无人审过（pending_count==total）时可撤回（旧引擎语义）。
-    if (actorId !== row.initiator_id) throw new Error('只能撤回本人发起的审批')
-    if (row.cur_node_seq_idx === 0) throw new Error('开始位置无法撤回')
+    if (actorId !== row.initiator_id) throw new EngineError('engine.withdrawOwnOnly')
+    if (row.cur_node_seq_idx === 0) throw new EngineError('engine.withdrawAtStart')
     if (task) {
-      if (task.is_finished) throw new Error('已审批结束，无法撤回')
+      if (task.is_finished) throw new EngineError('engine.withdrawFinished')
       if (task.pending_count !== task.total_approvers)
-        throw new Error('已有人审批，无法撤回')
+        throw new EngineError('engine.withdrawActed')
       finishTask(task.id, 'skipped')
       for (const a of listPendingByTask(task.id))
         setActorAction(a.id, 'withdrawn')
@@ -361,8 +362,8 @@ class Engine implements ApprovalEngine {
     actorId: number,
     opts: ActOptions,
   ): void {
-    if (!task) throw new Error('当前无待办任务')
-    if (!opts.transferTo) throw new Error('transfer 需要 transferTo')
+    if (!task) throw new EngineError('engine.noActiveTask')
+    if (!opts.transferTo) throw new EngineError('engine.transferNeedTarget')
     const actor = this.requirePendingActor(task.id, actorId)
     // 当前人标记转交（已处置），新增受让人为 pending（计数不变，仅换人）。
     setActorAction(actor.id, 'approved', `转交给 ${opts.transferTo}`)
@@ -389,9 +390,9 @@ class Engine implements ApprovalEngine {
     actorId: number,
     opts: ActOptions,
   ): void {
-    if (!task) throw new Error('当前无待办任务')
+    if (!task) throw new EngineError('engine.noActiveTask')
     const add = opts.addsignTo ?? []
-    if (add.length === 0) throw new Error('addsign 需要 addsignTo')
+    if (add.length === 0) throw new EngineError('engine.addsignNeedTarget')
     for (const uid of add) {
       createActor({
         inst_id: row.id,
@@ -567,7 +568,7 @@ class Engine implements ApprovalEngine {
 
   private requirePendingActor(taskId: number, actorId: number) {
     const pending = listPendingByTask(taskId).find((a) => a.userid === actorId)
-    if (!pending) throw new Error('您不是当前待审人或已处理过')
+    if (!pending) throw new EngineError('engine.notPending')
     return pending
   }
 }

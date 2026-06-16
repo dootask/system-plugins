@@ -9,6 +9,7 @@ import {
   PopoverTrigger,
 } from '#/components/ui/popover'
 import { cn } from '#/lib/utils'
+import { useT } from '#/lib/i18n/context'
 
 // 表单/引擎统一以 'YYYY-MM-DD' 字符串存日期，这里只在显示层与 Date 互转，对外仍是字符串。
 function strToDate(s?: string): Date | undefined {
@@ -27,7 +28,7 @@ export function DatePicker({
   value,
   onChange,
   disabled,
-  placeholder = '选择日期',
+  placeholder,
   className,
 }: {
   value?: string
@@ -36,8 +37,10 @@ export function DatePicker({
   placeholder?: string
   className?: string
 }) {
+  const t = useT()
   const [open, setOpen] = React.useState(false)
   const date = strToDate(value)
+  const ph = placeholder ?? t('ui.date.pick')
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild disabled={disabled}>
@@ -52,7 +55,7 @@ export function DatePicker({
           )}
         >
           <CalendarIcon className="size-4" />
-          {value || placeholder}
+          {value || ph}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
@@ -109,7 +112,7 @@ export function TimePicker({
   value,
   onChange,
   disabled,
-  placeholder = '选择时间',
+  placeholder,
   className,
 }: {
   value?: string
@@ -118,8 +121,10 @@ export function TimePicker({
   placeholder?: string
   className?: string
 }) {
+  const t = useT()
   const [open, setOpen] = React.useState(false)
   const [h = '', m = ''] = (value ?? '').split(':')
+  const ph = placeholder ?? t('ui.time.pick')
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild disabled={disabled}>
@@ -134,7 +139,7 @@ export function TimePicker({
           )}
         >
           <Clock className="size-4" />
-          {value || placeholder}
+          {value || ph}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
@@ -152,7 +157,7 @@ export function TimePicker({
         </div>
         <div className="border-t p-2">
           <Button size="sm" className="w-full" onClick={() => setOpen(false)}>
-            确定
+            {t('ui.time.ok')}
           </Button>
         </div>
       </PopoverContent>
@@ -184,22 +189,23 @@ export function DateTimePicker({
   placeholder?: string
   className?: string
 }) {
+  const t = useT()
   const { date, time } = splitDateTime(value)
   return (
     <div className={cn('flex gap-2', className)}>
       <DatePicker
         value={date}
         disabled={disabled}
-        placeholder="选择日期"
+        placeholder={t('ui.date.pick')}
         className="flex-1"
         onChange={(d) => onChange(joinDateTime(d, time))}
       />
       <TimePicker
         value={time}
         disabled={disabled || !date}
-        placeholder="时间"
+        placeholder={t('ui.time.label')}
         className="w-28"
-        onChange={(t) => onChange(joinDateTime(date, t))}
+        onChange={(tm) => onChange(joinDateTime(date, tm))}
       />
     </div>
   )
@@ -209,7 +215,7 @@ export function DateRangePicker({
   value,
   onChange,
   disabled,
-  placeholder = '选择日期范围',
+  placeholder,
   className,
 }: {
   value?: Array<string>
@@ -218,11 +224,13 @@ export function DateRangePicker({
   placeholder?: string
   className?: string
 }) {
+  const t = useT()
   const [open, setOpen] = React.useState(false)
   const from = strToDate(value?.[0])
   const to = strToDate(value?.[1])
   const range: DateRange | undefined = from ? { from, to } : undefined
-  const label = value?.[0] ? `${value[0]} ~ ${value[1] || '…'}` : placeholder
+  const ph = placeholder ?? t('ui.date.pickRange')
+  const label = value?.[0] ? `${value[0]} ~ ${value[1] || '…'}` : ph
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild disabled={disabled}>

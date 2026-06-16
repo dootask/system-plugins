@@ -5,6 +5,7 @@ import { FormRenderer } from '#/components/form/FormRenderer'
 import { initialFormValue, validateForm } from '#/lib/form'
 import { Button } from '#/components/ui/button'
 import { ErrorBar, Loading, SubPageBreadcrumb } from '#/components/ui/misc'
+import { useT } from '#/lib/i18n/context'
 import type { FormErrors, FormSchema } from '#/lib/form/types'
 
 interface DefDetail {
@@ -21,6 +22,7 @@ export function StartForm({
   defId: number
   backTo?: string
 }) {
+  const t = useT()
   const navigate = useNavigate()
   const back = backTo || '/'
   const [detail, setDetail] = useState<DefDetail | null>(null)
@@ -38,14 +40,14 @@ export function StartForm({
         setValue(initialFormValue(d.form_schema))
       })
       .catch((e) =>
-        setError(e instanceof ApiError ? e.message : '加载模板详情失败'),
+        setError(e instanceof ApiError ? e.message : t('startForm.loadFailed')),
       )
       .finally(() => setLoading(false))
   }, [defId])
 
   async function submit() {
     if (!detail) return
-    const { valid, errors: errs } = validateForm(detail.form_schema, value)
+    const { valid, errors: errs } = validateForm(detail.form_schema, value, t)
     if (!valid) {
       setErrors(errs)
       return
@@ -64,7 +66,7 @@ export function StartForm({
         search: { from: '/mine' },
       })
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '提交失败')
+      setError(e instanceof ApiError ? e.message : t('startForm.submitFailed'))
       setSubmitting(false)
     }
   }
@@ -82,7 +84,7 @@ export function StartForm({
               {detail.name}
             </span>
           ) : (
-            '发起申请'
+            t('nav.start')
           )
         }
       />
@@ -102,10 +104,10 @@ export function StartForm({
               onClick={() => navigate({ to: back })}
               disabled={submitting}
             >
-              取消
+              {t('common.cancel')}
             </Button>
             <Button onClick={submit} disabled={submitting}>
-              {submitting ? '提交中…' : '提交'}
+              {submitting ? t('startForm.submitting') : t('common.submit')}
             </Button>
           </div>
         </div>

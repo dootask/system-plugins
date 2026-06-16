@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { forbidden, ok, readJson, requireUser } from '#/lib/auth'
+import { serverT } from '#/lib/i18n/server'
 import { getDb } from '#/lib/db'
 import {
   alreadyMigrated,
@@ -17,7 +18,7 @@ export const Route = createFileRoute('/api/admin/migrate')({
       GET: async ({ request }: { request: Request }) => {
         const auth = await requireUser(request)
         if (auth instanceof Response) return auth
-        if (!auth.isAdmin) return forbidden('仅管理员可操作')
+        if (!auth.isAdmin) return forbidden(serverT(request)('server.err.adminOnly'))
         return ok({
           migrated: alreadyMigrated(getDb()),
           legacyConfigured: !!mysqlConfigFromEnv(),
@@ -26,7 +27,7 @@ export const Route = createFileRoute('/api/admin/migrate')({
       POST: async ({ request }: { request: Request }) => {
         const auth = await requireUser(request)
         if (auth instanceof Response) return auth
-        if (!auth.isAdmin) return forbidden('仅管理员可操作')
+        if (!auth.isAdmin) return forbidden(serverT(request)('server.err.adminOnly'))
 
         const cfg = mysqlConfigFromEnv()
         if (!cfg)

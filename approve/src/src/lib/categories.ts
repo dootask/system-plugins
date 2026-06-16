@@ -2,17 +2,20 @@
 // proc_def.category 既可能是分组码（新模板直接选分组），也可能是旧的细分码
 // （迁移/内置：vacate/overtime/travel/reimburse/review/custom），统一映射到分组。
 
+import type { MsgKey } from '#/lib/i18n/messages'
+
 export interface CategoryGroup {
   code: string
-  label: string
+  /** 分组名词条 key，渲染时由调用方用 t(labelKey) 取译文。 */
+  labelKey: MsgKey
 }
 
 export const CATEGORY_GROUPS: ReadonlyArray<CategoryGroup> = [
-  { code: 'attendance', label: '假勤' },
-  { code: 'admin', label: '行政' },
-  { code: 'finance', label: '财务' },
-  { code: 'hr', label: '人事' },
-  { code: 'other', label: '其他' },
+  { code: 'attendance', labelKey: 'category.attendance' },
+  { code: 'admin', labelKey: 'category.admin' },
+  { code: 'finance', labelKey: 'category.finance' },
+  { code: 'hr', labelKey: 'category.hr' },
+  { code: 'other', labelKey: 'category.other' },
 ]
 
 const GROUP_CODES = new Set(CATEGORY_GROUPS.map((g) => g.code))
@@ -36,6 +39,7 @@ export function groupOf(category: string | null | undefined): string {
   return FINE_TO_GROUP[category] ?? 'other'
 }
 
-export function groupLabel(code: string): string {
-  return CATEGORY_GROUPS.find((g) => g.code === code)?.label ?? '其他'
+/** 分组码 → 分组名词条 key（未知归入 other）。调用方用 t(...) 取译文。 */
+export function groupLabelKey(code: string): MsgKey {
+  return CATEGORY_GROUPS.find((g) => g.code === code)?.labelKey ?? 'category.other'
 }

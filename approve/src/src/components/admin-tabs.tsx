@@ -1,11 +1,13 @@
 import { Link, useRouterState } from '@tanstack/react-router'
 import { cn } from '#/lib/utils'
+import { useT } from '#/lib/i18n/context'
+import type { MsgKey } from '#/lib/i18n/messages'
 
 // 「管理」三页签：移动端在内容顶部以分段控件切换（同「我审批的」）；桌面端由左侧边栏切换，故隐藏。
-const ADMIN_TABS: Array<{ path: string; label: string }> = [
-  { path: '/stats', label: '数据统计' },
-  { path: '/admin', label: '模板管理' },
-  { path: '/admin/backup', label: '数据备份' },
+const ADMIN_TABS: Array<{ path: string; labelKey: MsgKey }> = [
+  { path: '/stats', labelKey: 'nav.stats' },
+  { path: '/admin', labelKey: 'nav.templates' },
+  { path: '/admin/backup', labelKey: 'nav.backup' },
 ]
 
 function normalize(pathname: string): string {
@@ -14,22 +16,23 @@ function normalize(pathname: string): string {
 }
 
 export function AdminTabs() {
+  const t = useT()
   const raw = useRouterState({ select: (s) => s.location.pathname })
   const pathname = normalize(raw)
   return (
     <div className="mb-4 flex gap-1 rounded-lg bg-muted p-1 md:hidden">
-      {ADMIN_TABS.map((t) => (
+      {ADMIN_TABS.map((tab) => (
         <Link
-          key={t.path}
-          to={t.path}
+          key={tab.path}
+          to={tab.path}
           className={cn(
             'flex-1 rounded-md py-1.5 text-center text-sm font-medium transition',
-            pathname === t.path
+            pathname === tab.path
               ? 'bg-background text-foreground shadow-sm'
               : 'text-muted-foreground',
           )}
         >
-          {t.label}
+          {t(tab.labelKey)}
         </Link>
       ))}
     </div>

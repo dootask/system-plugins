@@ -3,6 +3,7 @@ import { Loader2, Plus, Trash2, Users, X } from 'lucide-react'
 import { cn } from '#/lib/utils'
 import { ApiError, uploadFile } from '#/lib/api'
 import { previewImage } from '#/lib/dootask'
+import { useT } from '#/lib/i18n/context'
 import { Button } from '#/components/ui/button'
 import { Input } from '#/components/ui/input'
 import { Textarea } from '#/components/ui/textarea'
@@ -135,6 +136,7 @@ function FieldControl({
   errors,
   errorKey,
 }: FieldRowProps) {
+  const t = useT()
   const ph = field.props?.placeholder
 
   switch (field.type) {
@@ -221,10 +223,10 @@ function FieldControl({
           }
         >
           <SelectTrigger className="w-full">
-            <SelectValue placeholder={ph ?? '请选择'} />
+            <SelectValue placeholder={ph ?? t('form.select.placeholder')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={SELECT_NONE}>{ph ?? '请选择'}</SelectItem>
+            <SelectItem value={SELECT_NONE}>{ph ?? t('form.select.placeholder')}</SelectItem>
             {opts.map((o) => (
               <SelectItem key={String(o.value)} value={String(o.value)}>
                 {o.label}
@@ -348,6 +350,7 @@ function UserField({
   readOnly: boolean
   onChange: (v: Array<number>) => void
 }) {
+  const t = useT()
   // 人员展示头像+昵称；部门暂无名称解析接口，回退展示 id。
   const userOf = useUsers(kind === 'user' ? value : [])
   const open = async () => {
@@ -383,7 +386,7 @@ function UserField({
       ))}
       {!readOnly ? (
         <Button variant="outline" size="sm" onClick={open}>
-          <Users className="size-3" /> 选择
+          <Users className="size-3" /> {t('form.user.pick')}
         </Button>
       ) : value.length === 0 ? (
         <span className="text-sm text-muted-foreground">—</span>
@@ -409,6 +412,7 @@ function FileField({
   readOnly: boolean
   onChange: (v: Array<FileValue>) => void
 }) {
+  const t = useT()
   const [uploading, setUploading] = React.useState(0)
   const [error, setError] = React.useState<string | null>(null)
   // 用 ref 持有最新值，避免并发上传时基于过期闭包覆盖彼此结果。
@@ -430,7 +434,7 @@ function FileField({
         ])
       } catch (err) {
         setError(
-          err instanceof ApiError ? err.message : `「${f.name}」上传失败`,
+          err instanceof ApiError ? err.message : t('form.upload.failed', { name: f.name }),
         )
       } finally {
         setUploading((n) => Math.max(0, n - 1))
@@ -458,7 +462,7 @@ function FileField({
               type="button"
               onClick={() => onChange([])}
               className="absolute right-0 top-0 hidden rounded-bl bg-black/60 p-0.5 text-white group-hover:block"
-              aria-label="移除"
+              aria-label={t('form.remove')}
             >
               <X className="size-3" />
             </button>
@@ -487,7 +491,7 @@ function FileField({
                         type="button"
                         onClick={() => onChange(value.filter((_, j) => j !== i))}
                         className="absolute right-0 top-0 hidden rounded-bl bg-black/60 p-0.5 text-white group-hover:block"
-                        aria-label="移除"
+                        aria-label={t('form.remove')}
                       >
                         <X className="size-3" />
                       </button>
@@ -533,11 +537,11 @@ function FileField({
           ) : (
             <Plus className="size-4" />
           )}
-          {uploading > 0 ? `上传中…（${uploading}）` : '添加附件'}
+          {uploading > 0 ? t('form.uploading', { n: uploading }) : t('form.addFile')}
           <input type="file" multiple className="hidden" onChange={onPick} />
         </label>
       ) : value.length === 0 ? (
-        <span className="text-sm text-muted-foreground">无附件</span>
+        <span className="text-sm text-muted-foreground">{t('form.noFile')}</span>
       ) : null}
     </div>
   )
@@ -559,6 +563,7 @@ function TableField({
   errors: FormErrors
   errorKey: string
 }) {
+  const t = useT()
   const cols = (field.columns ?? []).filter((c) => c.type !== 'desc')
   const addRow = () => onChange([...value, emptyTableRow(cols)])
   const delRow = (i: number) => onChange(value.filter((_, j) => j !== i))
@@ -635,7 +640,7 @@ function TableField({
       </div>
       {!readOnly ? (
         <Button variant="outline" size="sm" onClick={addRow}>
-          <Plus className="size-4" /> 增加一行
+          <Plus className="size-4" /> {t('form.addRow')}
         </Button>
       ) : null}
     </div>

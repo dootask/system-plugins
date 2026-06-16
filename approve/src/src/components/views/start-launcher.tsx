@@ -14,11 +14,13 @@ import {
 } from '#/components/ui/dropdown-menu'
 import { EmptyState, ErrorBar, Loading } from '#/components/ui/misc'
 import { cn } from '#/lib/utils'
+import { useT } from '#/lib/i18n/context'
 import type { DefSummary } from '#/lib/types'
 
 const ALL = '__all__'
 
 export function StartLauncher() {
+  const t = useT()
   const navigate = useNavigate()
   const [defs, setDefs] = useState<Array<DefSummary>>([])
   const [loading, setLoading] = useState(true)
@@ -31,7 +33,7 @@ export function StartLauncher() {
     api<Array<DefSummary>>('/defs')
       .then(setDefs)
       .catch((e) =>
-        setError(e instanceof ApiError ? e.message : '加载模板失败'),
+        setError(e instanceof ApiError ? e.message : t('start.loadFailed')),
       )
       .finally(() => setLoading(false))
     api<{ isAdmin?: boolean }>('/me')
@@ -59,12 +61,14 @@ export function StartLauncher() {
   return (
     <div>
       {/* 桌面端标题（移动端顶部标题栏已显示）；标题独占一行，让右上角留给胶囊 */}
-      <h1 className="mb-4 text-lg font-semibold max-md:hidden">发起申请</h1>
+      <h1 className="mb-4 text-lg font-semibold max-md:hidden">
+        {t('nav.start')}
+      </h1>
       {/* 顶部：分类页签（桌面）+ 搜索；移动端搜索框右侧用筛选图标弹出分类 */}
       <div className="mb-5 flex items-center gap-3 max-sm:flex-col max-sm:items-stretch">
         <div className="flex flex-1 flex-wrap gap-1 max-sm:hidden">
           <TabPill active={tab === ALL} onClick={() => setTab(ALL)}>
-            全部
+            {t('common.all')}
           </TabPill>
           {groupsWithDefs.map((g) => (
             <TabPill
@@ -72,7 +76,7 @@ export function StartLauncher() {
               active={tab === g.code}
               onClick={() => setTab(g.code)}
             >
-              {g.label}
+              {t(g.labelKey)}
             </TabPill>
           ))}
         </div>
@@ -82,7 +86,7 @@ export function StartLauncher() {
             <Input
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              placeholder="搜索模板名称"
+              placeholder={t('start.searchPlaceholder')}
               className="pl-8"
             />
           </div>
@@ -92,7 +96,7 @@ export function StartLauncher() {
               <Button
                 variant="outline"
                 size="icon"
-                aria-label="按分类筛选"
+                aria-label={t('start.filterByCategory')}
                 className={cn(
                   'relative shrink-0 sm:hidden',
                   tab !== ALL && 'border-primary text-primary',
@@ -106,10 +110,12 @@ export function StartLauncher() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
               <DropdownMenuRadioGroup value={tab} onValueChange={setTab}>
-                <DropdownMenuRadioItem value={ALL}>全部</DropdownMenuRadioItem>
+                <DropdownMenuRadioItem value={ALL}>
+                  {t('common.all')}
+                </DropdownMenuRadioItem>
                 {groupsWithDefs.map((g) => (
                   <DropdownMenuRadioItem key={g.code} value={g.code}>
-                    {g.label}
+                    {t(g.labelKey)}
                   </DropdownMenuRadioItem>
                 ))}
               </DropdownMenuRadioGroup>
@@ -122,11 +128,9 @@ export function StartLauncher() {
 
       {visibleGroups.length === 0 ? (
         <EmptyState
-          title="暂无可用模板"
+          title={t('start.empty')}
           hint={
-            isAdmin
-              ? '点击「审批管理」新建审批模板'
-              : '请联系管理员在「审批管理」中启用或新建审批模板'
+            isAdmin ? t('start.emptyHintAdmin') : t('start.emptyHintUser')
           }
         />
       ) : (
@@ -134,7 +138,7 @@ export function StartLauncher() {
           {visibleGroups.map((g) => (
             <section key={g.code}>
               <h2 className="mb-3 text-sm font-medium text-muted-foreground">
-                {g.label}
+                {t(g.labelKey)}
               </h2>
               <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
                 {g.items.map((d) => (
@@ -166,13 +170,13 @@ export function StartLauncher() {
 
       {isAdmin ? (
         <p className="mt-8 text-center text-xs text-muted-foreground">
-          若未找到合适的模板，可
+          {t('start.createHintPrefix')}
           <Link
             to="/admin/defs/$id"
             params={{ id: 'new' }}
             className="ml-1 text-primary hover:underline"
           >
-            创建审批模板
+            {t('start.createTemplate')}
           </Link>
         </p>
       ) : null}

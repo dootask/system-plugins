@@ -18,6 +18,8 @@ import {
   collectFieldKeys,
   makeField,
 } from '#/lib/designer/utils'
+import { useT } from '#/lib/i18n/context'
+import type { TFunc } from '#/lib/i18n/translate'
 import type {
   FieldDef,
   FieldOption,
@@ -37,6 +39,7 @@ export function FormDesigner({
   value: FormSchema
   onChange: (next: FormSchema) => void
 }) {
+  const t = useT()
   const [previewValue, setPreviewValue] = React.useState<
     Record<string, unknown>
   >({})
@@ -46,7 +49,7 @@ export function FormDesigner({
   }, [value])
 
   const addField = (type: FieldType) => {
-    onChange([...value, makeField(type, collectFieldKeys(value))])
+    onChange([...value, makeField(type, collectFieldKeys(value), t)])
   }
   const patchField = (i: number, patch: Partial<FieldDef>) => {
     onChange(value.map((f, j) => (j === i ? { ...f, ...patch } : f)))
@@ -64,28 +67,31 @@ export function FormDesigner({
     <div className="grid gap-6 lg:grid-cols-2">
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mr-1 text-sm text-muted-foreground">添加字段：</span>
-          {FIELD_TYPES.map((t) => (
+          <span className="mr-1 text-sm text-muted-foreground">
+            {t('designer.form.addField')}
+          </span>
+          {FIELD_TYPES.map((m) => (
             <button
-              key={t.type}
+              key={m.type}
               type="button"
-              onClick={() => addField(t.type)}
+              onClick={() => addField(m.type)}
               className="rounded-md border border-input px-2 py-1 text-xs hover:bg-accent"
             >
-              {t.label}
+              {t(m.labelKey)}
             </button>
           ))}
         </div>
 
         {value.length === 0 ? (
           <p className="rounded-md border border-dashed py-8 text-center text-sm text-muted-foreground">
-            点击上方按钮添加字段
+            {t('designer.form.clickToAdd')}
           </p>
         ) : (
           <div className="space-y-2">
             {value.map((field, i) => (
               <FieldEditor
                 key={field.key}
+                t={t}
                 field={field}
                 isFirst={i === 0}
                 isLast={i === value.length - 1}
@@ -100,10 +106,14 @@ export function FormDesigner({
       </div>
 
       <div className="space-y-2">
-        <Label className="text-muted-foreground">实时预览</Label>
+        <Label className="text-muted-foreground">
+          {t('designer.form.livePreview')}
+        </Label>
         <div className="rounded-lg border bg-card p-4">
           {value.length === 0 ? (
-            <p className="text-sm text-muted-foreground">暂无字段</p>
+            <p className="text-sm text-muted-foreground">
+              {t('designer.form.noFields')}
+            </p>
           ) : (
             <FormRenderer
               schema={value}
@@ -118,6 +128,7 @@ export function FormDesigner({
 }
 
 function FieldEditor({
+  t,
   field,
   isFirst,
   isLast,
@@ -126,6 +137,7 @@ function FieldEditor({
   onMoveUp,
   onMoveDown,
 }: {
+  t: TFunc
   field: FieldDef
   isFirst: boolean
   isLast: boolean
@@ -135,13 +147,13 @@ function FieldEditor({
   onMoveDown: () => void
 }) {
   const [open, setOpen] = React.useState(false)
-  const typeMeta = FIELD_TYPES.find((t) => t.type === field.type)
+  const typeMeta = FIELD_TYPES.find((m) => m.type === field.type)
 
   return (
     <div className="rounded-md border">
       <div className="flex items-center gap-2 px-3 py-2">
         <span className="rounded bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-          {typeMeta?.label}
+          {typeMeta ? t(typeMeta.labelKey) : null}
         </span>
         <span className="flex-1 truncate text-sm font-medium">
           {field.label || field.key}
@@ -170,7 +182,7 @@ function FieldEditor({
           onClick={() => setOpen((o) => !o)}
           className="text-xs text-primary hover:underline"
         >
-          {open ? '收起' : '配置'}
+          {open ? t('designer.form.collapse') : t('designer.form.configure')}
         </button>
         <button
           type="button"
@@ -185,14 +197,14 @@ function FieldEditor({
         <div className="space-y-3 border-t bg-muted/30 px-3 py-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
-              <Label className="text-xs">标签</Label>
+              <Label className="text-xs">{t('designer.form.label')}</Label>
               <Input
                 value={field.label}
                 onChange={(e) => onChange({ label: e.target.value })}
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">字段标识(key)</Label>
+              <Label className="text-xs">{t('designer.form.fieldKey')}</Label>
               <Input
                 value={field.key}
                 onChange={(e) => onChange({ key: e.target.value })}
@@ -207,13 +219,13 @@ function FieldEditor({
                 checked={!!field.required}
                 onChange={(e) => onChange({ required: e.target.checked })}
               />
-              必填
+              {t('designer.form.required')}
             </label>
           ) : null}
 
           {field.type === 'desc' ? (
             <div className="space-y-1">
-              <Label className="text-xs">说明文字</Label>
+              <Label className="text-xs">{t('designer.form.descText')}</Label>
               <Input
                 value={field.props?.text ?? ''}
                 onChange={(e) =>
@@ -225,6 +237,7 @@ function FieldEditor({
 
           {typeMeta?.hasOptions ? (
             <OptionsEditor
+              t={t}
               options={field.options ?? []}
               onChange={(options) => onChange({ options })}
             />
@@ -232,15 +245,16 @@ function FieldEditor({
 
           {field.type === 'table' ? (
             <ColumnsEditor
+              t={t}
               columns={field.columns ?? []}
               onChange={(columns) => onChange({ columns })}
             />
           ) : null}
 
-          <RulesEditor field={field} onChange={onChange} />
+          <RulesEditor t={t} field={field} onChange={onChange} />
 
           <div className="space-y-1">
-            <Label className="text-xs">帮助说明（可选）</Label>
+            <Label className="text-xs">{t('designer.form.helpText')}</Label>
             <Input
               value={field.hint ?? ''}
               onChange={(e) => onChange({ hint: e.target.value || undefined })}
@@ -253,9 +267,11 @@ function FieldEditor({
 }
 
 function OptionsEditor({
+  t,
   options,
   onChange,
 }: {
+  t: TFunc
   options: Array<FieldOption>
   onChange: (opts: Array<FieldOption>) => void
 }) {
@@ -263,18 +279,18 @@ function OptionsEditor({
     onChange(options.map((o, j) => (j === i ? { ...o, ...p } : o)))
   return (
     <div className="space-y-1.5">
-      <Label className="text-xs">选项</Label>
+      <Label className="text-xs">{t('designer.form.options')}</Label>
       {options.map((o, i) => (
         <div key={i} className="flex items-center gap-2">
           <Input
             className="h-8"
-            placeholder="显示文案"
+            placeholder={t('designer.form.optionLabelPlaceholder')}
             value={o.label}
             onChange={(e) => patch(i, { label: e.target.value })}
           />
           <Input
             className="h-8"
-            placeholder="值"
+            placeholder={t('designer.form.optionValuePlaceholder')}
             value={String(o.value)}
             onChange={(e) => patch(i, { value: e.target.value })}
           />
@@ -294,22 +310,24 @@ function OptionsEditor({
           onChange([
             ...options,
             {
-              label: `选项${options.length + 1}`,
+              label: t('designer.default.option', { n: options.length + 1 }),
               value: `opt${options.length + 1}`,
             },
           ])
         }
       >
-        <Plus className="size-3" /> 增加选项
+        <Plus className="size-3" /> {t('designer.form.addOption')}
       </Button>
     </div>
   )
 }
 
 function ColumnsEditor({
+  t,
   columns,
   onChange,
 }: {
+  t: TFunc
   columns: Array<FieldDef>
   onChange: (cols: Array<FieldDef>) => void
 }) {
@@ -322,18 +340,22 @@ function ColumnsEditor({
     while (keys.has(key)) key = `col_${++n}`
     onChange([
       ...columns,
-      { key, type: 'text', label: `列${columns.length + 1}` },
+      {
+        key,
+        type: 'text',
+        label: t('designer.default.column', { n: columns.length + 1 }),
+      },
     ])
   }
   return (
     <div className="space-y-1.5 rounded-md border border-dashed p-2">
-      <Label className="text-xs">明细子表列</Label>
+      <Label className="text-xs">{t('designer.form.subtableColumns')}</Label>
       {columns.map((c, i) => (
         <div key={i} className="space-y-2 rounded-md border bg-background p-2">
           <div className="flex items-center gap-2">
             <Input
               className="h-8 min-w-0 flex-1"
-              placeholder="列名"
+              placeholder={t('designer.form.columnNamePlaceholder')}
               value={c.label}
               onChange={(e) => patch(i, { label: e.target.value })}
             />
@@ -360,9 +382,9 @@ function ColumnsEditor({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {TABLE_COLUMN_TYPES.map((t) => (
-                  <SelectItem key={t.type} value={t.type}>
-                    {t.label}
+                {TABLE_COLUMN_TYPES.map((m) => (
+                  <SelectItem key={m.type} value={m.type}>
+                    {t(m.labelKey)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -373,22 +395,24 @@ function ColumnsEditor({
                 checked={!!c.required}
                 onChange={(e) => patch(i, { required: e.target.checked })}
               />
-              必填
+              {t('designer.form.required')}
             </label>
           </div>
         </div>
       ))}
       <Button variant="outline" size="sm" onClick={addCol}>
-        <Plus className="size-3" /> 增加列
+        <Plus className="size-3" /> {t('designer.form.addColumn')}
       </Button>
     </div>
   )
 }
 
 function RulesEditor({
+  t,
   field,
   onChange,
 }: {
+  t: TFunc
   field: FieldDef
   onChange: (patch: Partial<FieldDef>) => void
 }) {
@@ -426,16 +450,16 @@ function RulesEditor({
     <div className="grid grid-cols-2 gap-3">
       {isNum ? (
         <>
-          {numInput('min', '最小值')}
-          {numInput('max', '最大值')}
+          {numInput('min', t('designer.form.ruleMin'))}
+          {numInput('max', t('designer.form.ruleMax'))}
         </>
       ) : null}
       {isText ? (
         <>
-          {numInput('minLength', '最小长度')}
-          {numInput('maxLength', '最大长度')}
+          {numInput('minLength', t('designer.form.ruleMinLength'))}
+          {numInput('maxLength', t('designer.form.ruleMaxLength'))}
           <div className="col-span-2 space-y-1">
-            <Label className="text-xs">正则校验（可选）</Label>
+            <Label className="text-xs">{t('designer.form.rulePattern')}</Label>
             <Input
               className="h-8"
               value={r.pattern ?? ''}
@@ -450,8 +474,8 @@ function RulesEditor({
       ) : null}
       {isMulti ? (
         <>
-          {numInput('minItems', '最少选择')}
-          {numInput('maxItems', '最多选择')}
+          {numInput('minItems', t('designer.form.ruleMinItems'))}
+          {numInput('maxItems', t('designer.form.ruleMaxItems'))}
         </>
       ) : null}
     </div>

@@ -2,6 +2,8 @@ import { AlertCircle } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { Link } from '@tanstack/react-router'
 import { cn } from '#/lib/utils'
+import { useT } from '#/lib/i18n/context'
+import type { MsgKey } from '#/lib/i18n/messages'
 import { Alert, AlertDescription } from '#/components/ui/alert'
 import { Badge } from '#/components/ui/badge'
 import { Skeleton } from '#/components/ui/skeleton'
@@ -14,16 +16,16 @@ import {
   BreadcrumbSeparator,
 } from '#/components/ui/breadcrumb'
 
-// 子页面包屑里「来源」（顶层路由）的显示名。
-const CRUMB_LABEL: Record<string, string> = {
-  '/': '发起申请',
-  '/todo': '待处理',
-  '/done': '已处理',
-  '/cc': '抄送我的',
-  '/mine': '已提交',
-  '/stats': '数据统计',
-  '/admin': '模板管理',
-  '/admin/backup': '数据备份',
+// 子页面包屑里「来源」（顶层路由）的显示名 key。
+const CRUMB_LABEL: Partial<Record<string, MsgKey>> = {
+  '/': 'ui.crumb.start',
+  '/todo': 'ui.crumb.todo',
+  '/done': 'ui.crumb.done',
+  '/cc': 'ui.crumb.cc',
+  '/mine': 'ui.crumb.mine',
+  '/stats': 'ui.crumb.stats',
+  '/admin': 'ui.crumb.admin',
+  '/admin/backup': 'ui.crumb.backup',
 }
 
 /** 三级子页（详情 / 发起 / 模板编辑）统一面包屑：来源列表（可点返回）> 当前页。 */
@@ -34,13 +36,14 @@ export function SubPageBreadcrumb({
   parent?: string
   current: ReactNode
 }) {
+  const t = useT()
   const to = parent && CRUMB_LABEL[parent] ? parent : '/'
   return (
     <Breadcrumb>
       <BreadcrumbList>
         <BreadcrumbItem>
           <BreadcrumbLink asChild>
-            <Link to={to}>{CRUMB_LABEL[to]}</Link>
+            <Link to={to}>{t(CRUMB_LABEL[to] ?? 'nav.start')}</Link>
           </BreadcrumbLink>
         </BreadcrumbItem>
         <BreadcrumbSeparator />
@@ -54,11 +57,12 @@ export function SubPageBreadcrumb({
 
 // 骨架屏占位（替代旋转图标，贴近 shadcn 风格）。center 仅保留签名兼容旧调用。
 export function Loading({ center }: { center?: boolean }) {
+  const t = useT()
   return (
     <div
       className={cn('space-y-3', center && 'py-2')}
       aria-busy="true"
-      aria-label="加载中"
+      aria-label={t('common.loading')}
     >
       <Skeleton className="h-7 w-40" />
       <Skeleton className="h-24 w-full rounded-lg" />
@@ -89,35 +93,41 @@ export function ErrorBar({ message }: { message: string }) {
 
 // ───────────────────────── 状态标签 ─────────────────────────
 
-const STATUS_META: Record<string, { label: string; cls: string }> = {
-  draft: { label: '草稿', cls: 'bg-muted text-muted-foreground' },
+const STATUS_META: Partial<Record<string, { labelKey: MsgKey; cls: string }>> = {
+  draft: { labelKey: 'ui.status.draft', cls: 'bg-muted text-muted-foreground' },
   running: {
-    label: '审批中',
+    labelKey: 'ui.status.running',
     cls: 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300',
   },
   approved: {
-    label: '已通过',
+    labelKey: 'ui.status.approved',
     cls: 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300',
   },
   rejected: {
-    label: '已拒绝',
+    labelKey: 'ui.status.rejected',
     cls: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
   },
-  withdrawn: { label: '已撤回', cls: 'bg-muted text-muted-foreground' },
+  withdrawn: {
+    labelKey: 'ui.status.withdrawn',
+    cls: 'bg-muted text-muted-foreground',
+  },
   archived: {
-    label: '已归档',
+    labelKey: 'ui.status.archived',
     cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
   },
 }
 
 export function StatusBadge({ status }: { status: string }) {
-  const meta = STATUS_META[status] ?? {
-    label: status,
-    cls: 'bg-muted text-muted-foreground',
-  }
+  const t = useT()
+  const meta = STATUS_META[status]
   return (
-    <Badge className={cn('rounded-full border-transparent', meta.cls)}>
-      {meta.label}
+    <Badge
+      className={cn(
+        'rounded-full border-transparent',
+        meta?.cls ?? 'bg-muted text-muted-foreground',
+      )}
+    >
+      {meta ? t(meta.labelKey) : status}
     </Badge>
   )
 }

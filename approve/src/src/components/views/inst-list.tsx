@@ -3,6 +3,8 @@ import { useNavigate } from '@tanstack/react-router'
 import { ListFilter, Search } from 'lucide-react'
 import { api, ApiError } from '#/lib/api'
 import { cn } from '#/lib/utils'
+import { useT } from '#/lib/i18n/context'
+import type { MsgKey } from '#/lib/i18n/messages'
 import { useActivate } from '#/components/keep-alive'
 import { useUsers } from '#/lib/use-users'
 import { UserChip } from '#/components/ui/user-chip'
@@ -42,26 +44,26 @@ import type { DefSummary, InstSummary } from '#/lib/types'
 
 export type Box = 'todo' | 'done' | 'mine' | 'cc'
 
-const TITLE: Record<Box, string> = {
-  todo: '待处理',
-  done: '已处理',
-  mine: '已提交',
-  cc: '抄送我的',
+const TITLE_KEY: Record<Box, MsgKey> = {
+  todo: 'inst.title.todo',
+  done: 'inst.title.done',
+  mine: 'inst.title.mine',
+  cc: 'inst.title.cc',
 }
-const EMPTY_HINT: Record<Box, string> = {
-  todo: '当前没有需要你审批的单据',
-  done: '你还没有处理过任何审批单',
-  mine: '在「发起申请」中选择模板开始一个新流程',
-  cc: '暂时没有抄送给你的单据',
+const EMPTY_HINT_KEY: Record<Box, MsgKey> = {
+  todo: 'inst.emptyHint.todo',
+  done: 'inst.emptyHint.done',
+  mine: 'inst.emptyHint.mine',
+  cc: 'inst.emptyHint.cc',
 }
 
 const STATUS_ALL = '__all__'
-const STATUS_OPTIONS: Array<{ value: string; label: string }> = [
-  { value: 'running', label: '审批中' },
-  { value: 'approved', label: '已通过' },
-  { value: 'rejected', label: '已拒绝' },
-  { value: 'withdrawn', label: '已撤回' },
-  { value: 'archived', label: '已归档' },
+const STATUS_OPTIONS: Array<{ value: string; labelKey: MsgKey }> = [
+  { value: 'running', labelKey: 'inst.status.running' },
+  { value: 'approved', labelKey: 'inst.status.approved' },
+  { value: 'rejected', labelKey: 'inst.status.rejected' },
+  { value: 'withdrawn', labelKey: 'inst.status.withdrawn' },
+  { value: 'archived', labelKey: 'inst.status.archived' },
 ]
 
 // 模板名映射跨视图共享一次拉取即可（列表项只回 def_id）。
@@ -73,6 +75,7 @@ interface ListResp {
 }
 
 export function InstListView({ box, active }: { box: Box; active: boolean }) {
+  const t = useT()
   const navigate = useNavigate()
   const [items, setItems] = useState<Array<InstSummary>>([])
   const [total, setTotal] = useState(0)
@@ -91,8 +94,8 @@ export function InstListView({ box, active }: { box: Box; active: boolean }) {
 
   // 搜索词防抖。
   useEffect(() => {
-    const t = setTimeout(() => setDebKeyword(keyword), 300)
-    return () => clearTimeout(t)
+    const timer = setTimeout(() => setDebKeyword(keyword), 300)
+    return () => clearTimeout(timer)
   }, [keyword])
   // 过滤条件变化回到第一页。
   useEffect(() => setPage(1), [debKeyword, status, pageSize])
@@ -111,7 +114,7 @@ export function InstListView({ box, active }: { box: Box; active: boolean }) {
       setItems(res.items)
       setTotal(res.total)
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '加载失败')
+      setError(e instanceof ApiError ? e.message : t('inst.loadFailed'))
     } finally {
       setLoading(false)
     }
@@ -148,7 +151,9 @@ export function InstListView({ box, active }: { box: Box; active: boolean }) {
   return (
     <div>
       {/* 桌面端标题独占一行（移动端顶部标题栏已显示），让右上角留给胶囊 */}
-      <h1 className="mb-4 text-lg font-semibold max-md:hidden">{TITLE[box]}</h1>
+      <h1 className="mb-4 text-lg font-semibold max-md:hidden">
+        {t(TITLE_KEY[box])}
+      </h1>
 
       {/* 搜索 + 筛选（移动端用筛选图标弹出状态，桌面端保留下拉） */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -158,7 +163,7 @@ export function InstListView({ box, active }: { box: Box; active: boolean }) {
             <Input
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              placeholder="搜索标题"
+              placeholder={t('inst.searchPlaceholder')}
               className="pl-8"
             />
           </div>
@@ -168,7 +173,7 @@ export function InstListView({ box, active }: { box: Box; active: boolean }) {
               <Button
                 variant="outline"
                 size="icon"
-                aria-label="按状态筛选"
+                aria-label={t('inst.filterByStatus')}
                 className={cn(
                   'relative shrink-0 sm:hidden',
                   status && 'border-primary text-primary',
@@ -186,11 +191,11 @@ export function InstListView({ box, active }: { box: Box; active: boolean }) {
                 onValueChange={(v) => setStatus(v === STATUS_ALL ? '' : v)}
               >
                 <DropdownMenuRadioItem value={STATUS_ALL}>
-                  全部状态
+                  {t('inst.allStatus')}
                 </DropdownMenuRadioItem>
                 {STATUS_OPTIONS.map((o) => (
                   <DropdownMenuRadioItem key={o.value} value={o.value}>
-                    {o.label}
+                    {t(o.labelKey)}
                   </DropdownMenuRadioItem>
                 ))}
               </DropdownMenuRadioGroup>
@@ -206,10 +211,10 @@ export function InstListView({ box, active }: { box: Box; active: boolean }) {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={STATUS_ALL}>全部状态</SelectItem>
+            <SelectItem value={STATUS_ALL}>{t('inst.allStatus')}</SelectItem>
             {STATUS_OPTIONS.map((o) => (
               <SelectItem key={o.value} value={o.value}>
-                {o.label}
+                {t(o.labelKey)}
               </SelectItem>
             ))}
           </SelectContent>
@@ -221,17 +226,17 @@ export function InstListView({ box, active }: { box: Box; active: boolean }) {
       {loading ? (
         <Loading />
       ) : items.length === 0 ? (
-        <EmptyState title="暂无审批单" hint={EMPTY_HINT[box]} />
+        <EmptyState title={t('inst.empty')} hint={t(EMPTY_HINT_KEY[box])} />
       ) : (
         <>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>标题</TableHead>
-                <TableHead>模板</TableHead>
-                <TableHead>状态</TableHead>
-                <TableHead>发起人</TableHead>
-                <TableHead>提交时间</TableHead>
+                <TableHead>{t('inst.col.title')}</TableHead>
+                <TableHead>{t('inst.col.template')}</TableHead>
+                <TableHead>{t('inst.col.status')}</TableHead>
+                <TableHead>{t('inst.col.initiator')}</TableHead>
+                <TableHead>{t('inst.col.submittedAt')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -249,7 +254,8 @@ export function InstListView({ box, active }: { box: Box; active: boolean }) {
                 >
                   <TableCell className="font-medium">{r.title}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    {defNames[r.def_id] ?? `模板#${r.def_id}`}
+                    {defNames[r.def_id] ??
+                      t('inst.templateFallback', { id: r.def_id })}
                   </TableCell>
                   <TableCell>
                     <StatusBadge status={r.status} />

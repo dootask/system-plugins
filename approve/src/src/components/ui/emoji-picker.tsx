@@ -6,6 +6,7 @@ import {
 } from '#/components/ui/popover'
 import { Button } from '#/components/ui/button'
 import { cn } from '#/lib/utils'
+import { useT } from '#/lib/i18n/context'
 
 // 常用图标（审批/办公场景），无需外部依赖。
 const EMOJIS = [
@@ -27,6 +28,7 @@ export function EmojiPicker({
   onChange: (v: string) => void
   className?: string
 }) {
+  const t = useT()
   const [open, setOpen] = useState(false)
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -66,7 +68,7 @@ export function EmojiPicker({
           }}
           className="mt-2 w-full rounded px-2 py-1 text-xs text-muted-foreground hover:bg-accent"
         >
-          默认图标
+          {t('ui.emoji.default')}
         </button>
       </PopoverContent>
     </Popover>

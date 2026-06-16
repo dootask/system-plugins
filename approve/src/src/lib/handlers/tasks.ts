@@ -7,7 +7,7 @@ import {
   requireUser,
 } from '#/lib/auth'
 import { buildEngineDeps, roleIdsOfDef } from '#/lib/engine-deps'
-import { createEngine } from '#/lib/engine'
+import { createEngine, EngineError } from '#/lib/engine'
 import { getInst } from '#/lib/repo/insts'
 import { getDef } from '#/lib/repo/defs'
 import { getActiveTask, getTask } from '#/lib/repo/tasks'
@@ -16,6 +16,7 @@ import type { ActOptions, EngineAction } from '#/lib/engine'
 import type { FileValue } from '#/lib/form/types'
 import { sanitizeAttachments } from '#/lib/uploads'
 import { notifyOnAdvance, notifyResult } from './notify'
+import { serverT } from '#/lib/i18n/server'
 import { idAfter } from './util'
 
 const ACTIONS: ReadonlySet<EngineAction> = new Set([
@@ -46,29 +47,30 @@ interface ActBody {
  * 退回(return)后若带 resubmitForm 且操作者是发起人 → 引擎 resubmit 续审。
  */
 export async function actTaskHandler(request: Request): Promise<Response> {
+  const t = serverT(request)
   const auth = await requireUser(request)
   if (auth instanceof Response) return auth
   const taskId = idAfter(request, 'tasks')
-  if (!taskId) return notFound('缺少任务 id')
+  if (!taskId) return notFound(t('server.err.missingTaskId'))
   const task = getTask(taskId)
-  if (!task) return notFound('任务不存在')
+  if (!task) return notFound(t('server.err.taskNotFound'))
   const inst = getInst(task.inst_id)
-  if (!inst) return notFound('审批单不存在')
+  if (!inst) return notFound(t('server.err.instNotFound'))
 
   const body = await readJson<ActBody>(request)
   const action = body?.action
-  if (!action || !ACTIONS.has(action)) return badRequest('非法 action')
+  if (!action || !ACTIONS.has(action)) return badRequest(t('server.err.badAction'))
 
   // 权限：withdraw 限发起人；其余动作限当前 task 的 pending approver。
   if (action === 'withdraw') {
     if (auth.userId !== inst.initiator_id) {
-      return forbidden('只能撤回本人发起的审批')
+      return forbidden(t('server.err.withdrawOwnOnly'))
     }
   } else {
     const isPending = listPendingByTask(taskId).some(
       (a) => a.userid === auth.userId,
     )
-    if (!isPending) return forbidden('您不是当前待审人或已处理过')
+    if (!isPending) return forbidden(t('server.err.notPendingApprover'))
   }
 
   const token = request.headers.get('x-user-token')
@@ -97,12 +99,14 @@ export async function actTaskHandler(request: Request): Promise<Response> {
       engine.resubmit(inst.id, body.resubmitForm)
     }
   } catch (e) {
-    return badRequest(e instanceof Error ? e.message : '操作失败')
+    return badRequest(
+      e instanceof EngineError ? t(e.key, e.params) : t('server.err.actFailed'),
+    )
   }
 
   // 通知（不阻断响应，失败仅记日志）。
-  await notifyOnAdvance(inst.id, prevTask?.id ?? null, token)
-  await notifyResult(inst.id, token)
+  await notifyOnAdvance(inst.id, prevTask?.id ?? null, token, t)
+  await notifyResult(inst.id, token, t)
   return ok({ ok: true })
 }
 
@@ -114,11 +118,13 @@ export async function resubmitHandler(
   request: Request,
   instId: number,
 ): Promise<Response> {
+  const t = serverT(request)
   const auth = await requireUser(request)
   if (auth instanceof Response) return auth
   const inst = getInst(instId)
-  if (!inst) return notFound('审批单不存在')
-  if (auth.userId !== inst.initiator_id) return forbidden('仅发起人可重新提交')
+  if (!inst) return notFound(t('server.err.instNotFound'))
+  if (auth.userId !== inst.initiator_id)
+    return forbidden(t('server.err.resubmitInitiatorOnly'))
   const body = await readJson<{ formData?: Record<string, unknown> }>(request)
 
   const token = request.headers.get('x-user-token')
@@ -129,8 +135,10 @@ export async function resubmitHandler(
   try {
     engine.resubmit(instId, body?.formData)
   } catch (e) {
-    return badRequest(e instanceof Error ? e.message : '重新提交失败')
+    return badRequest(
+      e instanceof EngineError ? t(e.key, e.params) : t('server.err.resubmitFailed'),
+    )
   }
-  await notifyOnAdvance(instId, prevTask?.id ?? null, token)
+  await notifyOnAdvance(instId, prevTask?.id ?? null, token, t)
   return ok({ ok: true })
 }

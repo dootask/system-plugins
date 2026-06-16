@@ -1,4 +1,5 @@
 import { verifyUserToken } from '#/lib/dootask-server'
+import { serverT } from '#/lib/i18n/server'
 import type { AuthUser } from '#/lib/types'
 
 function adminIds(): Array<number> {
@@ -34,17 +35,18 @@ export async function requireUser(
   // 凭据优先取请求头 x-user-token；下载类接口（如 <a>/window.open/主程序 downloadUrl
   // 无法带自定义头）回退到 URL 查询串 token/user_token。两者都经主程序反查验证，
   // 可信度一致，仅 URL 形式会在日志暴露 token。
+  const t = serverT(request)
   let token = request.headers.get('x-user-token')
   if (!token) {
     const sp = new URL(request.url).searchParams
     token = sp.get('token') || sp.get('user_token')
   }
-  if (!token) return unauthorized('缺少用户凭据')
+  if (!token) return unauthorized(t('server.err.missingCred'))
 
   let basic = readCache(token)
   if (!basic) {
     const verified = await verifyUserToken(token)
-    if (!verified) return unauthorized('凭据无效或已过期')
+    if (!verified) return unauthorized(t('server.err.invalidCred'))
     basic = verified
     tokenCache.set(token, { user: verified, at: Date.now() })
   }

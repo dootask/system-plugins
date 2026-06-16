@@ -3,6 +3,8 @@ import { Link, useRouterState } from '@tanstack/react-router'
 import { InstListView } from '#/components/views/inst-list'
 import type { Box } from '#/components/views/inst-list'
 import { cn } from '#/lib/utils'
+import { useT } from '#/lib/i18n/context'
+import type { MsgKey } from '#/lib/i18n/messages'
 
 // 四个列表视图常驻挂载，按当前路径显隐切换（类似 Vue keep-alive，切视图不丢状态）。
 // 落地页（/）、详情（/insts/$id）、发起（/start/$defId）、统计、管理走 __root 的 Outlet。
@@ -14,10 +16,10 @@ const VIEWS: Array<{ path: string; box: Box }> = [
 ]
 
 // 「我收到的」三页签（移动端在内容顶部以分段控件切换；桌面端由左侧边栏切换，故隐藏）。
-const INBOX_TABS: Array<{ path: string; label: string }> = [
-  { path: '/todo', label: '待处理' },
-  { path: '/done', label: '已处理' },
-  { path: '/cc', label: '抄送我的' },
+const INBOX_TABS: Array<{ path: string; labelKey: MsgKey }> = [
+  { path: '/todo', labelKey: 'nav.todo' },
+  { path: '/done', labelKey: 'nav.done' },
+  { path: '/cc', labelKey: 'nav.cc' },
 ]
 
 // basepath 为 /apps/approve，统一归一化成应用内相对路径。
@@ -27,6 +29,7 @@ function normalize(pathname: string): string {
 }
 
 export function KeepAliveViews() {
+  const t = useT()
   const raw = useRouterState({ select: (s) => s.location.pathname })
   const pathname = normalize(raw)
   const scrollMap = useRef<Record<string, number>>({})
@@ -50,18 +53,18 @@ export function KeepAliveViews() {
     <div hidden={!anyActive}>
       {inInbox ? (
         <div className="mb-4 flex gap-1 rounded-lg bg-muted p-1 md:hidden">
-          {INBOX_TABS.map((t) => (
+          {INBOX_TABS.map((tab) => (
             <Link
-              key={t.path}
-              to={t.path}
+              key={tab.path}
+              to={tab.path}
               className={cn(
                 'flex-1 rounded-md py-1.5 text-center text-sm font-medium transition',
-                pathname === t.path
+                pathname === tab.path
                   ? 'bg-background text-foreground shadow-sm'
                   : 'text-muted-foreground',
               )}
             >
-              {t.label}
+              {t(tab.labelKey)}
             </Link>
           ))}
         </div>

@@ -5,26 +5,37 @@ import type { ExportFilter } from '#/lib/repo/insts'
 import { getDef } from '#/lib/repo/defs'
 import { lastDecisionByInst } from '#/lib/repo/events'
 import { fetchDepartmentNames, resolveUsers } from '#/lib/dootask-server'
+import { serverT } from '#/lib/i18n/server'
+import type { TFunc } from '#/lib/i18n/translate'
+import type { MsgKey } from '#/lib/i18n/messages'
 import type { FieldDef, FormSchema } from '#/lib/form/types'
 import type { ProcDefRow, UserLite } from '#/lib/types'
 
 // 管理员导出审批数据为 XLSX。通用列恒定；当筛选指定单个模板时，额外把该模板的
 // 表单字段展开为列（同模板 schema 一致才可对齐）。下载机制见前端 downloadAuthed。
 
-const STATUS_LABEL: Record<string, string> = {
-  draft: '草稿',
-  running: '审批中',
-  approved: '已通过',
-  rejected: '已拒绝',
-  withdrawn: '已撤回',
-  archived: '已归档',
+const statusLabel = (s: string, t: TFunc): string => {
+  const key = `server.export.status.${s}` as MsgKey
+  return s in STATUS_KEYS ? t(key) : s
 }
-const DECISION_LABEL: Record<string, string> = {
-  approve: '通过',
-  reject: '拒绝',
-  return: '退回',
-  withdraw: '撤回',
-  archive: '归档',
+const STATUS_KEYS: Record<string, true> = {
+  draft: true,
+  running: true,
+  approved: true,
+  rejected: true,
+  withdrawn: true,
+  archived: true,
+}
+const decisionLabel = (a: string, t: TFunc): string => {
+  const key = `server.export.decision.${a}` as MsgKey
+  return a in DECISION_KEYS ? t(key) : a
+}
+const DECISION_KEYS: Record<string, true> = {
+  approve: true,
+  reject: true,
+  return: true,
+  withdraw: true,
+  archive: true,
 }
 const VALID_STATUSES = [
   'running',
@@ -59,7 +70,7 @@ function parseFilter(url: URL): ExportFilter {
 }
 
 /** 发起→结束 的耗时（天/小时/分），未结束返回空。 */
-function fmtDuration(from: string, to: string | null): string {
+function fmtDuration(from: string, to: string | null, t: TFunc): string {
   if (!to) return ''
   const a = Date.parse(from.replace(' ', 'T'))
   const b = Date.parse(to.replace(' ', 'T'))
@@ -70,15 +81,16 @@ function fmtDuration(from: string, to: string | null): string {
   const h = Math.floor(mins / 60)
   const m = mins - h * 60
   const parts: Array<string> = []
-  if (d) parts.push(`${d}天`)
-  if (h) parts.push(`${h}小时`)
-  if (m || parts.length === 0) parts.push(`${m}分`)
+  if (d) parts.push(t('server.export.dur.day', { n: d }))
+  if (h) parts.push(t('server.export.dur.hour', { n: h }))
+  if (m || parts.length === 0) parts.push(t('server.export.dur.min', { n: m }))
   return parts.join('')
 }
 
 interface FmtCtx {
   nick: (id: number) => string
   deptNames: Map<number, string>
+  t: TFunc
 }
 
 /** 把单个表单字段值格式化为单元格文本（按字段类型）。 */
@@ -105,7 +117,13 @@ function formatField(f: FieldDef, value: unknown, ctx: FmtCtx): string {
     }
     case 'dept': {
       const arr = Array.isArray(value) ? value : [value]
-      return arr.map((v) => ctx.deptNames.get(Number(v)) ?? `部门#${v}`).join('、')
+      return arr
+        .map(
+          (v) =>
+            ctx.deptNames.get(Number(v)) ??
+            ctx.t('server.export.deptFallback', { id: String(v) }),
+        )
+        .join('、')
     }
     case 'file': {
       const arr = Array.isArray(value)
@@ -118,7 +136,9 @@ function formatField(f: FieldDef, value: unknown, ctx: FmtCtx): string {
     }
     case 'table': {
       const arr = Array.isArray(value) ? value : []
-      return arr.length ? `${arr.length} 行` : ''
+      return arr.length
+        ? ctx.t('server.export.tableRows', { n: arr.length })
+        : ''
     }
     default:
       return String(value)
@@ -131,9 +151,10 @@ function formatField(f: FieldDef, value: unknown, ctx: FmtCtx): string {
  * - 否则：返回 XLSX 二进制（仅管理员）。
  */
 export async function exportInstsHandler(request: Request): Promise<Response> {
+  const t = serverT(request)
   const auth = await requireUser(request)
   if (auth instanceof Response) return auth
-  if (!auth.isAdmin) return forbidden('仅管理员可导出审批数据')
+  if (!auth.isAdmin) return forbidden(t('server.export.adminOnly'))
 
   const url = new URL(request.url)
   const filter = parseFilter(url)
@@ -193,26 +214,26 @@ export async function exportInstsHandler(request: Request): Promise<Response> {
   const deptNames = await fetchDepartmentNames(token)
   const nick = (id: number) => {
     const u = users[id] as UserLite | undefined
-    return u ? u.nickname : `用户#${id}`
+    return u ? u.nickname : t('server.export.userFallback', { id })
   }
-  const ctx: FmtCtx = { nick, deptNames }
+  const ctx: FmtCtx = { nick, deptNames, t }
 
   // 组装工作簿。
   const wb = new ExcelJS.Workbook()
-  const ws = wb.addWorksheet('审批数据')
+  const ws = wb.addWorksheet(t('server.export.sheet'))
   const baseHeaders = [
-    '单号',
-    '标题',
-    '模板',
-    '分类',
-    '发起人',
-    '发起部门',
-    '状态',
-    '发起时间',
-    '结束时间',
-    '耗时',
-    '末次处理',
-    '末次意见',
+    t('server.export.h.id'),
+    t('server.export.h.title'),
+    t('server.export.h.template'),
+    t('server.export.h.category'),
+    t('server.export.h.initiator'),
+    t('server.export.h.dept'),
+    t('server.export.h.status'),
+    t('server.export.h.createdAt'),
+    t('server.export.h.finishedAt'),
+    t('server.export.h.duration'),
+    t('server.export.h.lastHandler'),
+    t('server.export.h.lastComment'),
   ]
   const headers = [...baseHeaders, ...expandFields.map((f) => f.label)]
   ws.addRow(headers)
@@ -248,22 +269,27 @@ export async function exportInstsHandler(request: Request): Promise<Response> {
       d?.category ?? '',
       nick(r.initiator_id),
       r.dept_id ? (deptNames.get(r.dept_id) ?? '') : '',
-      STATUS_LABEL[r.status] ?? r.status,
+      statusLabel(r.status, t),
       r.created_at,
       r.finished_at ?? '',
-      fmtDuration(r.created_at, r.finished_at),
-      dec ? `${nick(dec.actor_id)}（${DECISION_LABEL[dec.action] ?? dec.action}）` : '',
+      fmtDuration(r.created_at, r.finished_at, t),
+      dec
+        ? t('server.export.decisionWrap', {
+            name: nick(dec.actor_id),
+            decision: decisionLabel(dec.action, t),
+          })
+        : '',
       dec?.remark ?? '',
       ...expandFields.map((f) => formatField(f, fd[f.key], ctx)),
     ])
   }
 
-  // 列宽：标题/意见较宽，时间适中，其余统一。
-  const wide = new Set(['标题', '末次意见'])
-  const medium = new Set(['发起时间', '结束时间', '末次处理', '模板'])
+  // 列宽按列序号（避免依赖会随语言变化的表头文本）：标题(1)/末次意见(11)较宽，
+  // 模板(2)/发起时间(7)/结束时间(8)/末次处理(10)适中，其余（含展开字段列）统一。
+  const WIDE_COLS = new Set([1, 11])
+  const MEDIUM_COLS = new Set([2, 7, 8, 10])
   ws.columns.forEach((col, i) => {
-    const h = headers[i]
-    col.width = wide.has(h) ? 32 : medium.has(h) ? 20 : 14
+    col.width = WIDE_COLS.has(i) ? 32 : MEDIUM_COLS.has(i) ? 20 : 14
   })
 
   const buf = await wb.xlsx.writeBuffer()

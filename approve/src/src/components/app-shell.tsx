@@ -15,6 +15,8 @@ import type { LucideProps } from 'lucide-react'
 import { cn } from '#/lib/utils'
 import { useDooTask } from '#/lib/dootask'
 import { api } from '#/lib/api'
+import { useT } from '#/lib/i18n/context'
+import type { MsgKey } from '#/lib/i18n/messages'
 import { Avatar, AvatarFallback, AvatarImage } from '#/components/ui/avatar'
 import { Badge } from '#/components/ui/badge'
 
@@ -22,7 +24,7 @@ type Icon = ComponentType<LucideProps>
 
 interface NavItem {
   to: string
-  label: string
+  labelKey: MsgKey
   icon: Icon
   exact?: boolean
   adminOnly?: boolean
@@ -31,39 +33,39 @@ interface NavItem {
 }
 
 interface NavGroup {
-  label?: string
+  labelKey?: MsgKey
   items: Array<NavItem>
 }
 
 // 桌面端左侧导航（按组）。
 const SIDEBAR_GROUPS: Array<NavGroup> = [
-  { items: [{ to: '/', label: '发起申请', icon: FilePlus2, exact: true }] },
+  { items: [{ to: '/', labelKey: 'nav.start', icon: FilePlus2, exact: true }] },
   {
-    label: '我收到的',
+    labelKey: 'nav.group.received',
     items: [
-      { to: '/todo', label: '待处理', icon: Clock },
-      { to: '/done', label: '已处理', icon: CheckCircle2 },
-      { to: '/cc', label: '抄送我的', icon: Forward },
+      { to: '/todo', labelKey: 'nav.todo', icon: Clock },
+      { to: '/done', labelKey: 'nav.done', icon: CheckCircle2 },
+      { to: '/cc', labelKey: 'nav.cc', icon: Forward },
     ],
   },
   {
-    label: '我提交的',
-    items: [{ to: '/mine', label: '已提交', icon: SendHorizontal }],
+    labelKey: 'nav.group.submitted',
+    items: [{ to: '/mine', labelKey: 'nav.mine', icon: SendHorizontal }],
   },
   {
-    label: '管理',
+    labelKey: 'nav.group.manage',
     items: [
-      { to: '/stats', label: '数据统计', icon: BarChart3, adminOnly: true },
+      { to: '/stats', labelKey: 'nav.stats', icon: BarChart3, adminOnly: true },
       {
         to: '/admin',
-        label: '模板管理',
+        labelKey: 'nav.templates',
         icon: SlidersHorizontal,
         adminOnly: true,
         exact: true,
       },
       {
         to: '/admin/backup',
-        label: '数据备份',
+        labelKey: 'nav.backup',
         icon: DatabaseBackup,
         adminOnly: true,
       },
@@ -73,17 +75,17 @@ const SIDEBAR_GROUPS: Array<NavGroup> = [
 
 // 移动端底部 Tab。
 const BOTTOM_TABS: Array<NavItem> = [
-  { to: '/', label: '发起申请', icon: FilePlus2, exact: true },
+  { to: '/', labelKey: 'nav.start', icon: FilePlus2, exact: true },
   {
     to: '/todo',
-    label: '我审批的',
+    labelKey: 'nav.tab.myApprovals',
     icon: CheckCircle2,
     match: ['/todo', '/done', '/cc'],
   },
-  { to: '/mine', label: '已提交', icon: SendHorizontal },
+  { to: '/mine', labelKey: 'nav.mine', icon: SendHorizontal },
   {
     to: '/admin',
-    label: '管理',
+    labelKey: 'nav.tab.manage',
     icon: SlidersHorizontal,
     adminOnly: true,
     // 移动端「管理」合并数据统计 / 模板管理 / 数据备份，内部用分段控件切换（见 AdminTabs）。
@@ -114,22 +116,22 @@ function effectivePath(pathname: string, from?: string): string {
 
 // 顶层路由的移动端标题栏文案。桌面端各页自身 h1 显示标题、移动端 h1 隐藏（max-md:hidden），
 // 统一由顶部标题栏据当前路径显示，避免移动端各页都只显示「审批中心」。
-const PAGE_TITLE: Record<string, string> = {
-  '/': '发起申请',
-  '/todo': '待处理',
-  '/done': '已处理',
-  '/cc': '抄送我的',
-  '/mine': '已提交',
-  '/stats': '数据统计',
-  '/admin': '模板管理',
-  '/admin/backup': '数据备份',
+const PAGE_TITLE: Record<string, MsgKey> = {
+  '/': 'nav.start',
+  '/todo': 'nav.todo',
+  '/done': 'nav.done',
+  '/cc': 'nav.cc',
+  '/mine': 'nav.mine',
+  '/stats': 'nav.stats',
+  '/admin': 'nav.templates',
+  '/admin/backup': 'nav.backup',
 }
 
-function titleOf(pathname: string): string {
-  if (pathname.startsWith('/insts/')) return '审批详情'
-  if (pathname.startsWith('/start/')) return '发起申请'
-  if (pathname.startsWith('/admin/defs/')) return '模板编辑'
-  return PAGE_TITLE[pathname] ?? '审批中心'
+function titleKeyOf(pathname: string): MsgKey {
+  if (pathname.startsWith('/insts/')) return 'page.title.detail'
+  if (pathname.startsWith('/start/')) return 'nav.start'
+  if (pathname.startsWith('/admin/defs/')) return 'page.title.templateEdit'
+  return PAGE_TITLE[pathname] ?? 'app.title'
 }
 
 function useIsAdmin(ready: boolean): boolean {
@@ -144,6 +146,7 @@ function useIsAdmin(ready: boolean): boolean {
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const t = useT()
   const { user, status } = useDooTask()
   const isAdmin = useIsAdmin(status === 'ready')
   const raw = useRouterState({ select: (s) => s.location.pathname })
@@ -152,7 +155,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const from = typeof search.from === 'string' ? search.from : undefined
   // 子页高亮归属的顶层路径（侧边栏 / 底部 Tab 据此判定激活）。
   const eff = effectivePath(pathname, from)
-  const nickname = user?.nickname || (user ? `用户#${user.userid}` : '')
+  const nickname =
+    user?.nickname ||
+    (user ? t('app.userFallback', { id: user.userid }) : '')
   const avatar = (user?.userimg as string | undefined) || undefined
 
   // 取主程序安全距离（移动端刘海/底部 home 条）；并隐藏右上角胶囊，改用自带返回控件。
@@ -211,7 +216,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {/* 桌面端左侧边栏 */}
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r bg-background md:flex">
         <div className="flex h-14 items-center border-b px-4">
-          <span className="text-base font-semibold">审批中心</span>
+          <span className="text-base font-semibold">{t('app.title')}</span>
         </div>
         <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
           {SIDEBAR_GROUPS.map((group, gi) => {
@@ -219,9 +224,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             if (items.length === 0) return null
             return (
               <div key={gi} className="space-y-1">
-                {group.label ? (
+                {group.labelKey ? (
                   <p className="px-3 pb-1 text-xs font-medium text-muted-foreground">
-                    {group.label}
+                    {t(group.labelKey)}
                   </p>
                 ) : null}
                 {items.map((it) => {
@@ -240,7 +245,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                       )}
                     >
                       <it.icon className="size-4 shrink-0" />
-                      <span className="flex-1 truncate">{it.label}</span>
+                      <span className="flex-1 truncate">{t(it.labelKey)}</span>
                       {counts[it.to] ? (
                         <Badge
                           variant="secondary"
@@ -276,7 +281,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         {/* 移动端顶部标题栏（仅标题；返回交由各子页自身的返回控件 / 胶囊）。h-14 与桌面端表头同高。 */}
         <div className="sticky top-0 z-30 border-b bg-background/95 pt-[var(--sat,0px)] backdrop-blur md:hidden">
           <div className="flex h-13 items-center px-4">
-            <span className="text-base font-semibold">{titleOf(pathname)}</span>
+            <span className="text-base font-semibold">
+              {t(titleKeyOf(pathname))}
+            </span>
           </div>
         </div>
         <div className="mx-auto max-w-5xl px-4 pb-6 pt-5 max-sm:px-3">
@@ -286,23 +293,23 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* 移动端底部 Tab */}
       <nav className="fixed inset-x-0 bottom-0 z-40 flex border-t bg-background pb-[var(--sab,0px)] md:hidden">
-        {BOTTOM_TABS.filter((t) => !t.adminOnly || isAdmin).map((t) => {
-          const active = t.match
-            ? t.match.includes(eff)
-            : t.exact
-              ? eff === t.to
-              : eff.startsWith(t.to)
+        {BOTTOM_TABS.filter((tab) => !tab.adminOnly || isAdmin).map((tab) => {
+          const active = tab.match
+            ? tab.match.includes(eff)
+            : tab.exact
+              ? eff === tab.to
+              : eff.startsWith(tab.to)
           return (
             <Link
-              key={t.to}
-              to={t.to}
+              key={tab.to}
+              to={tab.to}
               className={cn(
                 'flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium transition',
                 active ? 'text-primary' : 'text-muted-foreground',
               )}
             >
-              <t.icon className="size-5" />
-              {t.label}
+              <tab.icon className="size-5" />
+              {t(tab.labelKey)}
             </Link>
           )
         })}

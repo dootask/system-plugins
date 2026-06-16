@@ -4,6 +4,7 @@ import { ListFilter, Plus, Search } from 'lucide-react'
 import { api, ApiError } from '#/lib/api'
 import { confirmAction, useDooTask } from '#/lib/dootask'
 import { cn } from '#/lib/utils'
+import { useT } from '#/lib/i18n/context'
 import { Button } from '#/components/ui/button'
 import { Badge } from '#/components/ui/badge'
 import { Input } from '#/components/ui/input'
@@ -47,6 +48,7 @@ interface DefRow {
 const STATUS_ALL = '__all__'
 
 export function TemplateList() {
+  const t = useT()
   const navigate = useNavigate()
   const { status: dtStatus } = useDooTask()
   const [rows, setRows] = useState<Array<DefRow>>([])
@@ -61,8 +63,8 @@ export function TemplateList() {
   const [pageSize, setPageSize] = useState(20)
 
   useEffect(() => {
-    const t = setTimeout(() => setDebKeyword(keyword), 300)
-    return () => clearTimeout(t)
+    const timer = setTimeout(() => setDebKeyword(keyword), 300)
+    return () => clearTimeout(timer)
   }, [keyword])
   useEffect(() => setPage(1), [debKeyword, statusFilter, pageSize])
 
@@ -79,7 +81,9 @@ export function TemplateList() {
         setRows(res.items)
         setTotal(res.total)
       })
-      .catch((e) => setError(e instanceof ApiError ? e.message : '加载失败'))
+      .catch((e) =>
+        setError(e instanceof ApiError ? e.message : t('tpl.loadFailed')),
+      )
       .finally(() => setLoading(false))
   }
   useEffect(() => {
@@ -94,14 +98,14 @@ export function TemplateList() {
       await api(`/defs/${d.id}`, { method: 'PUT', json: { status: next } })
       load()
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '操作失败')
+      setError(e instanceof ApiError ? e.message : t('tpl.toggleFailed'))
     }
   }
   const del = async (d: DefRow) => {
     if (
       !(await confirmAction(
-        `确认删除模板「${d.name}」？已发起的审批单不受影响。`,
-        '删除模板',
+        t('tpl.deleteConfirm', { name: d.name }),
+        t('tpl.deleteTitle'),
       ))
     )
       return
@@ -109,7 +113,7 @@ export function TemplateList() {
       await api(`/defs/${d.id}`, { method: 'DELETE' })
       load()
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '删除失败')
+      setError(e instanceof ApiError ? e.message : t('tpl.deleteFailed'))
     }
   }
 
@@ -117,7 +121,9 @@ export function TemplateList() {
     <div>
       <AdminTabs />
       {/* 桌面端标题独占一行，让右上角留给胶囊 */}
-      <h1 className="mb-4 text-lg font-semibold max-md:hidden">模板管理</h1>
+      <h1 className="mb-4 text-lg font-semibold max-md:hidden">
+        {t('nav.templates')}
+      </h1>
 
       {/* 搜索 + 筛选 + 新建（移动端用筛选图标 + 仅图标新建，桌面端保留下拉与文字按钮） */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -127,7 +133,7 @@ export function TemplateList() {
             <Input
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              placeholder="搜索模板名称"
+              placeholder={t('tpl.searchPlaceholder')}
               className="pl-8"
             />
           </div>
@@ -137,7 +143,7 @@ export function TemplateList() {
               <Button
                 variant="outline"
                 size="icon"
-                aria-label="按状态筛选"
+                aria-label={t('tpl.filterByStatus')}
                 className={cn(
                   'relative shrink-0 sm:hidden',
                   statusFilter && 'border-primary text-primary',
@@ -157,13 +163,13 @@ export function TemplateList() {
                 }
               >
                 <DropdownMenuRadioItem value={STATUS_ALL}>
-                  全部
+                  {t('common.all')}
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="enabled">
-                  启用
+                  {t('tpl.statusEnabled')}
                 </DropdownMenuRadioItem>
                 <DropdownMenuRadioItem value="disabled">
-                  停用
+                  {t('tpl.statusDisabled')}
                 </DropdownMenuRadioItem>
               </DropdownMenuRadioGroup>
             </DropdownMenuContent>
@@ -171,7 +177,7 @@ export function TemplateList() {
           {/* 移动端新建（仅图标） */}
           <Button
             size="icon"
-            aria-label="新建模板"
+            aria-label={t('tpl.create')}
             className="shrink-0 sm:hidden"
             onClick={() =>
               navigate({ to: '/admin/defs/$id', params: { id: 'new' } })
@@ -189,9 +195,9 @@ export function TemplateList() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value={STATUS_ALL}>全部</SelectItem>
-            <SelectItem value="enabled">启用</SelectItem>
-            <SelectItem value="disabled">停用</SelectItem>
+            <SelectItem value={STATUS_ALL}>{t('common.all')}</SelectItem>
+            <SelectItem value="enabled">{t('tpl.statusEnabled')}</SelectItem>
+            <SelectItem value="disabled">{t('tpl.statusDisabled')}</SelectItem>
           </SelectContent>
         </Select>
         {/* 桌面端新建 */}
@@ -201,7 +207,7 @@ export function TemplateList() {
             navigate({ to: '/admin/defs/$id', params: { id: 'new' } })
           }
         >
-          <Plus className="size-4" /> 新建模板
+          <Plus className="size-4" /> {t('tpl.create')}
         </Button>
       </div>
 
@@ -210,16 +216,20 @@ export function TemplateList() {
       {loading ? (
         <Loading />
       ) : rows.length === 0 ? (
-        <EmptyState title="暂无模板" hint="点击「新建模板」开始配置" />
+        <EmptyState title={t('tpl.empty')} hint={t('tpl.emptyHint')} />
       ) : (
         <>
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>模板</TableHead>
-                <TableHead>状态</TableHead>
-                <TableHead className="max-sm:hidden">版本</TableHead>
-                <TableHead className="max-sm:hidden">更新时间</TableHead>
+                <TableHead>{t('tpl.col.template')}</TableHead>
+                <TableHead>{t('tpl.col.status')}</TableHead>
+                <TableHead className="max-sm:hidden">
+                  {t('tpl.col.version')}
+                </TableHead>
+                <TableHead className="max-sm:hidden">
+                  {t('tpl.col.updatedAt')}
+                </TableHead>
                 <TableHead className="text-right" />
               </TableRow>
             </TableHeader>
@@ -238,7 +248,9 @@ export function TemplateList() {
                     <Badge
                       variant={d.status === 'enabled' ? 'default' : 'secondary'}
                     >
-                      {d.status === 'enabled' ? '启用' : '停用'}
+                      {d.status === 'enabled'
+                        ? t('tpl.statusEnabled')
+                        : t('tpl.statusDisabled')}
                     </Badge>
                   </TableCell>
                   <TableCell className="text-xs text-muted-foreground max-sm:hidden">
@@ -258,10 +270,12 @@ export function TemplateList() {
                         })
                       }
                     >
-                      编辑
+                      {t('common.edit')}
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => toggle(d)}>
-                      {d.status === 'enabled' ? '停用' : '启用'}
+                      {d.status === 'enabled'
+                        ? t('tpl.action.disable')
+                        : t('tpl.action.enable')}
                     </Button>
                     <Button
                       variant="ghost"
@@ -269,7 +283,7 @@ export function TemplateList() {
                       className="text-destructive"
                       onClick={() => del(d)}
                     >
-                      删除
+                      {t('common.delete')}
                     </Button>
                   </TableCell>
                 </TableRow>

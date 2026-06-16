@@ -22,10 +22,15 @@ import {
   validateFormSchema,
 } from '#/lib/form/validate'
 import type { FormSchema } from '#/lib/form/types'
+import { makeT } from '#/lib/i18n/translate'
 
 // ────────────────────────────────────────────────────────────────────────
 // 集成测试：设计器纯逻辑产出的 form_schema / flow_nodes 能被引擎正确使用。
 // ────────────────────────────────────────────────────────────────────────
+
+const _tZh = makeT('zh')
+const vFlow = (f: unknown) => validateFlowTree(f, _tZh)
+const vSchema = (s: unknown) => validateFormSchema(s, _tZh)
 
 describe('表单设计器产出 → validateForm', () => {
   it('增字段后产出合法 schema，可被 validateForm 校验', () => {
@@ -36,11 +41,11 @@ describe('表单设计器产出 → validateForm', () => {
     // 设了必填
     schema = schema.map((f) => ({ ...f, required: true }))
 
-    expect(validateFormSchema(schema)).toBeNull()
+    expect(vSchema(schema)).toBeNull()
 
     // 空值 → required 报错
     const empty = initialFormValue(schema)
-    const r1 = validateForm(schema, empty)
+    const r1 = validateForm(schema, empty, _tZh)
     expect(r1.valid).toBe(false)
     expect(Object.keys(r1.errors).length).toBe(3)
 
@@ -54,7 +59,7 @@ describe('表单设计器产出 → validateForm', () => {
             ? f.options![0].value
             : 'x'
     }
-    expect(validateForm(schema, filled).valid).toBe(true)
+    expect(validateForm(schema, filled, _tZh).valid).toBe(true)
   })
 
   it('明细子表 schema 合法且校验生效', () => {
@@ -63,23 +68,23 @@ describe('表单设计器产出 → validateForm', () => {
       { key: 'name', type: 'text', label: '名称', required: true },
       { key: 'amount', type: 'number', label: '金额' },
     ]
-    expect(validateFormSchema(schema)).toBeNull()
+    expect(vSchema(schema)).toBeNull()
     const r = validateForm(schema, {
       [schema[0].key]: [{ name: '', amount: 5 }],
-    })
+    }, _tZh)
     expect(r.valid).toBe(false)
     expect(r.errors[`${schema[0].key}[0].name`]).toContain('名称')
   })
 
   it('非法 schema 被拒：重复 key / select 无选项', () => {
     expect(
-      validateFormSchema([
+      vSchema([
         { key: 'a', type: 'text', label: 'A' },
         { key: 'a', type: 'text', label: 'A2' },
       ]),
     ).toContain('重复')
     expect(
-      validateFormSchema([
+      vSchema([
         { key: 's', type: 'select', label: 'S', options: [] },
       ]),
     ).toContain('选项')
@@ -93,7 +98,7 @@ describe('流程设计器产出 → validateFlowTree + expandFlow', () => {
     ap.userIds = [20]
     flow = insertAfter(flow, 'start', ap)
 
-    expect(validateFlowTree(flow)).toBeNull()
+    expect(vFlow(flow)).toBeNull()
     const seq = expandFlow(flow, { starterId: 10, formData: {} })
     expect(seq.map((n) => n.type)).toEqual(['start', 'approver'])
     expect(seq[1].approverIds).toEqual([20])
@@ -106,7 +111,7 @@ describe('流程设计器产出 → validateFlowTree + expandFlow', () => {
     ap.directorLevel = 3
     flow = insertAfter(flow, 'start', ap)
 
-    expect(validateFlowTree(flow)).toBeNull()
+    expect(vFlow(flow)).toBeNull()
     const seq = expandFlow(flow, {
       starterId: 10,
       formData: {},
@@ -145,7 +150,7 @@ describe('流程设计器产出 → validateFlowTree + expandFlow', () => {
     mgr.userIds = [50]
     flow = insertInBranch(flow, defBranch.nodeId, mgr)
 
-    expect(validateFlowTree(flow)).toBeNull()
+    expect(vFlow(flow)).toBeNull()
 
     const hi = expandFlow(flow, { starterId: 1, formData: { amount: 8000 } })
     expect(
@@ -160,7 +165,7 @@ describe('流程设计器产出 → validateFlowTree + expandFlow', () => {
 
   it('校验拦截：无审批节点 / 分支缺兜底', () => {
     const onlyStart = makeStart()
-    expect(validateFlowTree(onlyStart)).toContain('审批节点')
+    expect(vFlow(onlyStart)).toContain('审批节点')
 
     // 给条件分支都加条件（无兜底）
     let flow = makeStart()
@@ -174,7 +179,7 @@ describe('流程设计器产出 → validateFlowTree + expandFlow', () => {
       ap.userIds = [1]
       flow = insertInBranch(flow, b.nodeId, ap)
     }
-    expect(validateFlowTree(flow)).toContain('兜底')
+    expect(vFlow(flow)).toContain('兜底')
   })
 
   it('树操作：增删节点/分支保持结构正确', () => {
@@ -204,6 +209,6 @@ describe('流程设计器产出 → validateFlowTree + expandFlow', () => {
     flow = removeBranch(flow, route.nodeId, bs[0].nodeId)
     flow = removeBranch(flow, route.nodeId, bs[1].nodeId)
     // route 应已解散
-    expect(validateFlowTree(updateNode(flow, ap2.nodeId, {}))).toBeNull()
+    expect(vFlow(updateNode(flow, ap2.nodeId, {}))).toBeNull()
   })
 })

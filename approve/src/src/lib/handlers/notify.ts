@@ -21,24 +21,26 @@ import { addMsg } from '#/lib/repo/msgs'
 import { buildDetailCard, resolveUsers, sendApprovalCard } from '#/lib/dootask-server'
 import { isNotifyEnabled } from '#/lib/repo/settings'
 import type { ProcInstRow } from '#/lib/types'
+import type { TFunc } from '#/lib/i18n/translate'
+import type { MsgKey } from '#/lib/i18n/messages'
 
 const STATE_APPROVED = 2
 const STATE_REJECTED = 3
 
-const WEEK = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
-function weekOf(s: unknown): string {
+function weekOf(s: unknown, t: TFunc): string {
   if (typeof s !== 'string' || !s) return ''
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s)
   if (!m) return ''
   const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
-  return Number.isNaN(d.getTime()) ? '' : WEEK[d.getDay()]
+  if (Number.isNaN(d.getTime())) return ''
+  return t(`server.week.${d.getDay()}` as MsgKey)
 }
 function str(v: unknown): string {
   return typeof v === 'string' ? v : ''
 }
 
 /** 表单摘要行（类型/起止/事由；缺字段则略过）。不含申请人，由调用方按场景前置。 */
-function formLines(inst: ProcInstRow): Array<string> {
+function formLines(inst: ProcInstRow, t: TFunc): Array<string> {
   let form: Record<string, unknown> = {}
   try {
     form = JSON.parse(inst.form_data || '{}') as Record<string, unknown>
@@ -48,13 +50,19 @@ function formLines(inst: ProcInstRow): Array<string> {
   const lines: Array<string> = []
   // 类型字段各模板 key 不一（请假为 type，部分为 leaveType），取其一。
   const type = str(form.leaveType) || str(form.type)
-  if (type) lines.push(`- 类型：${type}`)
+  if (type) lines.push(t('server.notify.type', { value: type }))
   const st = str(form.startTime)
-  if (st) lines.push(`- 开始：${st}${weekOf(st) ? ` (${weekOf(st)})` : ''}`)
+  if (st) {
+    const w = weekOf(st, t)
+    lines.push(t('server.notify.start', { value: `${st}${w ? ` (${w})` : ''}` }))
+  }
   const et = str(form.endTime)
-  if (et) lines.push(`- 结束：${et}${weekOf(et) ? ` (${weekOf(et)})` : ''}`)
+  if (et) {
+    const w = weekOf(et, t)
+    lines.push(t('server.notify.end', { value: `${et}${w ? ` (${w})` : ''}` }))
+  }
   const desc = str(form.reason) || str(form.description)
-  if (desc) lines.push(`- 事由：${desc}`)
+  if (desc) lines.push(t('server.notify.reason', { value: desc }))
   return lines
 }
 
@@ -66,12 +74,13 @@ async function sendCard(
   bodyLines: Array<string>,
   kind: string,
   token: string | null,
+  t: TFunc,
   taskId?: number | null,
 ): Promise<void> {
   const text = [
     `**${title}**`,
     bodyLines.join('\n'),
-    buildDetailCard(inst.id, '查看详情：点击查看审批详情'),
+    buildDetailCard(inst.id, t('server.notify.viewDetail')),
   ]
     .filter(Boolean)
     .join('\n\n')
@@ -98,6 +107,7 @@ async function nameOf(userId: number, token: string | null): Promise<string> {
 export async function notifyOnStart(
   instId: number,
   token: string | null,
+  t: TFunc,
 ): Promise<void> {
   if (!isNotifyEnabled()) return
   const inst = getInst(instId)
@@ -110,17 +120,21 @@ export async function notifyOnStart(
   const ccs = actors.filter((a) => a.role === 'cc').map((a) => a.userid)
 
   const applicant = await nameOf(inst.initiator_id, token)
-  const body = [`- 申请人：${applicant}`, ...formLines(inst)]
+  const body = [
+    t('server.notify.applicant', { name: applicant }),
+    ...formLines(inst, t),
+  ]
 
   await Promise.all([
     ...approvers.map((uid) =>
       sendCard(
         inst,
         uid,
-        `${applicant} 提交的「${defName}」待你审批`,
+        t('server.notify.toReview', { applicant, defName }),
         body,
         'reviewer',
         token,
+        t,
         task?.id,
       ),
     ),
@@ -128,10 +142,11 @@ export async function notifyOnStart(
       sendCard(
         inst,
         uid,
-        `抄送你：${applicant} 提交的「${defName}」`,
+        t('server.notify.cc', { applicant, defName }),
         body,
         'cc',
         token,
+        t,
       ),
     ),
   ])
@@ -142,6 +157,7 @@ export async function notifyOnAdvance(
   instId: number,
   prevTaskId: number | null,
   token: string | null,
+  t: TFunc,
 ): Promise<void> {
   if (!isNotifyEnabled()) return
   const inst = getInst(instId)
@@ -154,16 +170,20 @@ export async function notifyOnAdvance(
   const def = getDef(inst.def_id)
   const defName = def?.name ?? ''
   const applicant = await nameOf(inst.initiator_id, token)
-  const body = [`- 申请人：${applicant}`, ...formLines(inst)]
+  const body = [
+    t('server.notify.applicant', { name: applicant }),
+    ...formLines(inst, t),
+  ]
   await Promise.all(
     approvers.map((uid) =>
       sendCard(
         inst,
         uid,
-        `${applicant} 提交的「${defName}」待你审批`,
+        t('server.notify.toReview', { applicant, defName }),
         body,
         'reviewer',
         token,
+        t,
         task.id,
       ),
     ),
@@ -174,6 +194,7 @@ export async function notifyOnAdvance(
 export async function notifyResult(
   instId: number,
   token: string | null,
+  t: TFunc,
 ): Promise<void> {
   if (!isNotifyEnabled()) return
   const inst = getInst(instId)
@@ -191,17 +212,23 @@ export async function notifyResult(
     .find((e) => e.action === 'approve' || e.action === 'reject')
   const handler = last ? await nameOf(last.actor_id, token) : ''
 
+  const statusText = passed
+    ? t('server.notify.approved')
+    : t('server.notify.rejected')
   const body = [
-    `- 状态：${passed ? '已通过' : '已拒绝'}`,
-    handler ? `- 处理人：${handler}` : '',
-    ...formLines(inst),
+    t('server.notify.status', { value: statusText }),
+    handler ? t('server.notify.handler', { name: handler }) : '',
+    ...formLines(inst, t),
   ].filter(Boolean)
   await sendCard(
     inst,
     inst.initiator_id,
-    `你发起的「${defName}」${passed ? '已通过' : '被拒绝'}`,
+    passed
+      ? t('server.notify.resultApproved', { defName })
+      : t('server.notify.resultRejected', { defName }),
     body,
     'result',
     token,
+    t,
   )
 }

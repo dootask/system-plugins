@@ -28,10 +28,8 @@ import { pickUsers } from '#/lib/form/picker'
 import { useUsers } from '#/lib/use-users'
 import { UserChip } from '#/components/ui/user-chip'
 import {
-  APPROVE_MODE_LABEL,
-  OP_LABEL,
-  SET_TYPE_LABEL,
   addBranch,
+  approveModeLabel,
   conditionFields,
   insertAfter,
   insertInBranch,
@@ -39,12 +37,16 @@ import {
   makeCondition,
   makeNotifier,
   makeRoute,
+  opLabel,
   removeBranch,
   removeNode,
+  setTypeLabel,
   updateBranch,
   updateNode,
 } from '#/lib/designer/utils'
 import type { ConditionField } from '#/lib/designer/utils'
+import { useT } from '#/lib/i18n/context'
+import type { TFunc } from '#/lib/i18n/translate'
 import type { ApproveMode, SetType } from '#/lib/engine/types'
 import type { Condition, ConditionBranch, FlowNode } from '#/lib/engine/flow'
 import type { FormSchema } from '#/lib/form/types'
@@ -68,6 +70,7 @@ export function FlowDesigner({
   schema: FormSchema
   onChange: (next: FlowNode) => void
 }) {
+  const t = useT()
   // 当前编辑的节点/分支 id（打开右侧配置面板）。
   const [editNodeId, setEditNodeId] = React.useState<string | null>(null)
   const [editBranch, setEditBranch] = React.useState<string | null>(null)
@@ -79,10 +82,10 @@ export function FlowDesigner({
   ) => {
     const node =
       kind === 'approver'
-        ? makeApprover()
+        ? makeApprover(t)
         : kind === 'notifier'
-          ? makeNotifier()
-          : makeRoute()
+          ? makeNotifier(t)
+          : makeRoute(t)
     onChange(insertAfter(value, parentId, node))
   }
   const addInBranch = (
@@ -91,10 +94,10 @@ export function FlowDesigner({
   ) => {
     const node =
       kind === 'approver'
-        ? makeApprover()
+        ? makeApprover(t)
         : kind === 'notifier'
-          ? makeNotifier()
-          : makeRoute()
+          ? makeNotifier(t)
+          : makeRoute(t)
     onChange(insertInBranch(value, branchId, node))
   }
 
@@ -105,13 +108,14 @@ export function FlowDesigner({
       <div className="overflow-x-auto py-4">
         <div className="mx-auto flex w-max flex-col items-center px-6">
           <NodeChain
+            t={t}
             node={value}
             onAddAfter={addAfter}
             onAddInBranch={addInBranch}
             onEditNode={setEditNodeId}
             onEditBranch={setEditBranch}
             onDeleteNode={(id) => onChange(removeNode(value, id))}
-            onAddBranch={(routeId) => onChange(addBranch(value, routeId))}
+            onAddBranch={(routeId) => onChange(addBranch(value, routeId, t))}
             onDeleteBranch={(routeId, branchId) =>
               onChange(removeBranch(value, routeId, branchId))
             }
@@ -122,6 +126,7 @@ export function FlowDesigner({
 
       {editNodeId ? (
         <NodeConfigPanel
+          t={t}
           root={value}
           nodeId={editNodeId}
           onClose={() => setEditNodeId(null)}
@@ -130,6 +135,7 @@ export function FlowDesigner({
       ) : null}
       {editBranch ? (
         <BranchConfigPanel
+          t={t}
           root={value}
           branchId={editBranch}
           condFields={condFields}
@@ -144,6 +150,7 @@ export function FlowDesigner({
 // ───────────────────────── 链式渲染 ─────────────────────────
 
 interface ChainProps {
+  t: TFunc
   node: FlowNode
   onAddAfter: (
     parentId: string,
@@ -172,6 +179,7 @@ function NodeChain(props: ChainProps) {
       )}
       {/* 「+」加节点入口（route 自身的 childNode 也走这里） */}
       <AddButton
+        t={props.t}
         parentId={node.nodeId}
         onAdd={(k) => props.onAddAfter(node.nodeId, k)}
       />
@@ -181,7 +189,7 @@ function NodeChain(props: ChainProps) {
 }
 
 function NodeCard(props: ChainProps) {
-  const { node, onEditNode, onDeleteNode } = props
+  const { t, node, onEditNode, onDeleteNode } = props
   const color =
     node.type === 'start'
       ? 'bg-slate-500'
@@ -190,10 +198,10 @@ function NodeCard(props: ChainProps) {
         : 'bg-sky-500'
   const title =
     node.type === 'start'
-      ? '发起人'
+      ? t('designer.node.initiator')
       : node.type === 'approver'
-        ? '审批人'
-        : '抄送人'
+        ? t('designer.node.approver')
+        : t('designer.node.cc')
   return (
     <div className="w-60 overflow-hidden rounded-lg border bg-card shadow-sm">
       <div
@@ -219,28 +227,36 @@ function NodeCard(props: ChainProps) {
         disabled={node.type === 'start'}
         className="block w-full px-3 py-2.5 text-left text-sm text-muted-foreground hover:bg-accent disabled:cursor-default disabled:hover:bg-transparent"
       >
-        {node.type === 'start' ? '所有人可发起' : describeActor(node)}
+        {node.type === 'start'
+          ? t('designer.flow.anyoneCanStart')
+          : describeActor(node, t)}
       </button>
     </div>
   )
 }
 
-function describeActor(node: FlowNode): string {
+function describeActor(node: FlowNode, t: TFunc): string {
   const st: SetType = node.settype ?? 'specific'
   if (st === 'specific' || st === 'selfSelect') {
     const n = node.userIds?.length ?? 0
-    return n > 0 ? `${SET_TYPE_LABEL[st]}（${n} 人）` : '请选择人员'
+    return n > 0
+      ? t('designer.flow.membersCount', { label: setTypeLabel(st, t), n })
+      : t('designer.flow.selectMembers')
   }
   if (st === 'role') {
     const n = node.roleIds?.length ?? 0
-    return n > 0 ? `指定角色（${n} 个）` : '请选择角色'
+    return n > 0
+      ? t('designer.flow.rolesCount', { n })
+      : t('designer.flow.selectRole')
   }
-  if (st === 'leader') return `部门主管（到第 ${node.directorLevel ?? 1} 级）`
-  return '发起人自己'
+  if (st === 'leader')
+    return t('designer.flow.leaderLevel', { n: node.directorLevel ?? 1 })
+  return t('designer.flow.initiatorSelf')
 }
 
 function RouteNode(props: ChainProps) {
   const {
+    t,
     node,
     onEditBranch,
     onAddBranch,
@@ -260,7 +276,7 @@ function RouteNode(props: ChainProps) {
         className="whitespace-nowrap rounded-full border bg-background px-3 py-1 text-xs hover:bg-accent"
       >
         <Plus className="mr-1 inline size-3" />
-        添加条件
+        {t('designer.flow.addCondition')}
       </button>
       <div className="h-4 w-px bg-border" />
       <div className="relative flex items-stretch gap-4">
@@ -279,7 +295,9 @@ function RouteNode(props: ChainProps) {
             <div className="absolute top-0 left-1/2 h-4 w-px -translate-x-1/2 bg-border" />
             <div className="w-56 overflow-hidden rounded-lg border bg-card shadow-sm">
               <div className="flex items-center bg-emerald-600 px-3 py-1.5 text-xs font-medium text-white">
-                <span className="flex-1">{b.name || `条件${i + 1}`}</span>
+                <span className="flex-1">
+                  {b.name || t('designer.branch.n', { n: i + 1 })}
+                </span>
                 <button
                   type="button"
                   onClick={() => onDeleteBranch(node.nodeId, b.nodeId)}
@@ -293,10 +311,11 @@ function RouteNode(props: ChainProps) {
                 onClick={() => onEditBranch(b.nodeId)}
                 className="block w-full px-3 py-2.5 text-left text-sm text-muted-foreground hover:bg-accent"
               >
-                {describeBranch(b, condFields)}
+                {describeBranch(b, condFields, t)}
               </button>
             </div>
             <AddButton
+              t={t}
               parentId={b.nodeId}
               onAdd={(k) => onAddInBranch(b.nodeId, k)}
             />
@@ -313,20 +332,23 @@ function RouteNode(props: ChainProps) {
 function describeBranch(
   b: ConditionBranch,
   fields: Array<ConditionField>,
+  t: TFunc,
 ): string {
   const conds = b.conditions ?? []
-  if (conds.length === 0) return '其他情况（默认分支）'
+  if (conds.length === 0) return t('designer.flow.defaultBranch')
   return conds
     .map((c) => {
       const f = fields.find((x) => x.field === c.field)
-      return `${f?.label ?? c.field} ${OP_LABEL[c.op]} ${String(c.value)}`
+      return `${f?.label ?? c.field} ${opLabel(c.op, t)} ${String(c.value)}`
     })
-    .join(' 且 ')
+    .join(t('designer.flow.condJoin'))
 }
 
 function AddButton({
+  t,
   onAdd,
 }: {
+  t: TFunc
   parentId: string
   onAdd: (kind: 'approver' | 'notifier' | 'route') => void
 }) {
@@ -338,7 +360,7 @@ function AddButton({
         <DropdownMenuTrigger asChild>
           <button
             type="button"
-            aria-label="添加节点"
+            aria-label={t('designer.flow.addNode')}
             className="flex size-6 items-center justify-center rounded-full border bg-primary text-primary-foreground hover:bg-primary/90"
           >
             <Plus className="size-4" />
@@ -347,9 +369,9 @@ function AddButton({
         <DropdownMenuContent align="center" className="min-w-28">
           {(
             [
-              ['approver', '审批人'],
-              ['notifier', '抄送人'],
-              ['route', '条件分支'],
+              ['approver', t('designer.node.approver')],
+              ['notifier', t('designer.node.cc')],
+              ['route', t('designer.node.route')],
             ] as const
           ).map(([k, label]) => (
             <DropdownMenuItem key={k} onSelect={() => onAdd(k)}>
@@ -425,11 +447,13 @@ function findBranch(root: FlowNode, id: string): ConditionBranch | null {
 }
 
 function NodeConfigPanel({
+  t,
   root,
   nodeId,
   onClose,
   onChange,
 }: {
+  t: TFunc
   root: FlowNode
   nodeId: string
   onClose: () => void
@@ -448,9 +472,16 @@ function NodeConfigPanel({
   }
 
   return (
-    <Drawer title={isApprover ? '审批人设置' : '抄送人设置'} onClose={onClose}>
+    <Drawer
+      title={
+        isApprover
+          ? t('designer.flow.approverSettings')
+          : t('designer.flow.ccSettings')
+      }
+      onClose={onClose}
+    >
       <div className="space-y-1.5">
-        <Label>节点名称</Label>
+        <Label>{t('designer.flow.nodeName')}</Label>
         <Input
           value={node.name ?? ''}
           onChange={(e) => onChange({ name: e.target.value })}
@@ -458,7 +489,11 @@ function NodeConfigPanel({
       </div>
 
       <div className="space-y-1.5">
-        <Label>{isApprover ? '审批人来源' : '抄送人来源'}</Label>
+        <Label>
+          {isApprover
+            ? t('designer.flow.approverSource')
+            : t('designer.flow.ccSource')}
+        </Label>
         <Select
           value={st}
           onValueChange={(v) => onChange({ settype: v as SetType })}
@@ -469,25 +504,33 @@ function NodeConfigPanel({
           <SelectContent>
             {isApprover ? (
               <>
-                <SelectItem value="specific">指定成员</SelectItem>
-                <SelectItem value="leader">部门主管</SelectItem>
-                <SelectItem value="initiator">发起人自己</SelectItem>
+                <SelectItem value="specific">
+                  {t('designer.settype.specific')}
+                </SelectItem>
+                <SelectItem value="leader">
+                  {t('designer.flow.deptManager')}
+                </SelectItem>
+                <SelectItem value="initiator">
+                  {t('designer.flow.initiatorSelf')}
+                </SelectItem>
               </>
             ) : (
-              <SelectItem value="specific">指定成员</SelectItem>
+              <SelectItem value="specific">
+                {t('designer.settype.specific')}
+              </SelectItem>
             )}
           </SelectContent>
         </Select>
         {isApprover && st === 'leader' ? (
           <p className="text-xs text-muted-foreground">
-            连续多级主管：从直属主管起逐级审批到所设层级。
+            {t('designer.flow.leaderHint')}
           </p>
         ) : null}
       </div>
 
       {st === 'specific' ? (
         <div className="space-y-2">
-          <Label>选择人员</Label>
+          <Label>{t('designer.flow.selectMembersLabel')}</Label>
           <div className="flex flex-wrap items-center gap-2">
             {(node.userIds ?? []).map((id) => (
               <span
@@ -509,7 +552,7 @@ function NodeConfigPanel({
               </span>
             ))}
             <Button variant="outline" size="sm" onClick={pickUserIds}>
-              <Users className="size-3" /> 选择
+              <Users className="size-3" /> {t('designer.flow.select')}
             </Button>
           </div>
         </div>
@@ -517,7 +560,7 @@ function NodeConfigPanel({
 
       {isApprover && st === 'leader' ? (
         <div className="space-y-1.5">
-          <Label>审批到第几级主管</Label>
+          <Label>{t('designer.flow.leaderLevelLabel')}</Label>
           <Select
             value={String(node.directorLevel ?? 1)}
             onValueChange={(v) => onChange({ directorLevel: Number(v) })}
@@ -528,7 +571,9 @@ function NodeConfigPanel({
             <SelectContent>
               {[1, 2, 3, 4, 5].map((n) => (
                 <SelectItem key={n} value={String(n)}>
-                  {n === 1 ? '直属主管' : `第 ${n} 级主管`}
+                  {n === 1
+                    ? t('designer.flow.directManager')
+                    : t('designer.flow.managerLevelN', { n })}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -538,7 +583,7 @@ function NodeConfigPanel({
 
       {isApprover && (st === 'specific' || st === 'leader') ? (
         <div className="space-y-1.5">
-          <Label>多人审批方式</Label>
+          <Label>{t('designer.flow.multiApproveMode')}</Label>
           <Select
             value={node.approveMode ?? 'or'}
             onValueChange={(v) => onChange({ approveMode: v as ApproveMode })}
@@ -549,7 +594,7 @@ function NodeConfigPanel({
             <SelectContent>
               {(['or', 'cosign', 'sequence'] as const).map((m) => (
                 <SelectItem key={m} value={m}>
-                  {APPROVE_MODE_LABEL[m]}
+                  {approveModeLabel(m, t)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -558,7 +603,7 @@ function NodeConfigPanel({
       ) : null}
 
       <div className="space-y-1.5">
-        <Label>审批时限（小时，可选）</Label>
+        <Label>{t('designer.flow.dueHours')}</Label>
         <Input
           type="number"
           value={node.dueHours ?? ''}
@@ -571,19 +616,21 @@ function NodeConfigPanel({
         />
       </div>
       <p className="text-xs text-muted-foreground">
-        角色来源暂以 identity 近似（当前版本未开放角色选择）。
+        {t('designer.flow.roleHint')}
       </p>
     </Drawer>
   )
 }
 
 function BranchConfigPanel({
+  t,
   root,
   branchId,
   condFields,
   onClose,
   onChange,
 }: {
+  t: TFunc
   root: FlowNode
   branchId: string
   condFields: Array<ConditionField>
@@ -606,9 +653,9 @@ function BranchConfigPanel({
     onChange({ conditions: conds.filter((_, j) => j !== i) })
 
   return (
-    <Drawer title="条件设置" onClose={onClose}>
+    <Drawer title={t('designer.flow.conditionSettings')} onClose={onClose}>
       <div className="space-y-1.5">
-        <Label>分支名称</Label>
+        <Label>{t('designer.flow.branchName')}</Label>
         <Input
           value={branch.name ?? ''}
           onChange={(e) => onChange({ name: e.target.value })}
@@ -617,14 +664,14 @@ function BranchConfigPanel({
 
       {condFields.length === 0 ? (
         <p className="rounded-md bg-muted px-3 py-2 text-sm text-muted-foreground">
-          当前表单没有可用于条件的字段（需数值/金额或单选下拉字段）。该分支将作为默认分支。
+          {t('designer.flow.noConditionField')}
         </p>
       ) : (
         <div className="space-y-2">
-          <Label>条件（同时满足，AND）</Label>
+          <Label>{t('designer.flow.conditionsAnd')}</Label>
           {conds.length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              未设条件 = 默认（兜底）分支，永远命中。
+              {t('designer.flow.noConditionDefault')}
             </p>
           ) : null}
           {conds.map((c, i) => {
@@ -661,7 +708,7 @@ function BranchConfigPanel({
                       : (['eq', 'ne'] as const)
                     ).map((op) => (
                       <SelectItem key={op} value={op}>
-                        {OP_LABEL[op]}
+                        {opLabel(op, t)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -687,10 +734,12 @@ function BranchConfigPanel({
                     }}
                   >
                     <SelectTrigger className="h-8 w-full">
-                      <SelectValue placeholder="请选择" />
+                      <SelectValue placeholder={t('designer.flow.pleaseSelect')} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value={COND_VALUE_NONE}>请选择</SelectItem>
+                      <SelectItem value={COND_VALUE_NONE}>
+                        {t('designer.flow.pleaseSelect')}
+                      </SelectItem>
                       {field.options.map((o) => (
                         <SelectItem key={String(o.value)} value={String(o.value)}>
                           {o.label}
@@ -729,7 +778,7 @@ function BranchConfigPanel({
             )
           })}
           <Button variant="outline" size="sm" onClick={addCond}>
-            <Plus className="size-3" /> 增加条件
+            <Plus className="size-3" /> {t('designer.flow.addCondition2')}
           </Button>
         </div>
       )}

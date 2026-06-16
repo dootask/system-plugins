@@ -25,6 +25,7 @@ import {
 } from '#/components/ui/select'
 import { confirmAction, downloadViaHost, warnMessage } from '#/lib/dootask'
 import { cn } from '#/lib/utils'
+import { useT } from '#/lib/i18n/context'
 
 interface Stats {
   scope: 'all' | 'mine'
@@ -33,14 +34,14 @@ interface Stats {
   todo: number
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  draft: '草稿',
-  running: '审批中',
-  approved: '已通过',
-  rejected: '已拒绝',
-  withdrawn: '已撤回',
-  archived: '已归档',
-}
+const STATUS_LABEL_KEY = {
+  draft: 'stats.status.draft',
+  running: 'stats.status.running',
+  approved: 'stats.status.approved',
+  rejected: 'stats.status.rejected',
+  withdrawn: 'stats.status.withdrawn',
+  archived: 'stats.status.archived',
+} as const
 
 const STATUS_ORDER = [
   'running',
@@ -52,6 +53,7 @@ const STATUS_ORDER = [
 ]
 
 export function StatsView() {
+  const t = useT()
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -60,16 +62,21 @@ export function StatsView() {
   useEffect(() => {
     api<Stats>('/stats')
       .then(setStats)
-      .catch((e) => setError(e instanceof ApiError ? e.message : '加载失败'))
+      .catch((e) =>
+        setError(e instanceof ApiError ? e.message : t('stats.loadFailed')),
+      )
       .finally(() => setLoading(false))
-  }, [])
+  }, [t])
 
   if (loading) return <Loading center />
 
   const entries = stats
     ? STATUS_ORDER.filter((s) => (stats.byStatus[s] ?? 0) > 0).map((s) => ({
         key: s,
-        label: STATUS_LABEL[s] ?? s,
+        label:
+          s in STATUS_LABEL_KEY
+            ? t(STATUS_LABEL_KEY[s as keyof typeof STATUS_LABEL_KEY])
+            : s,
         count: stats.byStatus[s] ?? 0,
       }))
     : []
@@ -78,10 +85,15 @@ export function StatsView() {
     <div>
       <AdminTabs />
       {/* 标题独占一行；导出按钮另起一行（同「数据备份」），避免与右上角胶囊重叠 */}
-      <h1 className="text-lg font-semibold max-md:hidden">数据统计</h1>
+      <h1 className="text-lg font-semibold max-md:hidden">
+        {t('stats.title')}
+      </h1>
       {stats ? (
         <p className="mt-1 mb-4 text-sm text-muted-foreground">
-          {stats.scope === 'all' ? '全部审批单' : '我发起的审批单'}统计
+          {stats.scope === 'all'
+            ? t('stats.scope.all')
+            : t('stats.scope.mine')}
+          {t('stats.scope.suffix')}
         </p>
       ) : null}
       {stats?.scope === 'all' ? (
@@ -90,7 +102,7 @@ export function StatsView() {
             className="ml-auto"
             onClick={() => setExportOpen(true)}
           >
-            <Download className="size-4" /> 导出审批
+            <Download className="size-4" /> {t('stats.export')}
           </Button>
         </div>
       ) : null}
@@ -98,8 +110,8 @@ export function StatsView() {
       {stats ? (
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            <StatCard label="总数" count={stats.total} highlight />
-            <StatCard label="待我审批" count={stats.todo} />
+            <StatCard label={t('stats.card.total')} count={stats.total} highlight />
+            <StatCard label={t('stats.card.todo')} count={stats.todo} />
             {entries.map((e) => (
               <StatCard key={e.key} label={e.label} count={e.count} />
             ))}
@@ -145,13 +157,13 @@ function StatCard({
 }
 
 // 导出可选状态（不选=全部状态）。
-const EXPORT_STATUSES: Array<[string, string]> = [
-  ['running', '审批中'],
-  ['approved', '已通过'],
-  ['rejected', '已拒绝'],
-  ['withdrawn', '已撤回'],
-  ['archived', '已归档'],
-]
+const EXPORT_STATUSES = [
+  ['running', 'stats.status.running'],
+  ['approved', 'stats.status.approved'],
+  ['rejected', 'stats.status.rejected'],
+  ['withdrawn', 'stats.status.withdrawn'],
+  ['archived', 'stats.status.archived'],
+] as const
 
 const ALL_TEMPLATES = '__all__'
 
@@ -169,6 +181,7 @@ function ExportDialog({
   open: boolean
   onOpenChange: (o: boolean) => void
 }) {
+  const t = useT()
   const [defs, setDefs] = useState<Array<{ id: number; name: string }>>([])
   const [from, setFrom] = useState('')
   const [to, setTo] = useState('')
@@ -219,13 +232,16 @@ function ExportDialog({
         `/admin/export?${p.toString()}&count=1`,
       )
       if (pre.total === 0) {
-        await warnMessage('当前筛选无匹配的审批单')
+        await warnMessage(t('stats.export.empty'))
         return
       }
       if (pre.total > pre.limit) {
         const go = await confirmAction(
-          `共匹配 ${pre.total} 条，将只导出最近 ${pre.limit} 条。是否继续？`,
-          '导出审批数据',
+          t('stats.export.limitWarn', {
+            total: pre.total,
+            limit: pre.limit,
+          }),
+          t('stats.export.title'),
         )
         if (!go) return
       }
@@ -235,7 +251,7 @@ function ExportDialog({
       ).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(
         now.getMinutes(),
       ).padStart(2, '0')}`
-      const fname = `审批数据_${stamp}.xlsx`
+      const fname = `${t('stats.export.fileName')}_${stamp}.xlsx`
       const qs = `${p.toString()}&fname=${encodeURIComponent(fname)}`
       // 走主程序 downloadUrl（传字符串 → 主程序自动拼当前用户 token），兼容各端原生下载；
       // 需绝对 URL（Electron/EEUI 用）。脱离宿主时回退浏览器 blob 下载（带 header 鉴权）。
@@ -246,7 +262,7 @@ function ExportDialog({
       await downloadViaHost(abs, () => downloadAuthed(`/admin/export?${qs}`, fname))
       onOpenChange(false)
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '导出失败')
+      setError(e instanceof ApiError ? e.message : t('stats.export.failed'))
     } finally {
       setBusy(false)
     }
@@ -256,27 +272,37 @@ function ExportDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>导出审批数据</DialogTitle>
-          <DialogDescription>
-            按条件筛选后导出为 Excel（XLSX）。选定具体模板时会额外导出该模板的表单字段列。
-          </DialogDescription>
+          <DialogTitle>{t('stats.export.title')}</DialogTitle>
+          <DialogDescription>{t('stats.export.desc')}</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">发起起始日</Label>
-              <DatePicker value={from} onChange={setFrom} placeholder="不限" />
+              <Label className="text-xs text-muted-foreground">
+                {t('stats.export.from')}
+              </Label>
+              <DatePicker
+                value={from}
+                onChange={setFrom}
+                placeholder={t('stats.export.datePlaceholder')}
+              />
             </div>
             <div className="space-y-1.5">
-              <Label className="text-xs text-muted-foreground">发起截止日</Label>
-              <DatePicker value={to} onChange={setTo} placeholder="不限" />
+              <Label className="text-xs text-muted-foreground">
+                {t('stats.export.to')}
+              </Label>
+              <DatePicker
+                value={to}
+                onChange={setTo}
+                placeholder={t('stats.export.datePlaceholder')}
+              />
             </div>
           </div>
 
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">
-              状态（不选 = 全部）
+              {t('stats.export.statusLabel')}
             </Label>
             <div className="flex flex-wrap gap-2">
               {EXPORT_STATUSES.map(([v, l]) => (
@@ -291,20 +317,24 @@ function ExportDialog({
                       : 'border-border text-muted-foreground hover:bg-muted',
                   )}
                 >
-                  {l}
+                  {t(l)}
                 </button>
               ))}
             </div>
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">模板</Label>
+            <Label className="text-xs text-muted-foreground">
+              {t('stats.export.templateLabel')}
+            </Label>
             <Select value={defId} onValueChange={setDefId}>
               <SelectTrigger className="w-full">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={ALL_TEMPLATES}>全部模板</SelectItem>
+                <SelectItem value={ALL_TEMPLATES}>
+                  {t('stats.export.allTemplates')}
+                </SelectItem>
                 {defs.map((d) => (
                   <SelectItem key={d.id} value={String(d.id)}>
                     {d.name}
@@ -314,17 +344,19 @@ function ExportDialog({
             </Select>
             {defId !== ALL_TEMPLATES ? (
               <p className="text-xs text-muted-foreground">
-                将额外导出该模板的表单字段列。
+                {t('stats.export.templateHint')}
               </p>
             ) : null}
           </div>
 
           <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">标题关键字</Label>
+            <Label className="text-xs text-muted-foreground">
+              {t('stats.export.keywordLabel')}
+            </Label>
             <Input
               value={keyword}
               onChange={(e) => setKeyword(e.target.value)}
-              placeholder="可选，模糊匹配标题"
+              placeholder={t('stats.export.keywordPlaceholder')}
             />
           </div>
 
@@ -337,11 +369,11 @@ function ExportDialog({
             onClick={() => onOpenChange(false)}
             disabled={busy}
           >
-            取消
+            {t('common.cancel')}
           </Button>
           <Button onClick={doExport} disabled={busy}>
             {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-            导出 Excel
+            {t('stats.export.submit')}
           </Button>
         </DialogFooter>
       </DialogContent>

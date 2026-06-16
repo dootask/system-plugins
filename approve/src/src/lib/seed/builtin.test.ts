@@ -24,6 +24,7 @@ import {
   ensureBuiltinSeeded,
   seedBuiltinTemplates,
 } from './builtin'
+import { makeT } from '#/lib/i18n/translate'
 
 beforeEach(() => setDbForTesting(new Database(':memory:')))
 afterEach(() => closeDb())
@@ -40,6 +41,10 @@ function schemaOf(name: string): FormSchema {
   const d = listDefs().find((x) => x.name === name)!
   return JSON.parse(d.form_schema) as FormSchema
 }
+
+const _tZh = makeT('zh')
+const vFlow = (f: unknown) => validateFlowTree(f, _tZh)
+const vSchema = (s: unknown) => validateFormSchema(s, _tZh)
 
 describe('内置模板：幂等播种', () => {
   it('全新库注入 5 个模板，重复调用跳过', () => {
@@ -85,8 +90,8 @@ describe('内置模板：schema + flow 合法性', () => {
     it(`「${t.name}」schema/flow 校验通过且可展开`, () => {
       const schema = schemaOf(t.name)
       const flow = flowOf(t.name)
-      expect(validateFormSchema(schema)).toBeNull()
-      expect(validateFlowTree(flow)).toBeNull()
+      expect(vSchema(schema)).toBeNull()
+      expect(vFlow(flow)).toBeNull()
 
       // 展开（提供主管解析器 + 空 form_data）：非报销模板不依赖 form_data。
       // 报销含 route，需 form_data 命中分支，单独在下一个 describe 验证；这里给个高额值兜底。
@@ -147,7 +152,7 @@ describe('内置模板：schema + flow 合法性', () => {
     for (const t of BUILTIN_TEMPLATES) {
       const schema = schemaOf(t.name)
       const data = { ...initialFormValue(schema), ...samples[t.name] }
-      const r = validateForm(schema, data)
+      const r = validateForm(schema, data, _tZh)
       expect(r.valid, `${t.name}: ${JSON.stringify(r.errors)}`).toBe(true)
     }
   })

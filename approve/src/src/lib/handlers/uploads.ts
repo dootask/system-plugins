@@ -12,9 +12,11 @@ import {
   saveUpload,
   sniffImageType,
 } from '#/lib/uploads'
+import { serverT } from '#/lib/i18n/server'
 
 /** POST /api/uploads → 上传单个文件，返回 { name, url, size, mime }。 */
 export async function uploadHandler(request: Request): Promise<Response> {
+  const t = serverT(request)
   const auth = await requireUser(request)
   if (auth instanceof Response) return auth
 
@@ -22,20 +24,21 @@ export async function uploadHandler(request: Request): Promise<Response> {
   try {
     form = await request.formData()
   } catch {
-    return badRequest('请用 multipart/form-data 上传')
+    return badRequest(t('server.err.useMultipart'))
   }
   const file = form.get('file')
   if (!(file instanceof File) || file.size === 0) {
-    return badRequest('缺少文件字段 file')
+    return badRequest(t('server.err.missingFileField'))
   }
-  if (file.size > MAX_UPLOAD_BYTES) return badRequest('文件超过 20MB 上限')
+  if (file.size > MAX_UPLOAD_BYTES) return badRequest(t('server.err.fileTooLarge'))
   return created(await saveUpload(file))
 }
 
 /** GET /api/uploads/:name → 回文件字节（位图内联，其余按附件下载）。 */
 export function serveUploadHandler(request: Request, name: string): Response {
+  const t = serverT(request)
   const full = resolveUploadPath(name)
-  if (!full || !existsSync(full)) return notFound('文件不存在')
+  if (!full || !existsSync(full)) return notFound(t('server.err.fileNotFound'))
   const buf = readFileSync(full)
   const imageType = sniffImageType(buf)
   const headers: Record<string, string> = {

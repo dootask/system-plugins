@@ -4,12 +4,27 @@
 // 注意：服务端不信任 x-user-id，而是用 x-user-token 反查主程序确认身份
 // （见 lib/auth.ts requireUser）。x-user-id 仅作为辅助/调试信息透传。
 import type { Attachment } from '#/lib/types'
+import { DEFAULT_LOCALE } from '#/lib/i18n/locale'
+import type { Locale } from '#/lib/i18n/locale'
+import { translate } from '#/lib/i18n/translate'
 
 const API_BASE = '/apps/approve/api'
 
 let _auth: { userId: number | null; token: string | null } = {
   userId: null,
   token: null,
+}
+
+// 当前界面语言：由 LocaleProvider 解析出宿主 ?lang= 后写入，供 api() 以 x-lang 头透传，
+// 让服务端产出的文案（接口错误、机器人推送卡片）按触发请求的用户语言渲染。
+let _locale: Locale = DEFAULT_LOCALE
+
+export function setLocale(locale: Locale) {
+  _locale = locale
+}
+
+export function getLocale(): Locale {
+  return _locale
 }
 
 // 鉴权就绪门闩：useDooTask 完成与主程序握手后才调用 setAuth 写入身份头。
@@ -34,7 +49,7 @@ export function getAuthUserId(): number | null {
 }
 
 function authHeaders(): Record<string, string> {
-  const h: Record<string, string> = {}
+  const h: Record<string, string> = { 'x-lang': _locale }
   if (_auth.userId != null) h['x-user-id'] = String(_auth.userId)
   if (_auth.token) h['x-user-token'] = _auth.token
   return h
@@ -76,7 +91,7 @@ export async function api<T = unknown>(
   if (!res.ok) {
     const msg =
       (payload as { error?: string } | null)?.error ||
-      `请求失败 (${res.status})`
+      translate(_locale, 'common.requestFailed', { status: res.status })
     throw new ApiError(msg, res.status)
   }
   return (payload as { data?: T } | null)?.data as T
@@ -94,7 +109,7 @@ export async function downloadAuthed(
   await _authReady
   const res = await fetch(`${API_BASE}${path}`, { headers: authHeaders() })
   if (!res.ok) {
-    let msg = `下载失败 (${res.status})`
+    let msg = translate(_locale, 'common.downloadFailed', { status: res.status })
     try {
       const p = (await res.json()) as { error?: string } | null
       if (p?.error) msg = p.error

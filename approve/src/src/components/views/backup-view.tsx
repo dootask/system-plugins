@@ -13,6 +13,7 @@ import {
 } from '#/components/ui/table'
 import { EmptyState, ErrorBar, Loading, formatTime } from '#/components/ui/misc'
 import { AdminTabs } from '#/components/admin-tabs'
+import { useT } from '#/lib/i18n/context'
 
 interface BackupEntry {
   name: string
@@ -27,6 +28,7 @@ function formatBytes(n: number): string {
 }
 
 export function BackupView() {
+  const t = useT()
   const { status: dtStatus } = useDooTask()
   const [items, setItems] = useState<Array<BackupEntry>>([])
   const [loading, setLoading] = useState(true)
@@ -36,7 +38,9 @@ export function BackupView() {
   const load = () => {
     api<{ items: Array<BackupEntry> }>('/admin/backups')
       .then((r) => setItems(r.items))
-      .catch((e) => setError(e instanceof ApiError ? e.message : '加载失败'))
+      .catch((e) =>
+        setError(e instanceof ApiError ? e.message : t('backup.loadFailed')),
+      )
       .finally(() => setLoading(false))
   }
   useEffect(() => {
@@ -51,7 +55,7 @@ export function BackupView() {
       await api('/admin/backups', { method: 'POST' })
       load()
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '备份失败')
+      setError(e instanceof ApiError ? e.message : t('backup.backupFailed'))
     } finally {
       setBusy(false)
     }
@@ -60,14 +64,14 @@ export function BackupView() {
     try {
       await downloadAuthed(`/admin/backups/${name}`, name)
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '下载失败')
+      setError(e instanceof ApiError ? e.message : t('backup.downloadFailed'))
     }
   }
   const doRestore = async (name: string) => {
     if (
       !(await confirmAction(
-        `确认用「${name}」还原数据库？当前数据将被覆盖，且不可恢复。`,
-        '还原数据',
+        t('backup.restore.confirm', { name }),
+        t('backup.restore.confirmTitle'),
       ))
     )
       return
@@ -77,20 +81,26 @@ export function BackupView() {
       await api(`/admin/backups/${name}`, { method: 'POST' })
       load()
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '还原失败')
+      setError(e instanceof ApiError ? e.message : t('backup.restoreFailed'))
     } finally {
       setBusy(false)
     }
   }
   const doDelete = async (name: string) => {
-    if (!(await confirmAction(`确认删除备份「${name}」？`, '删除备份'))) return
+    if (
+      !(await confirmAction(
+        t('backup.delete.confirm', { name }),
+        t('backup.delete.confirmTitle'),
+      ))
+    )
+      return
     setBusy(true)
     setError(null)
     try {
       await api(`/admin/backups/${name}`, { method: 'DELETE' })
       load()
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : '删除失败')
+      setError(e instanceof ApiError ? e.message : t('backup.deleteFailed'))
     } finally {
       setBusy(false)
     }
@@ -100,15 +110,16 @@ export function BackupView() {
     <div>
       <AdminTabs />
       {/* 桌面端标题独占一行（移动端顶部标题栏已显示） */}
-      <h1 className="text-lg font-semibold max-md:hidden">数据备份</h1>
+      <h1 className="text-lg font-semibold max-md:hidden">
+        {t('backup.title')}
+      </h1>
       <p className="mt-1 mb-4 text-sm text-muted-foreground">
-        备份 / 还原 / 下载审批数据库与上传附件（附件由插件本地存储，随库一并打包成
-        zip）。
+        {t('backup.desc')}
       </p>
 
       <div className="mb-4 flex">
         <Button onClick={doBackup} disabled={busy} className="ml-auto">
-          <Database className="size-4" /> 立即备份
+          <Database className="size-4" /> {t('backup.now')}
         </Button>
       </div>
 
@@ -117,14 +128,17 @@ export function BackupView() {
       {loading ? (
         <Loading />
       ) : items.length === 0 ? (
-        <EmptyState title="暂无备份" hint="点击「立即备份」创建第一个备份" />
+        <EmptyState
+          title={t('backup.empty.title')}
+          hint={t('backup.empty.hint')}
+        />
       ) : (
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>备份名称</TableHead>
-              <TableHead>创建时间</TableHead>
-              <TableHead>大小</TableHead>
+              <TableHead>{t('backup.col.name')}</TableHead>
+              <TableHead>{t('backup.col.createdAt')}</TableHead>
+              <TableHead>{t('backup.col.size')}</TableHead>
               <TableHead className="text-right" />
             </TableRow>
           </TableHeader>
@@ -145,7 +159,7 @@ export function BackupView() {
                     onClick={() => doDownload(b.name)}
                     disabled={busy}
                   >
-                    下载
+                    {t('backup.download')}
                   </Button>
                   <Button
                     variant="ghost"
@@ -153,7 +167,7 @@ export function BackupView() {
                     onClick={() => doRestore(b.name)}
                     disabled={busy}
                   >
-                    还原
+                    {t('backup.restore')}
                   </Button>
                   <Button
                     variant="ghost"
@@ -162,7 +176,7 @@ export function BackupView() {
                     onClick={() => doDelete(b.name)}
                     disabled={busy}
                   >
-                    删除
+                    {t('common.delete')}
                   </Button>
                 </TableCell>
               </TableRow>

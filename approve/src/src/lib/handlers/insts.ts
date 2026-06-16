@@ -9,7 +9,7 @@ import {
 } from '#/lib/auth'
 import { getUserPrimaryDept } from '#/lib/dootask-server'
 import { buildEngineDeps, roleIdsOfDef } from '#/lib/engine-deps'
-import { createEngine } from '#/lib/engine'
+import { createEngine, EngineError } from '#/lib/engine'
 import { persistAttachments } from './attachments'
 import { sanitizeAttachments } from '#/lib/uploads'
 import { notifyOnStart } from './notify'
@@ -27,6 +27,7 @@ import {
 } from '#/lib/repo/actors'
 import { addEvent, listEventsByInst } from '#/lib/repo/events'
 import { validateForm } from '#/lib/form/validate'
+import { serverT } from '#/lib/i18n/server'
 import type { FileValue, FormSchema } from '#/lib/form/types'
 import type { ProcInstRow } from '#/lib/types'
 import { lastId, query } from './util'
@@ -49,16 +50,17 @@ function instSummary(row: ProcInstRow) {
 
 /** POST /api/insts → 发起：{ defId, formData }。validateForm 兜底后 engine.start。 */
 export async function createInstHandler(request: Request): Promise<Response> {
+  const t = serverT(request)
   const auth = await requireUser(request)
   if (auth instanceof Response) return auth
   const body = await readJson<{
     defId?: number
     formData?: Record<string, unknown>
   }>(request)
-  if (!body || !body.defId) return badRequest('缺少 defId')
+  if (!body || !body.defId) return badRequest(t('server.err.missingDefIdParam'))
   const def = getDef(body.defId)
-  if (!def) return notFound('模板不存在')
-  if (def.status !== 'enabled') return badRequest('该模板已停用，无法发起')
+  if (!def) return notFound(t('server.err.defNotFound'))
+  if (def.status !== 'enabled') return badRequest(t('server.err.defDisabled'))
 
   const formData = body.formData ?? {}
   let schema: FormSchema = []
@@ -67,9 +69,12 @@ export async function createInstHandler(request: Request): Promise<Response> {
   } catch {
     schema = []
   }
-  const { valid, errors } = validateForm(schema, formData)
+  const { valid, errors } = validateForm(schema, formData, t)
   if (!valid) {
-    return Response.json({ error: '表单校验未通过', errors }, { status: 400 })
+    return Response.json(
+      { error: t('server.err.formInvalid'), errors },
+      { status: 400 },
+    )
   }
 
   const token = request.headers.get('x-user-token')
@@ -85,13 +90,15 @@ export async function createInstHandler(request: Request): Promise<Response> {
       deptId,
     })
   } catch (e) {
-    return badRequest(e instanceof Error ? e.message : '发起失败')
+    return badRequest(
+      e instanceof EngineError ? t(e.key, e.params) : t('server.err.startFailed'),
+    )
   }
 
   // 表单 file 字段附件落库（审计/汇总）。
   persistAttachments(id, schema, formData, auth.userId)
   // 通知：审批人（当前待办）+ 抄送人。
-  await notifyOnStart(id, token)
+  await notifyOnStart(id, token, t)
   return created({ id })
 }
 
@@ -158,19 +165,20 @@ function dedupInsts(list: Array<ProcInstRow | undefined>): Array<ProcInstRow> {
 
 /** GET /api/insts/:id → 详情：inst + formData + 时间线 events + 当前 task + actors。 */
 export async function getInstDetail(request: Request): Promise<Response> {
+  const t = serverT(request)
   const auth = await requireUser(request)
   if (auth instanceof Response) return auth
   const id = lastId(request)
-  if (!id) return notFound('缺少审批单 id')
+  if (!id) return notFound(t('server.err.missingInstId'))
   const row = getInst(id)
-  if (!row) return notFound('审批单不存在')
+  if (!row) return notFound(t('server.err.instNotFound'))
 
   // 可见性：发起人 / 当前/历史参与人(审批/抄送) / 管理员。
   const actors = listActorsByInst(id)
   const isParticipant =
     row.initiator_id === auth.userId ||
     actors.some((a) => a.userid === auth.userId)
-  if (!isParticipant && !auth.isAdmin) return forbidden('无权查看该审批单')
+  if (!isParticipant && !auth.isAdmin) return forbidden(t('server.err.noViewPerm'))
 
   let formData: Record<string, unknown> = {}
   let formSchema: FormSchema = []
@@ -233,16 +241,17 @@ export async function commentInstHandler(
   request: Request,
   instId: number,
 ): Promise<Response> {
+  const t = serverT(request)
   const auth = await requireUser(request)
   if (auth instanceof Response) return auth
   const row = getInst(instId)
-  if (!row) return notFound('审批单不存在')
+  if (!row) return notFound(t('server.err.instNotFound'))
 
   const actors = listActorsByInst(instId)
   const isParticipant =
     row.initiator_id === auth.userId ||
     actors.some((a) => a.userid === auth.userId)
-  if (!isParticipant && !auth.isAdmin) return forbidden('无权评论该审批单')
+  if (!isParticipant && !auth.isAdmin) return forbidden(t('server.err.noCommentPerm'))
 
   const body = await readJson<{ comment?: string; images?: Array<FileValue> }>(
     request,
@@ -250,7 +259,7 @@ export async function commentInstHandler(
   const text = body?.comment?.trim()
   const attachments = sanitizeAttachments(body?.images)
   if (!text && attachments.length === 0)
-    return badRequest('评论内容不能为空')
+    return badRequest(t('server.err.emptyComment'))
 
   addEvent({
     inst_id: instId,

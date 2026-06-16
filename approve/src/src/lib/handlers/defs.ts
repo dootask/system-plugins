@@ -17,17 +17,20 @@ import {
 import { lastId, query } from './util'
 import { validateFormSchema } from '#/lib/form/validate'
 import { validateFlowTree } from '#/lib/engine/flow'
+import { serverT } from '#/lib/i18n/server'
+import type { TFunc } from '#/lib/i18n/translate'
 import type { FormSchema } from '#/lib/form/types'
 import type { FlowNode } from '#/lib/engine'
 
 /** GET /api/defs/:id → 模板详情（form_schema + flow_nodes 预览）。 */
 export async function getDefDetail(request: Request): Promise<Response> {
+  const t = serverT(request)
   const auth = await requireUser(request)
   if (auth instanceof Response) return auth
   const id = lastId(request)
-  if (!id) return notFound('缺少模板 id')
+  if (!id) return notFound(t('server.err.missingDefId'))
   const d = getDef(id)
-  if (!d) return notFound('模板不存在')
+  if (!d) return notFound(t('server.err.defNotFound'))
 
   let formSchema: FormSchema = []
   let flowNodes: FlowNode | null = null
@@ -60,9 +63,10 @@ export async function getDefDetail(request: Request): Promise<Response> {
  * 返回 { items, total }（服务端分页/过滤：keyword 匹配名称，status 匹配 enabled/disabled）。
  */
 export async function listAllDefsHandler(request: Request): Promise<Response> {
+  const t = serverT(request)
   const auth = await requireUser(request)
   if (auth instanceof Response) return auth
-  if (!auth.isAdmin) return forbidden('仅管理员可管理模板')
+  if (!auth.isAdmin) return forbidden(t('server.err.adminOnlyTemplates'))
   const keyword = (query(request, 'keyword') ?? '').trim().toLowerCase()
   const status = query(request, 'status') ?? ''
   const page = Math.max(1, Number(query(request, 'page')) || 1)
@@ -97,13 +101,13 @@ interface DefWriteBody {
 }
 
 /** 校验 + 序列化提交的 form_schema / flow_nodes，返回错误信息或 null。 */
-function validatePayload(body: DefWriteBody): string | null {
+function validatePayload(body: DefWriteBody, t: TFunc): string | null {
   if (body.form_schema !== undefined) {
-    const e = validateFormSchema(body.form_schema)
+    const e = validateFormSchema(body.form_schema, t)
     if (e) return e
   }
   if (body.flow_nodes !== undefined && body.flow_nodes !== null) {
-    const e = validateFlowTree(body.flow_nodes)
+    const e = validateFlowTree(body.flow_nodes, t)
     if (e) return e
   }
   return null
@@ -111,12 +115,13 @@ function validatePayload(body: DefWriteBody): string | null {
 
 /** POST /api/defs → 新建模板（管理员）。 */
 export async function createDefHandler(request: Request): Promise<Response> {
+  const t = serverT(request)
   const auth = await requireUser(request)
   if (auth instanceof Response) return auth
-  if (!auth.isAdmin) return forbidden('仅管理员可管理模板')
+  if (!auth.isAdmin) return forbidden(t('server.err.adminOnlyTemplates'))
   const body = await readJson<DefWriteBody>(request)
-  if (!body || !body.name?.trim()) return badRequest('缺少模板名称')
-  const err = validatePayload(body)
+  if (!body || !body.name?.trim()) return badRequest(t('server.err.missingDefName'))
+  const err = validatePayload(body, t)
   if (err) return badRequest(err)
 
   const d = createDef(
@@ -136,20 +141,21 @@ export async function createDefHandler(request: Request): Promise<Response> {
 
 /** PUT /api/defs/:id → 更新模板（管理员）。改 form_schema / flow_nodes 时递增版本。 */
 export async function updateDefHandler(request: Request): Promise<Response> {
+  const t = serverT(request)
   const auth = await requireUser(request)
   if (auth instanceof Response) return auth
-  if (!auth.isAdmin) return forbidden('仅管理员可管理模板')
+  if (!auth.isAdmin) return forbidden(t('server.err.adminOnlyTemplates'))
   const id = lastId(request)
-  if (!id) return notFound('缺少模板 id')
-  if (!getDef(id)) return notFound('模板不存在')
+  if (!id) return notFound(t('server.err.missingDefId'))
+  if (!getDef(id)) return notFound(t('server.err.defNotFound'))
   const body = await readJson<DefWriteBody>(request)
-  if (!body) return badRequest('请求体无效')
-  const err = validatePayload(body)
+  if (!body) return badRequest(t('server.err.badBody'))
+  const err = validatePayload(body, t)
   if (err) return badRequest(err)
 
   const patch: Record<string, unknown> = {}
   if (body.name !== undefined) {
-    if (!body.name.trim()) return badRequest('模板名称不能为空')
+    if (!body.name.trim()) return badRequest(t('server.err.emptyDefName'))
     patch.name = body.name.trim()
   }
   if (body.category !== undefined) patch.category = body.category
@@ -170,11 +176,12 @@ export async function updateDefHandler(request: Request): Promise<Response> {
 
 /** DELETE /api/defs/:id → 删除模板（管理员）。 */
 export async function deleteDefHandler(request: Request): Promise<Response> {
+  const t = serverT(request)
   const auth = await requireUser(request)
   if (auth instanceof Response) return auth
-  if (!auth.isAdmin) return forbidden('仅管理员可管理模板')
+  if (!auth.isAdmin) return forbidden(t('server.err.adminOnlyTemplates'))
   const id = lastId(request)
-  if (!id) return notFound('缺少模板 id')
-  if (!deleteDef(id)) return notFound('模板不存在')
+  if (!id) return notFound(t('server.err.missingDefId'))
+  if (!deleteDef(id)) return notFound(t('server.err.defNotFound'))
   return ok({ id })
 }

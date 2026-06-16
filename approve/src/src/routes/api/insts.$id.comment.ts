@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { commentInstHandler } from '#/lib/handlers/insts'
 import { lastId } from '#/lib/handlers/util'
+import { serverT } from '#/lib/i18n/server'
 
 // POST /apps/approve/api/insts/:id/comment → 在审批单上留言（写时间线，不改流转状态）
 export const Route = createFileRoute('/api/insts/$id/comment')({
@@ -10,7 +11,10 @@ export const Route = createFileRoute('/api/insts/$id/comment')({
         const id = lastId(request)
         if (!id)
           return Promise.resolve(
-            Response.json({ error: '缺少 id' }, { status: 404 }),
+            Response.json(
+            { error: serverT(request)('server.err.missingId') },
+            { status: 404 },
+          ),
           )
         return commentInstHandler(request, id)
       },

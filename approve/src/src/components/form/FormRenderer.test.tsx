@@ -53,9 +53,10 @@ describe('FormRenderer 渲染', () => {
     )
     expect(html).toContain('姓名')
     expect(html).toContain('*') // required 星号
-    expect(html).toContain('增加一行')
-    expect(html).toContain('选择') // 人员选择按钮
-    expect(html).toContain('说明文字') // desc 文案
+    // 无 LocaleProvider 时 useT 回退默认语言（en），故 UI 文案断言英文。
+    expect(html).toContain('Add Row')
+    expect(html).toContain('Select') // 人员选择按钮
+    expect(html).toContain('说明文字') // desc 文案（数据，不翻译）
     expect(html).toContain('张三') // 文本值
   })
 
@@ -63,8 +64,8 @@ describe('FormRenderer 渲染', () => {
     const html = renderToStaticMarkup(
       <FormRenderer schema={SCHEMA} value={VALUE} readOnly />,
     )
-    expect(html).not.toContain('增加一行')
-    expect(html).not.toContain('添加附件')
+    expect(html).not.toContain('Add Row')
+    expect(html).not.toContain('Add attachment')
     // 只读仍展示值
     expect(html).toContain('张三')
     expect(html).toContain('f.pdf')

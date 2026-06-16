@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
-import { setAuth } from '#/lib/api'
+import { getLocale, setAuth } from '#/lib/api'
+import { translate } from '#/lib/i18n/translate'
 
 export interface DooTaskUser {
   userid: number
@@ -99,8 +100,10 @@ export function useDooTask(): DooTaskState {
  */
 export async function confirmAction(
   content: string,
-  title = '请确认',
+  title?: string,
 ): Promise<boolean> {
+  // 未显式传标题时，用当前界面语言的「请确认」。
+  title = title ?? translate(getLocale(), 'common.confirmTitle')
   try {
     const tools = await import('@dootask/tools')
     if (await tools.isMicroApp())

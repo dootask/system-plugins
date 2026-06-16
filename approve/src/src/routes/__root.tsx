@@ -1,6 +1,7 @@
 import { HeadContent, Scripts, createRootRoute } from '@tanstack/react-router'
 import { AppShell } from '#/components/app-shell'
 import { KeepAliveViews } from '#/components/keep-alive'
+import { LocaleProvider } from '#/lib/i18n/context'
 
 import appCss from '../styles.css?url'
 
@@ -12,7 +13,8 @@ export const Route = createRootRoute({
     meta: [
       { charSet: 'utf-8' },
       { name: 'viewport', content: 'width=device-width, initial-scale=1' },
-      { title: '审批中心' },
+      // SSR 默认用回退语言（英文）；客户端 LocaleProvider 再按实际 ?lang= 校正 document.title。
+      { title: 'Approval Center' },
     ],
     links: [{ rel: 'stylesheet', href: appCss }],
   }),
@@ -27,10 +29,12 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body className="font-sans antialiased">
-        <AppShell>
-          <KeepAliveViews />
-          {children}
-        </AppShell>
+        <LocaleProvider>
+          <AppShell>
+            <KeepAliveViews />
+            {children}
+          </AppShell>
+        </LocaleProvider>
         <Scripts />
       </body>
     </html>
