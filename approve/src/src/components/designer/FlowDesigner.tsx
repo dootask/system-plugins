@@ -45,6 +45,7 @@ import {
   updateNode,
 } from '#/lib/designer/utils'
 import type { ConditionField } from '#/lib/designer/utils'
+import { useBackLayer } from '#/lib/back-intercept'
 import { useT } from '#/lib/i18n/context'
 import type { TFunc } from '#/lib/i18n/translate'
 import type { ApproveMode, SetType } from '#/lib/engine/types'
@@ -400,6 +401,15 @@ function Drawer({
   // 关闭不能直接 onClose——父级会立刻卸载本组件，vaul 来不及播放滑出动画（表现为「直接隐藏」）。
   // 改为：关闭先把 open 置 false 让 vaul 播放滑出，待 onAnimationEnd(false) 动画结束再 onClose 卸载。
   const [open, setOpen] = React.useState(true)
+  // 返回拦截关闭：先 setOpen(false) 播放滑出动画，再用兜底定时器确保 onClose 卸载。
+  // 因为 interceptBack 从宿主外部翻转 open 时，vaul 的 onAnimationEnd 不一定触发（左上角 X /
+  // 点遮罩是 vaul 自身关闭，onAnimationEnd 可靠）；不兜底卸载会残留 open=false 的实例 + vaul
+  // 体锁，导致「关掉后无法再次打开」。若 onAnimationEnd 也触发，onClose 幂等、无副作用。
+  const closeWithAnim = React.useCallback(() => {
+    setOpen(false)
+    window.setTimeout(onClose, 600)
+  }, [onClose])
+  useBackLayer(open, closeWithAnim)
   return (
     <DrawerRoot
       open={open}
@@ -411,7 +421,11 @@ function Drawer({
         if (!o) onClose()
       }}
     >
-      <DrawerContent className="flex flex-col sm:max-w-md">
+      <DrawerContent
+        className="flex flex-col sm:max-w-md"
+        // 取消 Esc 关闭：关闭统一交给左上角 X / 宿主返回（interceptBack）。
+        onEscapeKeyDown={(e) => e.preventDefault()}
+      >
         {/* 关闭按钮放标题前面（左侧），避开右上角被胶囊遮挡 */}
         <DrawerHeader className="flex-row items-center gap-2 space-y-0 border-b">
           <DrawerClose className="text-muted-foreground hover:text-foreground">

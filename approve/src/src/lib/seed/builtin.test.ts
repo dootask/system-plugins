@@ -1,6 +1,6 @@
 /**
  * 内置模板集成测试：
- *  1. 幂等播种（ensureBuiltinSeeded）注入 5 个模板，重复调用不重复造数据。
+ *  1. 幂等播种（ensureBuiltinSeeded）：全新空库注入全部内置模板；非空库/重复调用不造数据。
  *  2. 每个模板的 form_schema 经 validateFormSchema 通过、flow_nodes 经 validateFlowTree 通过。
  *  3. 每个模板的 flow 能被 expandFlow 展开（提供 resolveLeader），且对各自合法 form_data
  *     validateForm 通过。
@@ -47,7 +47,7 @@ const vFlow = (f: unknown) => validateFlowTree(f, _tZh)
 const vSchema = (s: unknown) => validateFormSchema(s, _tZh)
 
 describe('内置模板：幂等播种', () => {
-  it('全新库注入 5 个模板，重复调用跳过', () => {
+  it('全新空库注入全部内置模板，重复调用跳过', () => {
     const r1 = ensureBuiltinSeeded()
     expect(r1.created.length).toBe(BUILTIN_TEMPLATES.length)
     expect(listDefs().length).toBe(BUILTIN_TEMPLATES.length)
@@ -59,20 +59,18 @@ describe('内置模板：幂等播种', () => {
     expect(listDefs().length).toBe(BUILTIN_TEMPLATES.length)
   })
 
-  it('库内已有同名模板（迁移带入）时按名跳过、其余内置补齐', () => {
-    // 模拟迁移带入旧「请假」「加班」：内置应跳过这两个、补齐其余（报销/差旅申请/评审）。
+  it('库非空（迁移带入/已自建）→ 不播默认模板，仅写标记', () => {
+    // 模拟迁移已带入模板：库非空时不应再注入任何默认模板（避免污染既有数据）。
     getDb()
       .prepare(
-        `INSERT INTO proc_def (name, category, created_by) VALUES ('请假', 'vacate', 1), ('加班', 'overtime', 1)`,
+        `INSERT INTO proc_def (name, category, created_by) VALUES ('请假', 'vacate', 1)`,
       )
       .run()
     const r = ensureBuiltinSeeded()
-    expect(r.skipped).toBe(false)
-    expect(r.created.length).toBe(BUILTIN_TEMPLATES.length - 2)
-    // 同名不重复：请假/加班仍各 1 条。
-    expect(listDefs().filter((d) => d.name === '请假').length).toBe(1)
-    expect(listDefs().filter((d) => d.name === '加班').length).toBe(1)
-    expect(listDefs().length).toBe(BUILTIN_TEMPLATES.length)
+    expect(r.skipped).toBe(true)
+    expect(r.created.length).toBe(0)
+    expect(listDefs().length).toBe(1) // 仅原有那条，未补任何默认模板
+    expect(getSetting(SETTING_KEYS.builtinSeeded)).toBeTruthy() // 标记已写，后续跳过
   })
 
   it('seedBuiltinTemplates 按名补齐缺失（不重复）', () => {
@@ -109,6 +107,7 @@ describe('内置模板：schema + flow 合法性', () => {
 
   it('各模板对一份合法 form_data 通过 validateForm', () => {
     const samples: Record<string, Record<string, unknown>> = {
+      // 假勤
       请假: {
         leaveType: '年假',
         startTime: '2026-07-01',
@@ -116,19 +115,7 @@ describe('内置模板：schema + flow 合法性', () => {
         days: 3,
         reason: 'x',
       },
-      加班: {
-        startTime: '2026-07-01',
-        endTime: '2026-07-01',
-        hours: 4,
-        reason: 'x',
-      },
-      报销: {
-        amount: 1200,
-        items: [{ category: '差旅', amount: 1200, note: '' }],
-        invoices: [],
-        reason: 'x',
-      },
-      差旅申请: {
+      出差: {
         trips: [
           {
             from: '北京',
@@ -142,6 +129,56 @@ describe('内置模板：schema + flow 合法性', () => {
         attachments: [],
         reason: 'x',
       },
+      外出: {
+        startTime: '2026-07-01 09:00',
+        endTime: '2026-07-01 12:00',
+        place: '客户现场',
+        reason: 'x',
+      },
+      加班: {
+        startTime: '2026-07-01',
+        endTime: '2026-07-01',
+        hours: 4,
+        reason: 'x',
+      },
+      // 行政
+      会议室预定: {
+        topic: '周会',
+        startTime: '2026-07-01 10:00',
+        endTime: '2026-07-01 11:00',
+        attendees: [],
+        reason: 'x',
+      },
+      物品领用: { item: '笔记本', qty: 1, reason: 'x' },
+      物品维修: { item: '打印机', fault: '卡纸' },
+      用章: { sealType: '公章', docName: '合同A', reason: 'x' },
+      用车: { useTime: '2026-07-01 09:00', destination: '机场', reason: 'x' },
+      公文流转: { title: '通知', content: '正文' },
+      通用审批: { title: '事项', reason: 'x' },
+      // 财务
+      报销: {
+        amount: 1200,
+        items: [{ category: '差旅', amount: 1200, note: '' }],
+        invoices: [],
+        reason: 'x',
+      },
+      费用: { feeType: '办公费', amount: 300, reason: 'x' },
+      付款: { payee: '供应商A', amount: 5000, reason: 'x' },
+      合同审批: { name: '采购合同' },
+      采购: {
+        items: [{ name: '显示器', qty: 2, price: 1000 }],
+        budget: 2000,
+        reason: 'x',
+      },
+      活动经费: { name: '团建', budget: 5000, reason: 'x' },
+      // 人事
+      入职申请: { name: '张三' },
+      转正申请: { date: '2026-07-01', summary: '述职' },
+      调动申请: { toDept: [1], reason: 'x' },
+      离职申请: { date: '2026-07-01', reason: 'x' },
+      绩效: { period: '2026Q2', summary: '自评' },
+      招聘需求: { position: '前端', count: 2, requirement: '熟悉 React' },
+      // 其他
       评审: {
         reviewType: 'design',
         materials: [{ name: 'a.pdf' }],

@@ -14,6 +14,7 @@ import {
 import type { LucideProps } from 'lucide-react'
 import { cn } from '#/lib/utils'
 import { useDooTask } from '#/lib/dootask'
+import { handleBackIntercept } from '#/lib/back-intercept'
 import { api } from '#/lib/api'
 import { useT } from '#/lib/i18n/context'
 import type { MsgKey } from '#/lib/i18n/messages'
@@ -180,6 +181,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       })
     return () => {
       cancelled = true
+    }
+  }, [status])
+
+  // 返回拦截：主程序的返回/关闭（返回键、胶囊关闭）触发回调；若应用内有打开的
+  // 浮层（抽屉等）则先关浮层、拦截退出，否则放行（见 lib/back-intercept）。
+  useEffect(() => {
+    if (status !== 'ready') return
+    let cancelled = false
+    let dispose: (() => void) | undefined
+    import('@dootask/tools')
+      .then(async (tools) => {
+        const off = await tools.interceptBack(() => handleBackIntercept())
+        if (cancelled) off()
+        else dispose = off
+      })
+      .catch(() => {
+        /* 非微前端环境无 host，忽略 */
+      })
+    return () => {
+      cancelled = true
+      dispose?.()
     }
   }, [status])
 

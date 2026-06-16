@@ -1,5 +1,5 @@
 /**
- * 正式内置审批模板（请假 / 加班 / 报销 / 差旅 / 评审）。
+ * 全套内置审批模板（假勤 / 行政 / 财务 / 人事 / 其他，共 24 个）。
  *
  * 替代 M3b 临时 dev-seed：首次启动幂等播种（见 ensureBuiltinSeeded），开箱即用，
  * 管理员可在设计器复制/修改。每个模板产出：
@@ -20,7 +20,7 @@ import { createDef, listDefs } from '#/lib/repo/defs'
 import { SETTING_KEYS, getSetting, setSetting } from '#/lib/repo/settings'
 import { VACATE_TYPES } from '#/lib/migrate/transform'
 import type { FlowNode } from '#/lib/engine'
-import type { FormSchema } from '#/lib/form/types'
+import type { FieldDef, FormSchema } from '#/lib/form/types'
 
 /** 报销升级阈值（元）。> 阈值走更高层级审批。 */
 const REIMBURSE_ESCALATE_AMOUNT = 5000
@@ -283,47 +283,310 @@ interface BuiltinTemplate {
   sort: number
 }
 
+// 精简模板的通用字段构造器：必填事由、可选备注、可选多附件、单/多选项。
+const reasonField = (label: string): FieldDef => ({
+  key: 'reason',
+  type: 'textarea',
+  label,
+  required: true,
+  props: { rows: 3 },
+})
+const noteField = (label = '备注'): FieldDef => ({
+  key: 'note',
+  type: 'textarea',
+  label,
+  props: { rows: 3 },
+})
+const filesField = (label = '附件'): FieldDef => ({
+  key: 'files',
+  type: 'file',
+  label,
+  props: { multiple: true },
+})
+const opts = (...labels: Array<string>): Array<{ label: string; value: string }> =>
+  labels.map((v) => ({ label: v, value: v }))
+
+/**
+ * 全套内置模板（假勤 / 行政 / 财务 / 人事 / 其他）。category 用分组码，直接对应
+ * 「发起申请」宫格分组（见 lib/categories）。请假/加班/报销/差旅/评审沿用既有详细
+ * schema，其余按「关键字段 + 事由 + 附件」精简，管理员可在设计器细化。
+ * 审批流默认单级直属主管（settype=leader），报销含金额分流。
+ */
 export const BUILTIN_TEMPLATES: ReadonlyArray<BuiltinTemplate> = [
+  // ── 假勤 ──
+  { name: '请假', category: 'attendance', icon: '🌴', schema: LEAVE_SCHEMA, flow: leaderFlow('请假审批'), sort: 1 },
+  { name: '出差', category: 'attendance', icon: '✈️', schema: TRAVEL_SCHEMA, flow: leaderFlow('出差审批'), sort: 2 },
   {
-    name: '请假',
-    category: 'vacate',
-    icon: '🌴',
-    schema: LEAVE_SCHEMA,
-    flow: leaderFlow('请假审批'),
-    sort: 1,
-  },
-  {
-    name: '加班',
-    category: 'overtime',
-    icon: '🌙',
-    schema: OVERTIME_SCHEMA,
-    flow: leaderFlow('加班审批'),
-    sort: 2,
-  },
-  {
-    name: '报销',
-    category: 'reimburse',
-    icon: '💰',
-    schema: REIMBURSE_SCHEMA,
-    flow: reimburseFlow(),
+    name: '外出',
+    category: 'attendance',
+    icon: '🚪',
+    schema: [
+      { key: 'startTime', type: 'datetime', label: '开始时间', required: true },
+      { key: 'endTime', type: 'datetime', label: '结束时间', required: true },
+      { key: 'place', type: 'text', label: '外出地点', required: true },
+      reasonField('外出事由'),
+    ],
+    flow: leaderFlow('外出审批'),
     sort: 3,
   },
+  { name: '加班', category: 'attendance', icon: '🌙', schema: OVERTIME_SCHEMA, flow: leaderFlow('加班审批'), sort: 4 },
+
+  // ── 行政 ──
   {
-    name: '差旅申请',
-    category: 'travel',
-    icon: '✈️',
-    schema: TRAVEL_SCHEMA,
-    flow: leaderFlow('差旅审批'),
-    sort: 4,
-  },
-  {
-    name: '评审',
-    category: 'review',
-    icon: '📋',
-    schema: REVIEW_SCHEMA,
-    flow: reviewFlow(),
+    name: '会议室预定',
+    category: 'admin',
+    icon: '📅',
+    schema: [
+      { key: 'topic', type: 'text', label: '会议主题', required: true },
+      { key: 'startTime', type: 'datetime', label: '开始时间', required: true },
+      { key: 'endTime', type: 'datetime', label: '结束时间', required: true },
+      { key: 'attendees', type: 'user', label: '参会人', props: { multiple: true } },
+      reasonField('会议用途'),
+    ],
+    flow: leaderFlow('会议室预定审批'),
     sort: 5,
   },
+  {
+    name: '物品领用',
+    category: 'admin',
+    icon: '📦',
+    schema: [
+      { key: 'item', type: 'text', label: '领用物品', required: true },
+      { key: 'qty', type: 'number', label: '数量', required: true, rules: { min: 1 } },
+      reasonField('领用用途'),
+      filesField(),
+    ],
+    flow: leaderFlow('物品领用审批'),
+    sort: 6,
+  },
+  {
+    name: '物品维修',
+    category: 'admin',
+    icon: '🔧',
+    schema: [
+      { key: 'item', type: 'text', label: '报修物品', required: true },
+      { key: 'fault', type: 'textarea', label: '故障描述', required: true, props: { rows: 3 } },
+      filesField('故障图片'),
+    ],
+    flow: leaderFlow('物品维修审批'),
+    sort: 7,
+  },
+  {
+    name: '用章',
+    category: 'admin',
+    icon: '🖊️',
+    schema: [
+      { key: 'sealType', type: 'select', label: '用章类型', required: true, options: opts('公章', '合同章', '财务章', '法人章', '其他') },
+      { key: 'docName', type: 'text', label: '文件名称', required: true },
+      reasonField('用章用途'),
+      filesField(),
+    ],
+    flow: leaderFlow('用章审批'),
+    sort: 8,
+  },
+  {
+    name: '用车',
+    category: 'admin',
+    icon: '🚗',
+    schema: [
+      { key: 'useTime', type: 'datetime', label: '用车时间', required: true },
+      { key: 'returnTime', type: 'datetime', label: '预计归还' },
+      { key: 'destination', type: 'text', label: '目的地', required: true },
+      reasonField('用车事由'),
+    ],
+    flow: leaderFlow('用车审批'),
+    sort: 9,
+  },
+  {
+    name: '公文流转',
+    category: 'admin',
+    icon: '📃',
+    schema: [
+      { key: 'title', type: 'text', label: '公文标题', required: true },
+      { key: 'docType', type: 'select', label: '公文类型', options: opts('请示', '报告', '通知', '函', '其他') },
+      { key: 'content', type: 'textarea', label: '正文', required: true, props: { rows: 4 } },
+      filesField(),
+    ],
+    flow: leaderFlow('公文流转审批'),
+    sort: 10,
+  },
+  {
+    name: '通用审批',
+    category: 'admin',
+    icon: '📋',
+    schema: [
+      { key: 'title', type: 'text', label: '事项标题', required: true },
+      reasonField('事项说明'),
+      filesField(),
+    ],
+    flow: leaderFlow('通用审批'),
+    sort: 11,
+  },
+
+  // ── 财务 ──
+  { name: '报销', category: 'finance', icon: '💰', schema: REIMBURSE_SCHEMA, flow: reimburseFlow(), sort: 12 },
+  {
+    name: '费用',
+    category: 'finance',
+    icon: '🧾',
+    schema: [
+      { key: 'feeType', type: 'select', label: '费用类型', required: true, options: opts('办公费', '差旅费', '招待费', '交通费', '通讯费', '其他') },
+      { key: 'amount', type: 'money', label: '金额', required: true, rules: { min: 0 } },
+      reasonField('费用说明'),
+      filesField('票据'),
+    ],
+    flow: leaderFlow('费用审批'),
+    sort: 13,
+  },
+  {
+    name: '付款',
+    category: 'finance',
+    icon: '💴',
+    schema: [
+      { key: 'payee', type: 'text', label: '收款方', required: true },
+      { key: 'amount', type: 'money', label: '付款金额', required: true, rules: { min: 0 } },
+      reasonField('付款事由'),
+      filesField(),
+    ],
+    flow: leaderFlow('付款审批'),
+    sort: 14,
+  },
+  {
+    name: '合同审批',
+    category: 'finance',
+    icon: '📄',
+    schema: [
+      { key: 'name', type: 'text', label: '合同名称', required: true },
+      { key: 'party', type: 'text', label: '对方单位' },
+      { key: 'amount', type: 'money', label: '合同金额', rules: { min: 0 } },
+      filesField('合同附件'),
+      noteField('说明'),
+    ],
+    flow: leaderFlow('合同审批'),
+    sort: 15,
+  },
+  {
+    name: '采购',
+    category: 'finance',
+    icon: '🛒',
+    schema: [
+      {
+        key: 'items',
+        type: 'table',
+        label: '采购清单',
+        required: true,
+        columns: [
+          { key: 'name', type: 'text', label: '物品', required: true },
+          { key: 'qty', type: 'number', label: '数量', required: true, rules: { min: 1 } },
+          { key: 'price', type: 'money', label: '预估单价', rules: { min: 0 } },
+        ],
+      },
+      { key: 'budget', type: 'money', label: '预算金额', required: true, rules: { min: 0 } },
+      reasonField('采购事由'),
+      filesField(),
+    ],
+    flow: leaderFlow('采购审批'),
+    sort: 16,
+  },
+  {
+    name: '活动经费',
+    category: 'finance',
+    icon: '🎉',
+    schema: [
+      { key: 'name', type: 'text', label: '活动名称', required: true },
+      { key: 'date', type: 'date', label: '活动日期' },
+      { key: 'budget', type: 'money', label: '预算金额', required: true, rules: { min: 0 } },
+      reasonField('活动方案'),
+      filesField(),
+    ],
+    flow: leaderFlow('活动经费审批'),
+    sort: 17,
+  },
+
+  // ── 人事 ──
+  {
+    name: '入职申请',
+    category: 'hr',
+    icon: '🧑‍💼',
+    schema: [
+      { key: 'name', type: 'text', label: '姓名', required: true },
+      { key: 'dept', type: 'dept', label: '拟入职部门' },
+      { key: 'position', type: 'text', label: '拟任岗位' },
+      { key: 'date', type: 'date', label: '入职日期' },
+      noteField('备注'),
+      filesField(),
+    ],
+    flow: leaderFlow('入职审批'),
+    sort: 18,
+  },
+  {
+    name: '转正申请',
+    category: 'hr',
+    icon: '📈',
+    schema: [
+      { key: 'hireDate', type: 'date', label: '入职日期' },
+      { key: 'date', type: 'date', label: '转正日期', required: true },
+      { key: 'summary', type: 'textarea', label: '转正述职', required: true, props: { rows: 4 } },
+      filesField(),
+    ],
+    flow: leaderFlow('转正审批'),
+    sort: 19,
+  },
+  {
+    name: '调动申请',
+    category: 'hr',
+    icon: '🔀',
+    schema: [
+      { key: 'fromDept', type: 'dept', label: '现部门' },
+      { key: 'toDept', type: 'dept', label: '拟调入部门', required: true },
+      reasonField('调动原因'),
+      { key: 'date', type: 'date', label: '生效日期' },
+    ],
+    flow: leaderFlow('调动审批'),
+    sort: 20,
+  },
+  {
+    name: '离职申请',
+    category: 'hr',
+    icon: '👋',
+    schema: [
+      { key: 'date', type: 'date', label: '离职日期', required: true },
+      reasonField('离职原因'),
+      { key: 'handover', type: 'textarea', label: '工作交接说明', props: { rows: 3 } },
+      filesField(),
+    ],
+    flow: leaderFlow('离职审批'),
+    sort: 21,
+  },
+  {
+    name: '绩效',
+    category: 'hr',
+    icon: '📊',
+    schema: [
+      { key: 'period', type: 'text', label: '考核周期', required: true },
+      { key: 'summary', type: 'textarea', label: '自评', required: true, props: { rows: 4 } },
+      filesField(),
+    ],
+    flow: leaderFlow('绩效审批'),
+    sort: 22,
+  },
+  {
+    name: '招聘需求',
+    category: 'hr',
+    icon: '💼',
+    schema: [
+      { key: 'position', type: 'text', label: '招聘岗位', required: true },
+      { key: 'count', type: 'number', label: '招聘人数', required: true, rules: { min: 1 } },
+      { key: 'dept', type: 'dept', label: '需求部门' },
+      { key: 'requirement', type: 'textarea', label: '岗位要求', required: true, props: { rows: 4 } },
+      { key: 'date', type: 'date', label: '期望到岗' },
+    ],
+    flow: leaderFlow('招聘审批'),
+    sort: 23,
+  },
+
+  // ── 其他 ──
+  { name: '评审', category: 'other', icon: '📋', schema: REVIEW_SCHEMA, flow: reviewFlow(), sort: 24 },
 ]
 
 export interface BuiltinSeedResult {
@@ -359,16 +622,20 @@ export function seedBuiltinTemplates(): BuiltinSeedResult {
 }
 
 /**
- * 首启幂等入口：未播种过时按名字补齐缺失的内置模板，播种后写标记。
+ * 首启幂等入口：仅「全新空库」（无迁移数据、无任何模板）才播全套默认模板，播种后写标记。
  *
- * seedBuiltinTemplates 本身按名字判重，所以即便迁移已带入同名旧模板（请假/加班）也不会重复，
- * 而迁移没有的报销/差旅/评审仍会被补上——这是之前「库里有任何模板就整体跳过」漏播的修复。
- * 触发时机晚于迁移（见 db.ts）。
+ * 触发时机晚于迁移（见 db.ts）：若迁移已带入模板、或管理员已自建模板，库非空 →
+ * 不播默认模板（避免污染既有数据），仅写标记以跳过后续判断。
  */
 export function ensureBuiltinSeeded(): BuiltinSeedResult {
   // 已播种标记存在 → 跳过。
   if (getSetting(SETTING_KEYS.builtinSeeded))
     return { created: [], skipped: true }
+  // 库非空（迁移带入 / 已自建）→ 不播全套默认模板，仅写标记。
+  if (listDefs().length > 0) {
+    setSetting(SETTING_KEYS.builtinSeeded, new Date().toISOString())
+    return { created: [], skipped: true }
+  }
   const result = seedBuiltinTemplates()
   setSetting(SETTING_KEYS.builtinSeeded, new Date().toISOString())
   return result
