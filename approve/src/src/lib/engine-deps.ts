@@ -3,9 +3,14 @@
  * 据此解析「直属/多级主管」与「角色成员」。expandFlow 的 resolver 是同步签名，故先
  * 异步预取（部门表 + 角色成员名单）构建索引，再返回同步闭包供 createEngine 注入。
  *
- * resolveLeader(deptId, level)：
- *   - level=1 取该部门 owner_userid；level=2 取父部门 owner；以此类推沿 parent_id 上溯。
- *   - 找不到对应层级/无 owner → 返回 undefined（expandActor 会跳过该级，对齐旧引擎 dept==nil）。
+ * resolveLeader(level)：返回第 level 级「上级负责人」的全部 userid（每个部门负责人 =
+ *   主负责人 owner_userid + 部门管理员 deputy_userids）。口径：
+ *   - 以发起人所属的全部部门为起点，逐级沿 parent_id 上溯，按"距离"分层；
+ *   - 某部门里发起人本身是负责人 → 跳过该部门负责人、改取其父部门（取上级，不取同级）；
+ *     发起人是普通成员 → 该部门负责人即其本级上级；
+ *   - 跨级去重（同一人只在最近一级出现）、剔除发起人本人、跳过空层；
+ *   - 没有该级（到顶/无更上级）→ 返回空数组（expandActor 跳过该级 → 最终无人则自动通过）。
+ *   会签/或签/依次由流程节点的 approveMode 决定，与此解析无关。
  *
  * resolveRole(roleIds)：见文件尾「角色机制」说明。
  *   主程序无独立的「角色」实体，最接近的是 users.identity（如 admin）。本工程约定
@@ -18,11 +23,64 @@ import { makeClient, resolveRoleMembers } from '#/lib/dootask-server'
 import { collectRoleIds } from '#/lib/engine'
 import type { EngineDeps } from '#/lib/engine'
 
-interface DeptRow {
+export interface DeptRow {
   id: number
   name: string
   parent_id: number
   owner_userid: number
+  /** 部门管理员（副负责人）userid 列表；与 owner_userid 一并视为该部门负责人。 */
+  deputy_userids?: Array<number>
+}
+
+/** 某部门的全部负责人 = 主负责人 + 部门管理员。 */
+function leadersOf(d: DeptRow): Array<number> {
+  const out: Array<number> = []
+  if (d.owner_userid) out.push(d.owner_userid)
+  for (const u of d.deputy_userids ?? []) if (u) out.push(u)
+  return out
+}
+
+/**
+ * 逐级上级负责人分层：从发起人所属部门集出发 BFS 上溯，按距离分层。
+ * 某层某部门里发起人本身是负责人 → 不取其同级负责人、把父部门并入下一层；
+ * 普通成员 → 取该部门负责人。跨级去重、剔除发起人、跳过空层。返回 tiers[级-1]。
+ */
+export function leaderTiers(
+  byId: Map<number, DeptRow>,
+  startDeptIds: Array<number>,
+  selfId: number,
+): Array<Array<number>> {
+  const tiers: Array<Array<number>> = []
+  const seen = new Set<number>()
+  const visited = new Set<number>()
+  let frontier = new Set<number>(startDeptIds.filter((x) => Number.isFinite(x)))
+  let guard = 0
+  while (frontier.size > 0 && guard++ < 32) {
+    const levelLeaders: Array<number> = []
+    const next = new Set<number>()
+    for (const did of frontier) {
+      if (visited.has(did)) continue
+      visited.add(did)
+      const d = byId.get(did)
+      if (!d) continue
+      const leaders = leadersOf(d)
+      if (leaders.includes(selfId)) {
+        // 发起人是该部门负责人 → 其上级在父部门
+        if (d.parent_id) next.add(d.parent_id)
+      } else {
+        for (const uid of leaders) {
+          if (uid === selfId || seen.has(uid)) continue
+          seen.add(uid)
+          levelLeaders.push(uid)
+        }
+        // 成员的"更上级"在父部门（供 directorLevel>1 取下一级）
+        if (d.parent_id) next.add(d.parent_id)
+      }
+    }
+    if (levelLeaders.length > 0) tiers.push(levelLeaders)
+    frontier = next
+  }
+  return tiers
 }
 
 /**
@@ -35,6 +93,7 @@ interface DeptRow {
 export async function buildEngineDeps(
   token: string | null,
   roleIds: Array<number> = [],
+  selfId = 0,
 ): Promise<EngineDeps> {
   const [depts, roleMembers] = await Promise.all([
     fetchDepartments(token),
@@ -43,19 +102,13 @@ export async function buildEngineDeps(
   const byId = new Map<number, DeptRow>()
   for (const d of depts) byId.set(d.id, d)
 
-  const resolveLeader = (
-    deptId: number | null | undefined,
-    level: number,
-  ): number | undefined => {
-    if (deptId == null) return undefined
-    let cur = byId.get(deptId)
-    // level=1 即当前部门主管；每升一级沿 parent_id 上溯一层。
-    for (let i = 1; i < level && cur; i++) {
-      cur = cur.parent_id ? byId.get(cur.parent_id) : undefined
-    }
-    if (!cur || !cur.owner_userid) return undefined
-    return cur.owner_userid
-  }
+  // 预算各级上级负责人（发起人 = 请求用户，其所属部门即 fetchDepartments 返回集）。
+  const tiers = leaderTiers(
+    byId,
+    depts.map((d) => d.id),
+    selfId,
+  )
+  const resolveLeader = (level: number): Array<number> => tiers[level - 1] ?? []
 
   // 角色：从预取的 roleId→成员 map 取并去重合并。
   const resolveRole = (ids: Array<number>): Array<number> => {
@@ -87,7 +140,8 @@ async function fetchDepartments(token: string | null): Promise<Array<DeptRow>> {
   try {
     const client = await makeClient(token)
     if (!client) return []
-    const list = await client.getUserDepartments()
+    // /api/users/info/departments 返回本人所属部门（含 deputy_userids、parent_id）。
+    const list = (await client.getUserDepartments()) as Array<DeptRow>
     return Array.isArray(list) ? list : []
   } catch {
     return []

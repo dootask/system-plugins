@@ -28,9 +28,9 @@ import {
 beforeEach(() => setDbForTesting(new Database(':memory:')))
 afterEach(() => closeDb())
 
-// 直属/上级主管解析器（test stub）：level 1 → 100，level 2 → 200。
-const resolveLeader = (_dept: number | null | undefined, level: number) =>
-  level === 1 ? 100 : level === 2 ? 200 : undefined
+// 直属/上级主管解析器（test stub）：level 1 → [100]，level 2 → [200]。
+const resolveLeader = (level: number) =>
+  level === 1 ? [100] : level === 2 ? [200] : []
 
 function flowOf(name: string): FlowNode {
   const d = listDefs().find((x) => x.name === name)!
@@ -92,7 +92,6 @@ describe('内置模板：schema + flow 合法性', () => {
       // 报销含 route，需 form_data 命中分支，单独在下一个 describe 验证；这里给个高额值兜底。
       const seq = expandFlow(flow, {
         starterId: 10,
-        deptId: 1,
         formData: { amount: 9999 },
         resolveLeader,
       })
@@ -161,7 +160,6 @@ describe('内置模板：报销金额条件分流', () => {
     const flow = flowOf('报销')
     const seq = expandFlow(flow, {
       starterId: 10,
-      deptId: 1,
       formData: { amount: 8000 },
       resolveLeader,
     })
@@ -179,7 +177,6 @@ describe('内置模板：报销金额条件分流', () => {
     const flow = flowOf('报销')
     const seq = expandFlow(flow, {
       starterId: 10,
-      deptId: 1,
       formData: { amount: 1000 },
       resolveLeader,
     })

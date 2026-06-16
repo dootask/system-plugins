@@ -109,9 +109,8 @@ describe('流程设计器产出 → validateFlowTree + expandFlow', () => {
     expect(validateFlowTree(flow)).toBeNull()
     const seq = expandFlow(flow, {
       starterId: 10,
-      deptId: 1,
       formData: {},
-      resolveLeader: (_d, level) => 100 + level,
+      resolveLeader: (level) => [100 + level],
     })
     // start + 3 级主管
     expect(

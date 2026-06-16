@@ -516,8 +516,8 @@ export async function sendApprovalCard(
       { userid: toUserId, text, bot_type: 'approval-alert' },
     )
     return {
-      dialogId: Number(res?.dialog_id) || null,
-      msgId: Number(res?.id) || null,
+      dialogId: Number(res.dialog_id) || null,
+      msgId: Number(res.id) || null,
     }
   } catch (e) {
     console.error('[approve] sendApprovalCard failed:', (e as Error).message)

@@ -63,7 +63,6 @@ class Engine implements ApprovalEngine {
       const root = JSON.parse(def.flow_nodes || '{}') as FlowNode
       const ctx: ExpandContext = {
         starterId: starter.userId,
-        deptId: starter.deptId,
         formData,
         resolveLeader: this.deps.resolveLeader,
         resolveRole: this.deps.resolveRole,
@@ -173,7 +172,6 @@ class Engine implements ApprovalEngine {
       const root = JSON.parse(def.flow_nodes || '{}') as FlowNode
       const seq = expandFlow(root, {
         starterId: row.initiator_id,
-        deptId: row.dept_id,
         formData: fd,
         resolveLeader: this.deps.resolveLeader,
         resolveRole: this.deps.resolveRole,

@@ -73,7 +73,7 @@ export async function actTaskHandler(request: Request): Promise<Response> {
 
   const token = request.headers.get('x-user-token')
   const def = getDef(inst.def_id)
-  const deps = await buildEngineDeps(token, roleIdsOfDef(def?.flow_nodes))
+  const deps = await buildEngineDeps(token, roleIdsOfDef(def?.flow_nodes), auth.userId)
   const engine = createEngine(deps)
 
   // 审批意见图片：校验本地上传 URL 后随事件入库。
@@ -123,7 +123,7 @@ export async function resubmitHandler(
 
   const token = request.headers.get('x-user-token')
   const def = getDef(inst.def_id)
-  const deps = await buildEngineDeps(token, roleIdsOfDef(def?.flow_nodes))
+  const deps = await buildEngineDeps(token, roleIdsOfDef(def?.flow_nodes), auth.userId)
   const engine = createEngine(deps)
   const prevTask = getActiveTask(instId)
   try {

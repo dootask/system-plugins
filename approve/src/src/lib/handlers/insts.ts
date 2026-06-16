@@ -75,7 +75,7 @@ export async function createInstHandler(request: Request): Promise<Response> {
   const token = request.headers.get('x-user-token')
   const [deptId, deps] = await Promise.all([
     getUserPrimaryDept(token),
-    buildEngineDeps(token, roleIdsOfDef(def.flow_nodes)),
+    buildEngineDeps(token, roleIdsOfDef(def.flow_nodes), auth.userId),
   ])
   const engine = createEngine(deps)
   let id: number

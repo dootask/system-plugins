@@ -13,20 +13,20 @@
  */
 import type { ApproveMode, NodeInfo, NodeType, SetType } from './types'
 
-/** 部门主管解析器：给定发起部门与层级（1=直属，2=第二级…），返回该层级主管 userid。 */
-export type LeaderResolver = (
-  deptId: number | null | undefined,
-  level: number,
-) => number | undefined
+/**
+ * 部门主管解析器：给定层级（1=直属上级，2=再上一级…），返回该层级的全部负责人 userid。
+ * 解析口径（由 buildEngineDeps 的闭包实现）：多部门并集 + 逐级上溯 + 跨级去重 + 剔除发起人本人；
+ * 发起人若本身是某部门负责人，则取其父部门负责人（不取同级负责人）。无该级则返回空数组。
+ */
+export type LeaderResolver = (level: number) => Array<number>
 
 /** 角色解析器：给定角色 id 列表，返回这些角色下的成员 userid。 */
 export type RoleResolver = (roleIds: Array<number>) => Array<number>
 
 export interface ExpandContext {
   starterId: number
-  deptId?: number | null
   formData: Record<string, unknown>
-  /** settype=leader 时按层级取主管；未提供则跳过该节点（审批人为空）。 */
+  /** settype=leader 时按层级取全部负责人；未提供则跳过该节点（审批人为空）。 */
   resolveLeader?: LeaderResolver
   /** settype=role 时按角色取成员。 */
   resolveRole?: RoleResolver
@@ -141,20 +141,22 @@ function expandActor(node: FlowNode, ctx: ExpandContext): Array<NodeInfo> {
   const settype: SetType = node.settype ?? 'specific'
 
   // 连续多级主管：每一级生成一个独立审批节点（复刻旧 settype=3）。
+  // 同级可有多名负责人（部门负责人 + 部门管理员、多部门并集），全部纳入该节点，
+  // 会签/或签/依次由节点自身的 approveMode 决定（不再硬编码 or）。
   if (settype === 'leader' && !isNotifier) {
     const maxLevel =
       node.directorLevel && node.directorLevel > 0 ? node.directorLevel : 1
     const out: Array<NodeInfo> = []
     for (let i = 0; i < maxLevel; i++) {
-      const uid = ctx.resolveLeader?.(ctx.deptId, i + 1)
-      if (uid === undefined) continue // 该级无主管 → 跳过（旧引擎 dept==nil 时不 push）
+      const ids = uniq(ctx.resolveLeader?.(i + 1) ?? [])
+      if (ids.length === 0) continue // 该级无负责人 → 跳过（旧引擎 dept==nil 时不 push）
       out.push({
         nodeId: maxLevel > 1 ? `${node.nodeId}-${i + 1}` : node.nodeId,
         type: 'approver',
-        approveMode: 'or',
+        approveMode,
         settype,
-        approverIds: [uid],
-        memberCount: 1,
+        approverIds: ids,
+        memberCount: ids.length,
         isSystem: false,
         name: node.name,
         dueHours: node.dueHours,

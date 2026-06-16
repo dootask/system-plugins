@@ -356,8 +356,7 @@ describe('时限 due_at', () => {
 
 describe('多级主管 (leader) 展开', () => {
   it('directorLevel=2 按层级拼接 step（产出两个审批节点）', () => {
-    const resolveLeader = (_d: number | null | undefined, level: number) =>
-      100 + level
+    const resolveLeader = (level: number) => [100 + level]
     const eng = createEngine({ resolveLeader })
     const flow: FlowNode = {
       nodeId: 'lead',
