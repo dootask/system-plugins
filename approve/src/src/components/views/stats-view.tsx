@@ -23,7 +23,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '#/components/ui/select'
-import { confirmAction, warnMessage } from '#/lib/dootask'
+import { confirmAction, downloadViaHost, warnMessage } from '#/lib/dootask'
 import { cn } from '#/lib/utils'
 
 interface Stats {
@@ -237,10 +237,15 @@ function ExportDialog({
       ).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(
         now.getMinutes(),
       ).padStart(2, '0')}`
-      await downloadAuthed(
-        `/admin/export?${p.toString()}`,
-        `审批数据_${stamp}.xlsx`,
-      )
+      const fname = `审批数据_${stamp}.xlsx`
+      const qs = `${p.toString()}&fname=${encodeURIComponent(fname)}`
+      // 走主程序 downloadUrl（传字符串 → 主程序自动拼当前用户 token），兼容各端原生下载；
+      // 需绝对 URL（Electron/EEUI 用）。脱离宿主时回退浏览器 blob 下载（带 header 鉴权）。
+      const abs = new URL(
+        `/apps/approve/api/admin/export?${qs}`,
+        window.location.href,
+      ).href
+      await downloadViaHost(abs, () => downloadAuthed(`/admin/export?${qs}`, fname))
       onOpenChange(false)
     } catch (e) {
       setError(e instanceof ApiError ? e.message : '导出失败')

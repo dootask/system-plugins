@@ -164,3 +164,25 @@ export async function warnMessage(message: string): Promise<void> {
   }
   if (typeof window !== 'undefined') window.alert(message)
 }
+
+/**
+ * 通过主程序下载一个 URL（@dootask/tools downloadUrl）。
+ * 传字符串 → 主程序自动把当前用户 token 拼到 URL 末尾再下载，兼容 Electron/EEUI/浏览器
+ * 各端（这是其他端能正常下载的关键，浏览器侧 <a download>+blob 在原生壳里不一定生效）。
+ * 脱离宿主(standalone/dev) 抛 UnsupportedError 时走 fallback（浏览器原生下载）。
+ */
+export async function downloadViaHost(
+  absoluteUrl: string,
+  fallback?: () => Promise<void>,
+): Promise<void> {
+  const tools = await import('@dootask/tools')
+  try {
+    await tools.downloadUrl(absoluteUrl)
+  } catch (e) {
+    if (fallback && e instanceof tools.UnsupportedError) {
+      await fallback()
+      return
+    }
+    throw e
+  }
+}

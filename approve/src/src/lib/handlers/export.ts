@@ -267,14 +267,27 @@ export async function exportInstsHandler(request: Request): Promise<Response> {
   })
 
   const buf = await wb.xlsx.writeBuffer()
+  // 走主程序 downloadUrl/原生下载时文件名由 Content-Disposition 决定（前端控制不了），
+  // 故前端把期望文件名经 fname 传来，这里消毒后写入；中文用 RFC5987 filename* 编码。
+  const safeName = sanitizeFilename(url.searchParams.get('fname'))
+  const asciiName = safeName.replace(/[^\x20-\x7e]/g, '_') || 'approve-export.xlsx'
   return new Response(buf, {
     headers: {
       'content-type':
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'content-disposition': 'attachment; filename="approve-export.xlsx"',
+      'content-disposition': `attachment; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(
+        safeName || 'approve-export.xlsx',
+      )}`,
       // 供前端读取实际导出/匹配数量（截断提示）。
       'x-export-rows': String(rows.length),
       'x-export-total': String(total),
     },
   })
+}
+
+/** 文件名消毒：去掉路径分隔符/控制字符/引号，限长，防注入 Content-Disposition。 */
+function sanitizeFilename(name: string | null): string {
+  if (!name) return ''
+  // eslint-disable-next-line no-control-regex
+  return name.replace(/[\\/:*?"<>|\x00-\x1f]/g, '').trim().slice(0, 120)
 }
