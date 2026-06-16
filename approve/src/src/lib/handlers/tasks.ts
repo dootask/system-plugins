@@ -1,6 +1,7 @@
 import {
   badRequest,
   forbidden,
+  getRequestToken,
   notFound,
   ok,
   readJson,
@@ -73,7 +74,7 @@ export async function actTaskHandler(request: Request): Promise<Response> {
     if (!isPending) return forbidden(t('server.err.notPendingApprover'))
   }
 
-  const token = request.headers.get('x-user-token')
+  const token = getRequestToken(request)
   const def = getDef(inst.def_id)
   const deps = await buildEngineDeps(token, roleIdsOfDef(def?.flow_nodes), auth.userId)
   const engine = createEngine(deps)
@@ -127,7 +128,7 @@ export async function resubmitHandler(
     return forbidden(t('server.err.resubmitInitiatorOnly'))
   const body = await readJson<{ formData?: Record<string, unknown> }>(request)
 
-  const token = request.headers.get('x-user-token')
+  const token = getRequestToken(request)
   const def = getDef(inst.def_id)
   const deps = await buildEngineDeps(token, roleIdsOfDef(def?.flow_nodes), auth.userId)
   const engine = createEngine(deps)

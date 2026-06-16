@@ -8,3 +8,10 @@ author: DooTask
 website: https://www.dootask.com/
 tags:
   - 审批
+
+# 应用指令接口（doo app call / AI）：静态规范随版本目录发布，调用目标为 approve 服务容器。
+# 规范文件实际放在版本目录（如 0.2.0/openapi.yaml），readSpecFile 会优先在版本目录解析。
+openapi:
+  file: ./openapi.yaml
+  service: approve
+  port: 3000

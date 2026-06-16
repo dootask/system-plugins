@@ -1,0 +1,192 @@
+openapi: 3.0.3
+info:
+  title: 审批中心 Approve
+  description: >-
+    DooTask 审批中心应用指令接口，供 `doo app call approve <指令>` 调用。
+    身份由主程序自动注入（Token 头），无需手动传递；后端据此反查真实用户并鉴权。
+  version: "0.2.0"
+
+# 说明：主程序调用时直连容器端口、按本文件 path 原样请求（不经 nginx），
+# 容器内 TanStack 路由 basepath 为 /apps/approve，故 path 必须写全。
+paths:
+  /apps/approve/api/defs:
+    get:
+      operationId: list-templates
+      summary: 列出可发起的审批模板
+      description: 返回当前启用的审批模板（含 id/名称/分类）。发起前先据此选模板，再用 template-detail 查表单字段。
+      responses:
+        "200":
+          description: 模板列表
+
+  /apps/approve/api/defs/{id}:
+    get:
+      operationId: template-detail
+      summary: 查看模板详情与表单字段
+      description: 返回指定模板的 form_schema（字段名/类型/必填），据此构造 submit-approval 的 formData。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 模板 id（来自 list-templates）
+      responses:
+        "200":
+          description: 模板详情
+
+  /apps/approve/api/insts:
+    get:
+      operationId: list-approvals
+      summary: 列出审批单
+      description: 按收件箱维度列出审批单。box=todo 我的待办、mine 我发起的、cc 抄送我的、done 我已办。
+      parameters:
+        - name: box
+          in: query
+          schema:
+            type: string
+            enum: [todo, mine, cc, done]
+            default: mine
+          description: 收件箱类型
+        - name: keyword
+          in: query
+          schema:
+            type: string
+          description: 标题关键词
+        - name: status
+          in: query
+          schema:
+            type: string
+          description: 状态过滤（如 running/approved/rejected）
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        "200":
+          description: "{ items, total }"
+    post:
+      operationId: submit-approval
+      summary: 发起审批
+      description: >-
+        据模板发起一张审批单。defId 为模板 id；formData 是按模板 form_schema 填的字段对象
+        （字段名→值）。formData 为嵌套对象，建议整体用 `--data '<json>'` 传入。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [defId, formData]
+              properties:
+                defId:
+                  type: integer
+                  description: 模板 id（来自 list-templates）
+                formData:
+                  type: object
+                  additionalProperties: true
+                  description: 按模板字段填写的表单数据，键为字段名
+      responses:
+        "201":
+          description: "{ id } 新建审批单 id"
+
+  /apps/approve/api/insts/{id}:
+    get:
+      operationId: approval-detail
+      summary: 查看审批单详情
+      description: >-
+        返回审批单的表单数据、流程进度、时间线与当前可处置的任务。
+        若当前用户是待审人，响应中会给出可用于 handle-task 的 task id。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 审批单 id
+      responses:
+        "200":
+          description: 审批单详情
+
+  /apps/approve/api/tasks/{id}/act:
+    post:
+      operationId: handle-task
+      summary: 处置审批任务
+      description: >-
+        对一个待办任务执行处置。id 为任务 id（task id，来自 approval-detail，非审批单 id）。
+        action 取值：approve 同意、reject 拒绝、return 退回、withdraw 撤回（仅发起人）、
+        transfer 转交、addsign 加签。transferTo/addsignTo/returnTo/resubmitForm 为可选项，
+        含数组/对象时整体用 `--data '<json>'` 传入。
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: 任务 id（proc_task.id）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action]
+              properties:
+                action:
+                  type: string
+                  enum: [approve, reject, return, withdraw, transfer, addsign]
+                  description: 处置动作
+                comment:
+                  type: string
+                  description: 审批意见
+                transferTo:
+                  type: integer
+                  description: 转交目标用户 id（action=transfer 时）
+                addsignTo:
+                  type: array
+                  items:
+                    type: integer
+                  description: 加签用户 id 列表（action=addsign 时）
+                returnTo:
+                  type: string
+                  description: 退回目标，"initiator" 退回发起人或指定节点 id（action=return 时）
+      responses:
+        "200":
+          description: "{ ok: true }"
+
+  /apps/approve/api/counts:
+    get:
+      operationId: my-counts
+      summary: 我的各类审批数量
+      description: 返回 { todo, done, cc, mine } 各收件箱的数量，用于角标/概览。
+      responses:
+        "200":
+          description: 数量统计
+
+  /apps/approve/api/me:
+    get:
+      operationId: whoami
+      summary: 当前用户身份
+      description: >-
+        返回当前调用者的 userId、昵称、邮箱与是否管理员（isAdmin）。
+        身份由主程序自动注入并经后端反查得到；AI 据此判断「我是谁/是否管理员」，
+        例如管理员可见全量审批与统计、普通用户仅见本人相关。
+      responses:
+        "200":
+          description: 当前用户身份
+
+  /apps/approve/api/stats:
+    get:
+      operationId: approval-stats
+      summary: 审批数据概览
+      description: >-
+        审批统计概览：scope（admin 全量 / 普通用户仅本人发起）、total 总数、
+        byStatus 各状态计数、todo 待办数。用于 AI 快速了解当前审批整体情况。
+      responses:
+        "200":
+          description: 统计概览

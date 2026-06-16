@@ -2,6 +2,7 @@ import {
   badRequest,
   created,
   forbidden,
+  getRequestToken,
   notFound,
   ok,
   readJson,
@@ -77,7 +78,7 @@ export async function createInstHandler(request: Request): Promise<Response> {
     )
   }
 
-  const token = request.headers.get('x-user-token')
+  const token = getRequestToken(request)
   const [deptId, deps] = await Promise.all([
     getUserPrimaryDept(token),
     buildEngineDeps(token, roleIdsOfDef(def.flow_nodes), auth.userId),

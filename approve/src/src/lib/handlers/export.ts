@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs'
-import { forbidden, ok, requireUser } from '#/lib/auth'
+import { forbidden, getRequestToken, ok, requireUser } from '#/lib/auth'
 import { countForExport, listForExport } from '#/lib/repo/insts'
 import type { ExportFilter } from '#/lib/repo/insts'
 import { getDef } from '#/lib/repo/defs'
@@ -164,7 +164,7 @@ export async function exportInstsHandler(request: Request): Promise<Response> {
     return ok({ total, limit: EXPORT_LIMIT })
   }
 
-  const token = request.headers.get('x-user-token')
+  const token = getRequestToken(request)
   const rows = listForExport(filter)
 
   // 选定模板 → 展开其表单字段为列（desc 无值跳过）。

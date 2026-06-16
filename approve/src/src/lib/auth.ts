@@ -9,6 +9,21 @@ function adminIds(): Array<number> {
     .filter((n) => Number.isFinite(n))
 }
 
+/**
+ * 统一提取用户凭据（token），按优先级：
+ *   1. 前端透传的 `x-user-token` 头（插件页面内 fetch 用）；
+ *   2. 主程序应用指令 `doo app call` 透传的 `Token` 头（AI/CLI 调用用）；
+ *   3. URL 查询串 `token`/`user_token`（下载类 <a>/window.open 无法带自定义头时回退）。
+ * 三者都会经主程序反查验证，可信度一致，仅 URL 形式会在日志暴露 token。
+ */
+export function getRequestToken(request: Request): string | null {
+  const header =
+    request.headers.get('x-user-token') || request.headers.get('Token')
+  if (header) return header
+  const sp = new URL(request.url).searchParams
+  return sp.get('token') || sp.get('user_token')
+}
+
 // 反查结果缓存：同一 token 在短时间内复用，避免每个请求都打主程序。
 const TOKEN_TTL_MS = 60_000
 const tokenCache = new Map<
@@ -32,15 +47,8 @@ const tokenCache = new Map<
 export async function requireUser(
   request: Request,
 ): Promise<AuthUser | Response> {
-  // 凭据优先取请求头 x-user-token；下载类接口（如 <a>/window.open/主程序 downloadUrl
-  // 无法带自定义头）回退到 URL 查询串 token/user_token。两者都经主程序反查验证，
-  // 可信度一致，仅 URL 形式会在日志暴露 token。
   const t = serverT(request)
-  let token = request.headers.get('x-user-token')
-  if (!token) {
-    const sp = new URL(request.url).searchParams
-    token = sp.get('token') || sp.get('user_token')
-  }
+  const token = getRequestToken(request)
   if (!token) return unauthorized(t('server.err.missingCred'))
 
   let basic = readCache(token)
