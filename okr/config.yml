@@ -7,6 +7,14 @@ website: https://www.dootask.com
 github: https://github.com/dootask/system-plugins/tree/main/okr
 tags:
   - 目标管理
+
+# 应用指令接口（doo app call / AI）：静态规范随版本目录发布，调用目标为 okr 服务容器。
+# 规范文件实际放在版本目录（如 0.5.9/openapi.yaml），readSpecFile 会优先在版本目录解析。
+openapi:
+  file: ./openapi.yaml
+  service: okr
+  port: 5566
+
 menu_items:
   - location: application
     label:

@@ -1,0 +1,398 @@
+openapi: 3.0.3
+info:
+  title: OKR 管理
+  description: >-
+    DooTask OKR 应用指令接口，供 `doo app call okr <指令>` 调用。
+    身份由主程序自动注入（Token 头），无需手动传递；后端据此识别当前用户并鉴权。
+  version: "0.5.9"
+
+# 说明：主程序调用时直连容器端口、按本文件 path 原样请求（不经 nginx）。
+# okr 路由会把 /apps/okr/api/v1/ 前缀去掉再分发，故 path 写全 /apps/okr/api/v1/...。
+# 后端 score/progress/confidence/participant 为 form 绑定、cancel/follow/delete/archive 为 GET，
+# 故这些标量参数统一声明为 query（Gin form 绑定会合并读取 query），直连最稳；
+# 仅 create/update/replay-create 带嵌套数组，用 JSON requestBody。
+paths:
+  # ---------------- 读 ----------------
+  /apps/okr/api/v1/okr/my/list:
+    get:
+      operationId: my-okr-list
+      summary: 我的 OKR 列表
+      parameters:
+        - { name: objective, in: query, schema: { type: string }, description: 目标(O)关键词 }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: page_size, in: query, schema: { type: integer, default: 50 } }
+      responses: { "200": { description: 分页列表 } }
+
+  /apps/okr/api/v1/okr/participant/list:
+    get:
+      operationId: participating-okr-list
+      summary: 我参与的 OKR 列表
+      parameters:
+        - { name: objective, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: page_size, in: query, schema: { type: integer, default: 50 } }
+      responses: { "200": { description: 分页列表 } }
+
+  /apps/okr/api/v1/okr/department/list:
+    get:
+      operationId: department-okr-list
+      summary: 部门 OKR 列表
+      parameters:
+        - { name: department_id, in: query, schema: { type: integer }, description: 部门 id }
+        - { name: userid, in: query, schema: { type: integer }, description: 用户 id }
+        - { name: objective, in: query, schema: { type: string } }
+        - { name: type, in: query, schema: { type: integer }, description: "1-承诺型 2-挑战型" }
+        - { name: completed, in: query, schema: { type: integer }, description: "0-未完成 1-已完成未评分" }
+        - { name: start_at, in: query, schema: { type: string } }
+        - { name: end_at, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: page_size, in: query, schema: { type: integer, default: 50 } }
+      responses: { "200": { description: 分页列表 } }
+
+  /apps/okr/api/v1/okr/detail:
+    get:
+      operationId: okr-detail
+      summary: OKR 详情
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: integer }, description: okr id }
+      responses: { "200": { description: 详情(含关键结果/对齐/参与人) } }
+
+  /apps/okr/api/v1/okr/log/list:
+    get:
+      operationId: okr-log-list
+      summary: OKR 动态日志
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: integer }, description: okr id }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: page_size, in: query, schema: { type: integer, default: 50 } }
+      responses: { "200": { description: 动态分页列表 } }
+
+  /apps/okr/api/v1/okr/align/list:
+    get:
+      operationId: align-list
+      summary: 可对齐的目标列表
+      description: 列出可作为对齐目标(align_objective)的 OKR，用于创建/更新时填对齐目标 id。
+      parameters:
+        - { name: objective, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: page_size, in: query, schema: { type: integer, default: 50 } }
+      responses: { "200": { description: 分页列表 } }
+
+  /apps/okr/api/v1/okr/align/detail:
+    get:
+      operationId: align-detail
+      summary: 某目标的对齐情况
+      description: 返回指定 OKR 当前已对齐的目标，配合 set-align/cancel-align 管理对齐关系。
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: integer }, description: okr id }
+      responses: { "200": { description: 对齐目标列表 } }
+
+  /apps/okr/api/v1/okr/align/update:
+    post:
+      operationId: set-align
+      summary: 设置/更新对齐目标
+      description: >-
+        定向设置某 OKR 的对齐目标，无需像 update-okr 那样重传 key_results。
+        align_objective 为对齐目标 okr id（多个逗号分隔，来自 align-list）。
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: integer }, description: 本 okr id }
+        - { name: align_objective, in: query, schema: { type: string }, description: 对齐目标 okr id，逗号分隔 }
+      responses: { "200": { description: 更新结果 } }
+
+  /apps/okr/api/v1/okr/align/cancel:
+    get:
+      operationId: cancel-align
+      summary: 取消一个对齐关系
+      parameters:
+        - { name: okr_id, in: query, required: true, schema: { type: integer }, description: 本 okr id }
+        - { name: align_okr_id, in: query, required: true, schema: { type: integer }, description: 要取消对齐的目标 okr id }
+      responses: { "200": { description: 取消结果 } }
+
+  /apps/okr/api/v1/okr/user/info:
+    get:
+      operationId: whoami
+      summary: 当前用户信息
+      description: >-
+        返回当前调用者身份（userid、昵称、所属部门、是否管理员等）。
+        AI 据此判断「我是谁/是否管理员」——影响能否用 department=0 的全局分析、
+        无部门时能否创建 OKR、以及按部门维度查询时该用哪个 department id。
+      responses: { "200": { description: 当前用户信息 } }
+
+  /apps/okr/api/v1/okr/user/basic:
+    get:
+      operationId: user-basic
+      summary: 指定会员基础信息
+      description: 按 userid 解析成员昵称/头像，用于把详情里返回的参与人/负责人 id 渲染成名字。
+      parameters:
+        - { name: userid, in: query, required: true, schema: { type: integer }, description: 用户 id }
+      responses: { "200": { description: 会员基础信息 } }
+
+  /apps/okr/api/v1/okr/user/list:
+    get:
+      operationId: okr-user-list
+      summary: 用户列表
+      description: 查询成员，拿用户 id 用于填写关键结果参与人(participant，逗号分隔)。
+      parameters:
+        - { name: keyword, in: query, schema: { type: string }, description: 关键词(昵称/邮箱) }
+        - { name: dept_only, in: query, schema: { type: boolean, default: false }, description: 是否仅本部门 }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: page_size, in: query, schema: { type: integer, default: 50 } }
+      responses: { "200": { description: 用户分页列表 } }
+
+  /apps/okr/api/v1/okr/project/list:
+    get:
+      operationId: okr-project-list
+      summary: 项目列表
+      description: 查询项目，拿 project_id 用于创建/更新 OKR 关联项目。
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: page_size, in: query, schema: { type: integer, default: 50 } }
+      responses: { "200": { description: 项目分页列表 } }
+
+  /apps/okr/api/v1/okr/replay/list:
+    get:
+      operationId: replay-list
+      summary: 复盘列表
+      parameters:
+        - { name: okr_id, in: query, schema: { type: integer }, description: 目标 id(可选) }
+        - { name: objective, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: page_size, in: query, schema: { type: integer, default: 50 } }
+      responses: { "200": { description: 复盘分页列表 } }
+
+  /apps/okr/api/v1/okr/replay/detail:
+    get:
+      operationId: replay-detail
+      summary: 复盘详情
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: integer }, description: 复盘 id }
+      responses: { "200": { description: 复盘详情 } }
+
+  /apps/okr/api/v1/okr/archive/list:
+    get:
+      operationId: archive-list
+      summary: 归档的 OKR 列表
+      parameters:
+        - { name: objective, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: page_size, in: query, schema: { type: integer, default: 50 } }
+      responses: { "200": { description: 归档分页列表 } }
+
+  # ---------------- 分析统计（只读，看当前进展/完成情况） ----------------
+  /apps/okr/api/v1/okr/statistics/completes:
+    get:
+      operationId: my-statistics
+      summary: 我的目标数量统计
+      description: 当前用户未完成/已完成/已取消的目标数量，无需参数。
+      responses: { "200": { description: 数量统计 } }
+
+  /apps/okr/api/v1/okr/statistics/overall:
+    get:
+      operationId: my-overall
+      summary: 我的整体完成度与评分
+      description: 当前用户 OKR 的整体完成度与评分汇总，无需参数。
+      responses: { "200": { description: 完成度/评分汇总 } }
+
+  /apps/okr/api/v1/okr/analyze/department:
+    get:
+      operationId: analyze-departments
+      summary: 可分析的部门列表
+      description: 返回当前用户可做分析的部门 {id,name,owner}，用于下面 analyze-* 指令的 department 参数。
+      responses: { "200": { description: 部门列表 } }
+
+  /apps/okr/api/v1/okr/analyze/complete:
+    get:
+      operationId: analyze-completeness
+      summary: 整体平均完成度
+      description: 指定部门的 OKR 总数与完成数。department=0 为全公司（需管理员），否则填部门 id（来自 analyze-departments）。
+      parameters:
+        - { name: department, in: query, required: true, schema: { type: integer }, description: "部门 id；0=全公司(需管理员)" }
+      responses: { "200": { description: "{ total, complete }" } }
+
+  /apps/okr/api/v1/okr/analyze/score:
+    get:
+      operationId: analyze-score
+      summary: OKR 评分分布
+      parameters:
+        - { name: department, in: query, required: true, schema: { type: integer }, description: "部门 id；0=全公司(需管理员)" }
+      responses: { "200": { description: 评分分布 } }
+
+  /apps/okr/api/v1/okr/create:
+    post:
+      operationId: create-okr
+      summary: 创建 OKR
+      description: >-
+        创建目标(O)及其关键结果(KR)。含嵌套数组 key_results，建议整体用 `--data '<json>'` 传入。
+        发起人无部门且非管理员会被拒。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, type, priority, ascription, start_at, end_at, key_results]
+              properties:
+                title: { type: string, description: 目标标题(<=255) }
+                type: { type: integer, enum: [1, 2], description: "1-承诺型 2-挑战型" }
+                priority: { type: string, enum: [P0, P1, P2] }
+                ascription: { type: integer, enum: [1, 2], description: "归属 1-部门 2-个人" }
+                visible_range: { type: integer, enum: [1, 2, 3], description: "可见范围 1-全公司 2-相关成员 3-部门成员" }
+                align_objective: { type: string, description: 对齐目标 id(来自 align-list；多个逗号分隔) }
+                project_id: { type: integer, description: 关联项目 id(来自 okr-project-list) }
+                start_at: { type: string, description: 开始时间 }
+                end_at: { type: string, description: 结束时间 }
+                key_results:
+                  type: array
+                  description: 关键结果列表
+                  items:
+                    type: object
+                    required: [title, start_at, end_at]
+                    properties:
+                      title: { type: string }
+                      participant: { type: string, description: 参与人用户 id，逗号分隔 }
+                      confidence: { type: integer, description: 信心指数 0-100 }
+                      start_at: { type: string }
+                      end_at: { type: string }
+      responses: { "200": { description: 新建的 OKR } }
+
+  /apps/okr/api/v1/okr/update:
+    post:
+      operationId: update-okr
+      summary: 更新 OKR
+      description: 更新目标及关键结果（KR 带 id/is_delete）。含嵌套数组，建议用 `--data '<json>'`。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id, title, type, priority, start_at, end_at, key_results]
+              properties:
+                id: { type: integer, description: okr id }
+                title: { type: string }
+                type: { type: integer, enum: [1, 2] }
+                priority: { type: string, enum: [P0, P1, P2] }
+                visible_range: { type: integer, enum: [1, 2, 3] }
+                align_objective: { type: string }
+                project_id: { type: integer }
+                start_at: { type: string }
+                end_at: { type: string }
+                key_results:
+                  type: array
+                  items:
+                    type: object
+                    required: [id, is_delete, title, start_at, end_at]
+                    properties:
+                      id: { type: integer, description: KR id(新增可传 0) }
+                      is_delete: { type: boolean, description: 是否删除该 KR }
+                      title: { type: string }
+                      participant: { type: string }
+                      confidence: { type: integer }
+                      start_at: { type: string }
+                      end_at: { type: string }
+      responses: { "200": { description: 更新后的 OKR } }
+
+  /apps/okr/api/v1/okr/update/progress:
+    post:
+      operationId: update-progress
+      summary: 更新进度与进度状态
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: integer }, description: okr/关键结果 id }
+        - { name: progress, in: query, schema: { type: integer }, description: 进度 0-100 }
+        - { name: status, in: query, schema: { type: integer, enum: [0, 1, 2, 3] }, description: "0-默认 1-正常 2-有风险 3-延期" }
+      responses: { "200": { description: 更新结果 } }
+
+  /apps/okr/api/v1/okr/score:
+    post:
+      operationId: score-okr
+      summary: OKR 评分
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: integer }, description: okr id }
+        - { name: score, in: query, schema: { type: number }, description: 评分 0-10 }
+        - { name: type, in: query, schema: { type: integer, enum: [1, 2] }, description: "1-个人评分 2-上级评分" }
+      responses: { "200": { description: 评分结果 } }
+
+  /apps/okr/api/v1/okr/confidence/update:
+    post:
+      operationId: update-confidence
+      summary: 更新信心指数
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: integer }, description: okr id }
+        - { name: confidence, in: query, schema: { type: integer }, description: 信心指数 0-100 }
+      responses: { "200": { description: 更新结果 } }
+
+  /apps/okr/api/v1/okr/participant/update:
+    post:
+      operationId: update-participant
+      summary: 更新参与人
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: integer }, description: okr id }
+        - { name: participant, in: query, schema: { type: string }, description: 参与人用户 id，逗号分隔 }
+      responses: { "200": { description: 更新结果 } }
+
+  /apps/okr/api/v1/okr/follow:
+    get:
+      operationId: follow-okr
+      summary: 关注/取消关注目标
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: integer }, description: okr id }
+      responses: { "200": { description: 关注结果 } }
+
+  /apps/okr/api/v1/okr/cancel:
+    get:
+      operationId: cancel-okr
+      summary: 取消/重启目标
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: integer }, description: okr id }
+      responses: { "200": { description: 操作结果 } }
+
+  /apps/okr/api/v1/okr/delete:
+    get:
+      operationId: delete-okr
+      summary: 删除 OKR
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: integer }, description: okr id }
+      responses: { "200": { description: 删除结果 } }
+
+  /apps/okr/api/v1/okr/replay/create:
+    post:
+      operationId: create-replay
+      summary: 添加复盘
+      description: 对目标做周期复盘。含嵌套数组 comments，建议整体用 `--data '<json>'`。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [okr_id, comments]
+              properties:
+                okr_id: { type: integer, description: 目标 id }
+                review: { type: string, description: 价值与收获 }
+                problem: { type: string, description: 问题与不足 }
+                comments:
+                  type: array
+                  description: 复盘评价
+                  items:
+                    type: object
+                    required: [okr_id, comment]
+                    properties:
+                      okr_id: { type: integer }
+                      comment: { type: integer, enum: [1, 2], description: "1-做得好的 2-可提升的" }
+      responses: { "200": { description: 复盘结果 } }
+
+  /apps/okr/api/v1/okr/archive:
+    get:
+      operationId: archive-okr
+      summary: 归档目标
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: integer }, description: okr id }
+      responses: { "200": { description: 归档结果 } }
+
+  /apps/okr/api/v1/okr/archive/restore:
+    get:
+      operationId: restore-archive
+      summary: 还原归档目标
+      parameters:
+        - { name: id, in: query, required: true, schema: { type: integer }, description: okr id }
+      responses: { "200": { description: 还原结果 } }
