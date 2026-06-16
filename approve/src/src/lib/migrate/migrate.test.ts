@@ -599,11 +599,190 @@ describe('runMigration', () => {
       (db.prepare('SELECT COUNT(*) c FROM proc_def').get() as { c: number }).c,
     ).toBe(1)
 
-    // force：重跑会再写一遍（管理员手动重置场景）。
+    // force：跳过 already-migrated 检查再执行一遍；同名模板按名复用、不重复建，
+    // 故 proc_def 仍为 1（避免重名脏数据）。注意 force 不清库，仅用于清库后的重置重跑。
     const r3 = await runMigration(src, db, true)
     expect(r3.migrated).toBe(true)
     expect(
       (db.prepare('SELECT COUNT(*) c FROM proc_def').get() as { c: number }).c,
-    ).toBe(2)
+    ).toBe(1)
+  })
+
+  it('孤儿实例(proc_def_id 已不在 procdef)→按 proc_def_name 归并到同名模板最新版', async () => {
+    const db = new Database(':memory:')
+    setDbForTesting(db) // 开 foreign_keys=ON：修复前 def_id=0 会触发 FK 失败、整批回滚。
+    const data: FakeData = {
+      procdefs: [
+        {
+          id: 68, // 当前仅存最新版「请假」（旧引擎每改一次模板换新 id）。
+          name: '请假',
+          version: 21,
+          resource: RESOURCE_VACATE,
+          userid: '1',
+          username: 'a',
+          company: 'c',
+          deploy_time: '',
+          created_time: '',
+        },
+      ],
+      // proc_def_id=3 是早期版本，已不在 procdef 表；但名字「请假」仍在 → 应归并。
+      insts: [
+        baseInst({
+          id: 300,
+          proc_def_id: 3,
+          proc_def_name: '请假',
+          state: 2,
+          is_finished: 1,
+          end_time: '2024-01-05 10:00:00',
+        }),
+      ],
+      executions: [
+        {
+          id: 1,
+          proc_inst_id: 300,
+          proc_def_id: 3,
+          node_infos: nodeInfos('2'),
+          is_active: 0,
+          start_time: '2024-01-01 09:00:00',
+        },
+      ],
+      tasks: [],
+      identitylinks: [],
+    }
+    const r = await runMigration(makeSource(data), db)
+    expect(r.migrated).toBe(true)
+    expect(r.instsFinished).toBe(1)
+
+    const leaveDef = db
+      .prepare("SELECT id FROM proc_def WHERE name = '请假'")
+      .get() as { id: number }
+    const inst = db
+      .prepare('SELECT def_id, def_version FROM proc_inst WHERE id = 1')
+      .get() as { def_id: number; def_version: number }
+    expect(inst.def_id).toBe(leaveDef.id) // 挂到同名最新版「请假」
+    expect(inst.def_version).toBe(21)
+    // 同名匹配成功 → 不应产生占位模板。
+    expect(
+      (db.prepare('SELECT COUNT(*) c FROM proc_def').get() as { c: number }).c,
+    ).toBe(1)
+  })
+
+  it('既无 id 也无同名匹配的实例→挂占位「（历史）未知模板」', async () => {
+    const db = new Database(':memory:')
+    setDbForTesting(db)
+    const data: FakeData = {
+      procdefs: [
+        {
+          id: 68,
+          name: '请假',
+          version: 21,
+          resource: RESOURCE_VACATE,
+          userid: '1',
+          username: 'a',
+          company: 'c',
+          deploy_time: '',
+          created_time: '',
+        },
+      ],
+      insts: [
+        baseInst({
+          id: 301,
+          proc_def_id: 999,
+          proc_def_name: '某个已彻底删除的模板',
+          state: 2,
+          is_finished: 1,
+          end_time: '2024-01-05 10:00:00',
+        }),
+      ],
+      executions: [
+        {
+          id: 1,
+          proc_inst_id: 301,
+          proc_def_id: 999,
+          node_infos: nodeInfos('2'),
+          is_active: 0,
+          start_time: '2024-01-01 09:00:00',
+        },
+      ],
+      tasks: [],
+      identitylinks: [],
+    }
+    const r = await runMigration(makeSource(data), db)
+    expect(r.migrated).toBe(true)
+    expect(r.instsFinished).toBe(1)
+
+    const ph = db
+      .prepare("SELECT id FROM proc_def WHERE name = '（历史）未知模板'")
+      .get() as { id: number } | undefined
+    expect(ph).toBeTruthy()
+    const inst = db
+      .prepare('SELECT def_id FROM proc_inst WHERE id = 1')
+      .get() as { def_id: number }
+    expect(inst.def_id).toBe(ph?.id)
+  })
+
+  it('库中已有同名模板（如内置播种）→ 迁移按名复用，不重复建', async () => {
+    const db = new Database(':memory:')
+    setDbForTesting(db)
+    // 模拟「上一轮迁移失败回滚 → 首启播种把内置「请假」灌入空库」后的状态。
+    const seeded = db
+      .prepare(
+        `INSERT INTO proc_def (name, category, form_schema, flow_nodes, version, status, created_by)
+         VALUES ('请假', 'vacate', '[]', '{}', 1, 'enabled', 0)`,
+      )
+      .run()
+    const seededId = seeded.lastInsertRowid as number
+
+    const data: FakeData = {
+      procdefs: [
+        {
+          id: 50,
+          name: '请假',
+          version: 9,
+          resource: RESOURCE_VACATE,
+          userid: '1',
+          username: 'a',
+          company: 'c',
+          deploy_time: '',
+          created_time: '',
+        },
+      ],
+      insts: [
+        baseInst({
+          id: 400,
+          proc_def_id: 50,
+          proc_def_name: '请假',
+          state: 2,
+          is_finished: 1,
+          end_time: '2024-01-05 10:00:00',
+        }),
+      ],
+      executions: [
+        {
+          id: 1,
+          proc_inst_id: 400,
+          proc_def_id: 50,
+          node_infos: nodeInfos('2'),
+          is_active: 0,
+          start_time: '2024-01-01 09:00:00',
+        },
+      ],
+      tasks: [],
+      identitylinks: [],
+    }
+    const r = await runMigration(makeSource(data), db)
+    expect(r.migrated).toBe(true)
+    // 「请假」全库仅此一条（复用已播种，未重复建）；result.defs 只计新建数（=0）。
+    const leave = db
+      .prepare("SELECT id FROM proc_def WHERE name = '请假'")
+      .all() as Array<{ id: number }>
+    expect(leave.length).toBe(1)
+    expect(leave[0].id).toBe(seededId)
+    expect(r.defs).toBe(0)
+    // 历史实例挂到复用的那条模板。
+    const inst = db
+      .prepare('SELECT def_id FROM proc_inst WHERE id = 1')
+      .get() as { def_id: number }
+    expect(inst.def_id).toBe(seededId)
   })
 })

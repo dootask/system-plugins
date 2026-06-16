@@ -146,34 +146,83 @@ export async function runMigration(
 
   // ── 单事务写入（原子）。──
   const tx = db.transaction(() => {
-    // 1) procdef → proc_def，记录 旧 id → 新 id 映射。
-    const defIdMap = new Map<number, { newId: number; version: number }>()
+    // 1) procdef → proc_def，记录 旧 id → 新 id 映射；并按模板名归并最新版（迁移孤儿实例用）。
+    type DefRef = { newId: number; version: number }
+    const defIdMap = new Map<number, DefRef>()
+    const defByName = new Map<string, DefRef>()
     const insDef = db.prepare(
       `INSERT INTO proc_def
          (name, category, icon, form_schema, flow_nodes, start_scope, version, status, sort_order, created_by, created_at)
        VALUES (@name, @category, @icon, @form_schema, @flow_nodes, NULL, @version, 'enabled', @sort, @created_by, @created_at)`,
     )
-    for (const pd of procdefs) {
-      const flow = convertResourceToFlow(pd.resource)
-      const { category, schema } = inferCategoryAndSchema(pd.name)
-      const info = insDef.run({
-        name: pd.name,
-        category,
-        icon: null,
-        form_schema: JSON.stringify(schema),
-        flow_nodes: JSON.stringify(flow ?? {}),
-        version: pd.version || 1,
-        sort: pd.id,
-        created_by: parseInt(pd.userid || '0', 10) || 0,
-        created_at: pd.created_time || pd.deploy_time || nowStr(),
-      })
-      defIdMap.set(pd.id, {
-        newId: info.lastInsertRowid as number,
-        version: pd.version || 1,
-      })
-      result.defs++
+    // 迁移前库中已有的模板（典型：上一轮迁移失败回滚后被首启播种灌入的内置模板）。
+    // 按名复用：同名旧 procdef 不再重复建 proc_def，避免「迁移失败→重跑」产生重名模板。
+    // 正常安装（迁移在播种之前、库为空）此表为空，行为与旧版完全一致。
+    const preexistingByName = new Map<string, DefRef>()
+    for (const row of db
+      .prepare('SELECT id, name, version FROM proc_def')
+      .all() as Array<{ id: number; name: string; version: number }>) {
+      const nm = (row.name || '').trim()
+      const prev = preexistingByName.get(nm)
+      if (nm && (!prev || row.version > prev.version))
+        preexistingByName.set(nm, { newId: row.id, version: row.version })
     }
-    log(`proc_def 写入 ${result.defs} 条`)
+
+    let reusedDefs = 0
+    for (const pd of procdefs) {
+      const nm = (pd.name || '').trim()
+      const reuse = nm ? preexistingByName.get(nm) : undefined
+      let ref: DefRef
+      if (reuse) {
+        ref = reuse // 复用库中已有同名模板，不重复建。
+        reusedDefs++
+      } else {
+        const flow = convertResourceToFlow(pd.resource)
+        const { category, schema } = inferCategoryAndSchema(pd.name)
+        const info = insDef.run({
+          name: pd.name,
+          category,
+          icon: null,
+          form_schema: JSON.stringify(schema),
+          flow_nodes: JSON.stringify(flow ?? {}),
+          version: pd.version || 1,
+          sort: pd.id,
+          created_by: parseInt(pd.userid || '0', 10) || 0,
+          created_at: pd.created_time || pd.deploy_time || nowStr(),
+        })
+        ref = { newId: info.lastInsertRowid as number, version: pd.version || 1 }
+        result.defs++
+      }
+      defIdMap.set(pd.id, ref)
+      // 同名多版本只保留最新版（version 最大）；当前库通常每名仅 1 条最新版。
+      const prev = defByName.get(nm)
+      if (nm && (!prev || ref.version > prev.version)) defByName.set(nm, ref)
+    }
+    log(
+      `proc_def 新建 ${result.defs} 条` +
+        (reusedDefs ? `，复用已有 ${reusedDefs} 条` : ''),
+    )
+
+    // 占位模板（懒建）：仅当实例既无旧 id 匹配、也无同名模板时挂靠，保证 def_id 外键
+    // 有效、不丢历史。正常迁移（同名模板都在）不会触发，故无匹配时才产生这一行。
+    let placeholderDefId = 0
+    const ensurePlaceholderDef = (): number => {
+      if (placeholderDefId) return placeholderDefId
+      const info = insDef.run({
+        name: '（历史）未知模板',
+        category: 'custom',
+        icon: null,
+        form_schema: '[]',
+        flow_nodes: '{}',
+        version: 1,
+        sort: 9999,
+        created_by: 0,
+        created_at: nowStr(),
+      })
+      placeholderDefId = info.lastInsertRowid as number
+      log('建占位模板「（历史）未知模板」用于无法归并的历史实例')
+      return placeholderDefId
+    }
 
     // 预备语句。
     const insInst = db.prepare(
@@ -203,9 +252,13 @@ export async function runMigration(
     // 2/3/4) 实例迁移。
     let n = 0
     for (const { inst, execution, tasks, identitylinks } of instBundles) {
-      const defRef = defIdMap.get(inst.proc_def_id)
-      // 找不到对应 def（老数据脏）→ 用 0 占位，仍迁实例以免丢历史。
-      const defId = defRef?.newId ?? 0
+      // 先按旧 procdef id 精确匹配（命中当年那条版本）；旧引擎每改模板都生成新 procdef id、
+      // version 递增、老实例锁定老 id，故多数历史实例的 proc_def_id 已不在 procdef 表内。
+      // 回退按 proc_def_name 归并到同名模板最新版；仍无匹配才挂占位 def（外键安全、不丢历史）。
+      const defRef =
+        defIdMap.get(inst.proc_def_id) ??
+        defByName.get((inst.proc_def_name || '').trim())
+      const defId = defRef?.newId ?? ensurePlaceholderDef()
       const defVersion = defRef?.version ?? 1
 
       const finished = isFinishedState(inst.state, inst.is_finished)
