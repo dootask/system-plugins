@@ -13,6 +13,8 @@ services:
       # EMBEDDING_BASE_URL / EMBEDDING_API_KEY 即可覆盖
       # 注意：AppStore 的 ReplaceParams 只匹配精确 ${KEY}，fields 变量不要用 ${KEY:-default} 语法
       KB_CONTENT_DIR: /app/kb-content
+      # 应用自带知识库 overlay 根：各微应用安装时由 AppStore 复制到 docker/appstore/ai-kb/<app-id>/
+      KB_APPS_DIR: /app/kb-apps
       KB_INGEST_TOKEN: "${KB_INGEST_TOKEN}"
       RAG_ENABLED: "${RAG_ENABLED:-true}"
       EMBEDDING_BASE_URL: "${EMBEDDING_BASE_URL:-}"
@@ -24,6 +26,8 @@ services:
       # 用 AppStore 注入的 ${ROOT_PATH}（指向宿主机 dootask 根目录），跨部署位置自动 work
       # 不能用相对路径里的 .. —— AppStore 会 normalize 让它走不出 app 目录
       - "${ROOT_PATH}/resources/ai-kb:/app/kb-content:ro"
+      # 只读挂载应用自带知识库 overlay（AppStore 在应用安装/卸载时写入/清理）
+      - "${ROOT_PATH}/docker/appstore/ai-kb:/app/kb-apps:ro"
 
 volumes:
   dootask-ai-config:

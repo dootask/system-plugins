@@ -35,6 +35,44 @@ def _kb_root() -> str:
     return os.environ.get("KB_CONTENT_DIR", "/app/kb-content")
 
 
+def _kb_apps_root() -> Optional[str]:
+    """应用 overlay 根（KB_APPS_DIR，默认 /app/kb-apps）。
+
+    结构为 <app-id>/<locale>/<type>/...，由 AppStore 在应用安装时复制写入；
+    目录不存在（未挂载/无应用自带 KB）时各处会自动跳过。
+    """
+    root = os.environ.get("KB_APPS_DIR", "/app/kb-apps").strip()
+    return root or None
+
+
+def _path_key(root_type: str, rel_path: str) -> str:
+    """对账记账键。core 保持 path:{rel}（向后兼容旧索引），apps 用 path:apps:{rel}。"""
+    if root_type == "apps":
+        return f"path:apps:{rel_path}"
+    return f"path:{rel_path}"
+
+
+def _parse_path_key(meta_key: str) -> Optional[Tuple[str, str]]:
+    """解析记账键 -> (root_type, rel_path)；非 path: 键返回 None。
+
+    兼容旧格式 path:{rel}（无 root_type 段）按 core 处理。
+    """
+    if not meta_key.startswith("path:"):
+        return None
+    rest = meta_key[5:]
+    if rest.startswith("apps:"):
+        return ("apps", rest[5:])
+    return ("core", rest)
+
+
+def _merge_result(into: Dict[str, Any], res: Dict[str, Any]) -> Dict[str, Any]:
+    into["ingested"] += res.get("ingested", 0)
+    into["failed"] += res.get("failed", 0)
+    into["total_chunks"] += res.get("total_chunks", 0)
+    into["errors"].extend(res.get("errors", []))
+    return into
+
+
 def _build_embed_text(title: str, aliases: List[str], content: str) -> str:
     """拼 title + aliases 到 embed 文本前。
 
@@ -61,6 +99,19 @@ def _list_md_files(root: str, locale: str = "zh") -> List[str]:
     pattern = os.path.join(root, locale, "**", "*.md")
     return sorted(
         os.path.relpath(p, root)
+        for p in _glob.glob(pattern, recursive=True)
+    )
+
+
+def _list_app_md_files(apps_root: str, locale: str = "zh") -> List[str]:
+    """列出 overlay 根下各应用 <app-id>/<locale>/** 的 markdown 相对路径。
+
+    返回相对 apps_root 的路径（含 <app-id> 段，如 approve/zh/concept/x.md），
+    使记账键天然按应用命名空间隔离，卸载某应用时其条目可被精确对账删除。
+    """
+    pattern = os.path.join(apps_root, "*", locale, "**", "*.md")
+    return sorted(
+        os.path.relpath(p, apps_root)
         for p in _glob.glob(pattern, recursive=True)
     )
 
@@ -119,15 +170,15 @@ async def _delete_old_chunks(chunk_id: str) -> int:
     return len(stale)
 
 
-async def _write_bookkeeping(rel_path: str, chunk_id: str, count: int, file_hash: str) -> None:
-    """meta 双账：src:{id} 记 chunk 数（删除用），path:{rel_path} 记 hash+id（对账用）。"""
+async def _write_bookkeeping(rel_path: str, chunk_id: str, count: int, file_hash: str, root_type: str = "core") -> None:
+    """meta 双账：src:{id} 记 chunk 数（删除用），path 键记 hash+id（对账用）。"""
     await get_raw_client().hset(META_KEY, mapping={
         f"src:{chunk_id}".encode(): str(count).encode(),
-        f"path:{rel_path}".encode(): f"{file_hash}:{chunk_id}".encode(),
+        _path_key(root_type, rel_path).encode(): f"{file_hash}:{chunk_id}".encode(),
     })
 
 
-async def ingest_one(rel_path: str, kb_root: Optional[str] = None) -> Dict[str, Any]:
+async def ingest_one(rel_path: str, kb_root: Optional[str] = None, root_type: str = "core") -> Dict[str, Any]:
     """ingest 单个 markdown 文件。"""
     root = kb_root or _kb_root()
     full = os.path.join(root, rel_path)
@@ -153,7 +204,7 @@ async def ingest_one(rel_path: str, kb_root: Optional[str] = None) -> Dict[str, 
     chunks = split_markdown(body)
     if not chunks:
         await _delete_old_chunks(fm["id"])
-        await _write_bookkeeping(rel_path, str(fm["id"]), 0, file_hash)
+        await _write_bookkeeping(rel_path, str(fm["id"]), 0, file_hash, root_type)
         return {"path": rel_path, "id": fm["id"], "chunks": 0, "ok": True, "error": None}
 
     title = str(fm.get("title") or "")
@@ -202,19 +253,19 @@ async def ingest_one(rel_path: str, kb_root: Optional[str] = None) -> Dict[str, 
             attributes=attrs,
         )
 
-    await _write_bookkeeping(rel_path, str(fm["id"]), len(chunks), file_hash)
+    await _write_bookkeeping(rel_path, str(fm["id"]), len(chunks), file_hash, root_type)
 
     return {"path": rel_path, "id": fm["id"], "chunks": len(chunks), "ok": True, "error": None}
 
 
-async def ingest_paths(paths: List[str], kb_root: Optional[str] = None) -> Dict[str, Any]:
+async def ingest_paths(paths: List[str], kb_root: Optional[str] = None, root_type: str = "core") -> Dict[str, Any]:
     """批量 ingest。失败的不阻塞其他文件。"""
     results: List[Dict[str, Any]] = []
     total = len(paths)
     progress_every = 50
     for idx, p in enumerate(paths, 1):
         try:
-            results.append(await ingest_one(p, kb_root))
+            results.append(await ingest_one(p, kb_root, root_type))
         except Exception as e:
             logger.exception(f"ingest failed for {p}")
             results.append({"path": p, "ok": False, "error": str(e)})
@@ -242,83 +293,120 @@ async def ingest_paths(paths: List[str], kb_root: Optional[str] = None) -> Dict[
 
 async def ingest_all(
     kb_root: Optional[str] = None,
+    kb_apps_root: Optional[str] = None,
     locales: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """全量 ingest。"""
-    root = kb_root or _kb_root()
-    if not os.path.isdir(root):
-        logger.warning(f"KB content dir not found: {root}; skipping ingest")
-        return {"ingested": 0, "failed": 0, "total_chunks": 0, "errors": []}
-
+    """全量 ingest（核心根 + 应用 overlay 根）。"""
+    core_root = kb_root or _kb_root()
+    apps_root = kb_apps_root if kb_apps_root is not None else _kb_apps_root()
     locales = locales or ["zh"]  # P0 只跑中文；P1 加 en
-    all_paths: List[str] = []
-    for loc in locales:
-        all_paths.extend(_list_md_files(root, loc))
 
-    logger.info(f"ingest_all: {len(all_paths)} files from {root}")
-    if not all_paths:
-        return {"ingested": 0, "failed": 0, "total_chunks": 0, "errors": []}
+    merged: Dict[str, Any] = {"ingested": 0, "failed": 0, "total_chunks": 0, "errors": []}
 
-    return await ingest_paths(all_paths, kb_root=root)
+    if os.path.isdir(core_root):
+        core_paths: List[str] = []
+        for loc in locales:
+            core_paths.extend(_list_md_files(core_root, loc))
+        logger.info(f"ingest_all core: {len(core_paths)} files from {core_root}")
+        if core_paths:
+            _merge_result(merged, await ingest_paths(core_paths, kb_root=core_root, root_type="core"))
+    else:
+        logger.warning(f"KB content dir not found: {core_root}; skipping core ingest")
+
+    if apps_root and os.path.isdir(apps_root):
+        app_paths: List[str] = []
+        for loc in locales:
+            app_paths.extend(_list_app_md_files(apps_root, loc))
+        logger.info(f"ingest_all apps: {len(app_paths)} files from {apps_root}")
+        if app_paths:
+            _merge_result(merged, await ingest_paths(app_paths, kb_root=apps_root, root_type="apps"))
+
+    return merged
 
 
 async def reconcile(
     kb_root: Optional[str] = None,
+    kb_apps_root: Optional[str] = None,
     locales: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
-    """按文件内容 hash 对账，增量收敛新增/变更/删除的 markdown。
+    """按文件内容 hash 对账，增量收敛核心根 + 应用 overlay 根的增/删/改 markdown。
 
     无变化时只做本地哈希比对，零 embedding API 调用、零写入。
     meta 缺 path:* 账（如从旧版本升级）时相关文件会被视为变更，触发一次性重灌补账。
+    core 与 apps 按 root_type 分别记账（path:{rel} vs path:apps:{rel}），相同相对路径
+    不会互相误删。
     """
-    root = kb_root or _kb_root()
-    if not os.path.isdir(root):
-        logger.warning(f"KB content dir not found: {root}; skip reconcile")
-        return {"changed": 0, "removed": 0, "ingested": 0, "failed": 0, "total_chunks": 0, "errors": []}
-
+    core_root = kb_root or _kb_root()
+    apps_root = kb_apps_root if kb_apps_root is not None else _kb_apps_root()
     locales = locales or ["zh"]
-    disk: Dict[str, str] = {}
-    for loc in locales:
-        for p in _list_md_files(root, loc):
-            try:
-                with open(os.path.join(root, p), "rb") as f:
-                    disk[p] = _file_hash(f.read())
-            except OSError:
-                continue
+
+    # 扫描磁盘：disk[(root_type, rel)] = hash；scanned 记录"本次确实扫了"的根，
+    # 未扫到的根（目录缺失/未挂载）其 indexed 条目不参与 removed 判定，避免误删。
+    disk: Dict[Tuple[str, str], str] = {}
+    scanned: set = set()
+    if os.path.isdir(core_root):
+        scanned.add("core")
+        for loc in locales:
+            for rel in _list_md_files(core_root, loc):
+                try:
+                    with open(os.path.join(core_root, rel), "rb") as f:
+                        disk[("core", rel)] = _file_hash(f.read())
+                except OSError:
+                    continue
+    else:
+        logger.warning(f"KB content dir not found: {core_root}; skip core reconcile")
+
+    if apps_root and os.path.isdir(apps_root):
+        scanned.add("apps")
+        for loc in locales:
+            for rel in _list_app_md_files(apps_root, loc):
+                try:
+                    with open(os.path.join(apps_root, rel), "rb") as f:
+                        disk[("apps", rel)] = _file_hash(f.read())
+                except OSError:
+                    continue
 
     r = get_raw_client()
-    indexed: Dict[str, Tuple[str, str]] = {}  # rel_path -> (hash, chunk_id)
+    indexed: Dict[Tuple[str, str], Tuple[str, str]] = {}  # (root_type, rel) -> (hash, chunk_id)
     for k, v in (await r.hgetall(META_KEY) or {}).items():
-        key = k.decode()
-        if key.startswith("path:"):
-            h, _, cid = v.decode().partition(":")
-            indexed[key[5:]] = (h, cid)
+        parsed = _parse_path_key(k.decode())
+        if parsed is None:
+            continue
+        h, _, cid = v.decode().partition(":")
+        indexed[parsed] = (h, cid)
 
-    changed = [p for p in disk if disk[p] != indexed.get(p, ("",))[0]]
-    removed = [p for p in indexed if p not in disk]
+    changed = [key for key in disk if disk[key] != indexed.get(key, ("",))[0]]
+    removed = [key for key in indexed if key[0] in scanned and key not in disk]
 
     # 先删后增：同 id 的文件移动路径时，避免删除旧路径误伤新写入的 chunk
-    for p in removed:
-        await _delete_old_chunks(indexed[p][1])
-        await r.hdel(META_KEY, f"path:{p}")
+    for rt, rel in removed:
+        await _delete_old_chunks(indexed[(rt, rel)][1])
+        await r.hdel(META_KEY, _path_key(rt, rel))
 
     if not changed:
         return {"changed": 0, "removed": len(removed), "ingested": 0, "failed": 0, "total_chunks": 0, "errors": []}
 
-    logger.info(f"reconcile: {len(changed)} changed, {len(removed)} removed")
-    result = await ingest_paths(changed, kb_root=root)
+    core_changed = [rel for rt, rel in changed if rt == "core"]
+    apps_changed = [rel for rt, rel in changed if rt == "apps"]
+    logger.info(f"reconcile: core changed={len(core_changed)} apps changed={len(apps_changed)} removed={len(removed)}")
+
+    merged: Dict[str, Any] = {"ingested": 0, "failed": 0, "total_chunks": 0, "errors": []}
+    if core_changed:
+        _merge_result(merged, await ingest_paths(core_changed, kb_root=core_root, root_type="core"))
+    if apps_changed:
+        _merge_result(merged, await ingest_paths(apps_changed, kb_root=apps_root, root_type="apps"))
 
     # 同一路径换了 chunk id：清掉旧 id 留下的孤儿
-    for p in changed:
-        prev_id = indexed.get(p, ("", ""))[1]
+    for rt, rel in changed:
+        prev_id = indexed.get((rt, rel), ("", ""))[1]
         if not prev_id:
             continue
-        cur = await r.hget(META_KEY, f"path:{p}")
+        cur = await r.hget(META_KEY, _path_key(rt, rel))
         cur_id = cur.decode().partition(":")[2] if cur else ""
         if cur_id and cur_id != prev_id:
             await _delete_old_chunks(prev_id)
 
-    return {"changed": len(changed), "removed": len(removed), **result}
+    return {"changed": len(changed), "removed": len(removed), **merged}
 
 
 # CLI 入口（开发期 docker exec 调用）
