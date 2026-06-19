@@ -96,6 +96,29 @@ const createFields = (lang: Language): FieldConfig[] => {
 const createAiList = (lang: Language): Record<AIBotKey, BotConfig> => {
   const isZh = lang === "zh"
   return {
+    dootask: {
+      extraFields: [
+        {
+          prop: "key",
+          label: isZh ? "账号令牌" : "Account Token",
+          tip: isZh
+            ? "由上方账号面板自动管理，无需手动填写"
+            : "Managed automatically by the account panel above; no need to fill in manually.",
+        },
+        {
+          prop: "base_url",
+          tip: isZh
+            ? "官方网关地址，自动配置"
+            : "Official gateway URL, configured automatically.",
+        },
+        {
+          prop: "models",
+          tip: isZh
+            ? "登录后点击下方按钮拉取官方模型列表"
+            : "After signing in, click the button below to fetch the official model list.",
+        },
+      ],
+    },
     openai: {
       extraFields: [
         {

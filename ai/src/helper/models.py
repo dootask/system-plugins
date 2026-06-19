@@ -78,6 +78,60 @@ def _fetch_ollama_models(
     return {"models": formatted, "original": models}
 
 
+def _fetch_dootask_models(
+    base_url: str,
+    key: Optional[str] = None,
+) -> Dict[str, object]:
+    """从 DooTask 官方网关（AppStore 计量代理）拉取该 token 档位可见的模型列表。
+
+    base_url 形如 https://appstore.dootask.com/v1，返回 OpenAI list 格式。
+    """
+    if not base_url:
+        raise ModelListError("缺少网关地址")
+    if not key:
+        raise ModelListError("请先登录 DooTask 账号")
+
+    headers: Dict[str, str] = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {key}",
+    }
+    url = base_url.rstrip("/") + "/models"
+    try:
+        with httpx.Client(headers=headers, timeout=15) as client:
+            response = client.get(url)
+            response.raise_for_status()
+            data = response.json()
+    except httpx.HTTPStatusError as exc:
+        raise ModelListError(f"获取失败：HTTP {exc.response.status_code}") from exc
+    except httpx.HTTPError as exc:
+        raise ModelListError(f"获取失败：{exc}") from exc
+    except ValueError as exc:
+        raise ModelListError("获取失败：响应解析错误") from exc
+
+    items = data.get("data") if isinstance(data, dict) else None
+    if not isinstance(items, list):
+        raise ModelListError("获取失败：无效的返回结构")
+
+    formatted: List[ModelInfo] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        model_id = item.get("id")
+        if not model_id:
+            continue
+        formatted.append({
+            "id": str(model_id),
+            "name": str(item.get("name") or model_id),
+            "support_mcp": True,
+            "thinking": "off",
+        })
+
+    if not formatted:
+        raise ModelListError("未找到默认模型")
+
+    return {"models": formatted, "original": items}
+
+
 def get_models_list(
     model_type: str,
     base_url: Optional[str] = None,
@@ -91,6 +145,9 @@ def get_models_list(
 
     if model_type == "ollama":
         return _fetch_ollama_models(base_url=base_url or "", key=key or None, agency=agency or None)
+
+    if model_type == "dootask":
+        return _fetch_dootask_models(base_url=base_url or "", key=key or None)
 
     default_models = DEFAULT_MODELS.get(model_type)
     if not default_models:

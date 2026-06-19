@@ -10,6 +10,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 # 第三方库导入
+import httpx
 from exceptiongroup import ExceptionGroup
 from fastapi import FastAPI, Request, Header
 from fastapi.middleware.cors import CORSMiddleware
@@ -18,7 +19,15 @@ from langchain.agents import create_agent
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, AIMessageChunk
 
 # 本地模块导入
-from helper.config import SERVER_PORT, CLEAR_COMMANDS, STREAM_TIMEOUT, UI_DIST_PATH, MAIN_SERVER_URL
+from helper.config import (
+    SERVER_PORT,
+    CLEAR_COMMANDS,
+    STREAM_TIMEOUT,
+    UI_DIST_PATH,
+    MAIN_SERVER_URL,
+    DOOTASK_AI_GATEWAY_URL,
+    DOOTASK_AI_INSTANCE_ID,
+)
 from helper.invoke import parse_context, build_invoke_stream_key
 from helper.lifespan import lifespan_context
 from helper.models import (
@@ -998,6 +1007,78 @@ async def models_list(type: str = '', base_url: str = '', key: str = '', agency:
         return JSONResponse(content={"code": 500, "error": "获取失败"}, status_code=500)
 
     return JSONResponse(content={"code": 200, "data": data}, status_code=200)
+
+# ---- DooTask 官方厂商账号代理（前端 → 插件 → AppStore，规避 CORS、隐藏实例 ID）----
+
+def _bearer(authorization: str) -> str:
+    if authorization and authorization.startswith("Bearer "):
+        return authorization[len("Bearer "):].strip()
+    return ""
+
+
+async def _gateway_call(method: str, path: str, json_body=None, token: str = ""):
+    if not DOOTASK_AI_GATEWAY_URL:
+        return JSONResponse(content={"code": 500, "error": "AI 网关未配置"}, status_code=500)
+    url = f"{DOOTASK_AI_GATEWAY_URL}/api/v1/ai/account{path}"
+    headers = {"Content-Type": "application/json"}
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.request(method, url, json=json_body, headers=headers)
+        return JSONResponse(content=resp.json(), status_code=resp.status_code)
+    except httpx.HTTPError as exc:
+        return JSONResponse(content={"code": 502, "error": f"网关请求失败：{exc}"}, status_code=502)
+
+
+@app.get('/gateway/config')
+async def gateway_config():
+    """暴露网关地址供前端写入 dootask_base_url（= gateway/v1）。"""
+    return JSONResponse(content={"code": 200, "data": {
+        "gateway_url": DOOTASK_AI_GATEWAY_URL,
+        "base_url": (DOOTASK_AI_GATEWAY_URL + "/v1") if DOOTASK_AI_GATEWAY_URL else "",
+        "instance_id": DOOTASK_AI_INSTANCE_ID,
+        "configured": bool(DOOTASK_AI_GATEWAY_URL),
+    }})
+
+
+@app.post('/gateway/provision')
+async def gateway_provision():
+    """按安装实例自助开通匿名账号，返回 gateway_token。"""
+    return await _gateway_call("POST", "/provision", json_body={"instance_id": DOOTASK_AI_INSTANCE_ID})
+
+
+@app.post('/gateway/login')
+async def gateway_login(request: Request):
+    body = await request.json()
+    return await _gateway_call("POST", "/login", json_body=body)
+
+
+@app.post('/gateway/claim')
+async def gateway_claim(request: Request, authorization: str = Header(default="")):
+    body = await request.json()
+    return await _gateway_call("POST", "/claim", json_body=body, token=_bearer(authorization))
+
+
+@app.post('/gateway/logout')
+async def gateway_logout(authorization: str = Header(default="")):
+    return await _gateway_call("POST", "/logout", token=_bearer(authorization))
+
+
+@app.post('/gateway/email/send')
+async def gateway_email_send(request: Request, authorization: str = Header(default="")):
+    body = await request.json()
+    return await _gateway_call("POST", "/email/send", json_body=body, token=_bearer(authorization))
+
+
+@app.get('/gateway/me')
+async def gateway_me(authorization: str = Header(default="")):
+    return await _gateway_call("GET", "/me", token=_bearer(authorization))
+
+
+@app.get('/gateway/balance')
+async def gateway_balance(authorization: str = Header(default="")):
+    return await _gateway_call("GET", "/balance", token=_bearer(authorization))
 
 @app.get('/mcp/config')
 async def get_mcp_config():

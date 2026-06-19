@@ -5,6 +5,7 @@ import { Plug } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ModelListTable } from "@/components/aibot/ModelListTable"
+import { AccountPanel } from "@/components/aibot/AccountPanel"
 import {
   Sheet,
   SheetContent,
@@ -57,6 +58,8 @@ export interface BotSettingsSheetProps {
   mcps: MCPConfig[]
   onToggleModelMcp: (bot: AIBotKey, modelId: string, mcpId: string, checked: boolean) => void
   onApplyModelMcpToAll: (bot: AIBotKey, sourceModelId: string, allModelIds: string[]) => void
+  onGatewayAuth: (token: string, baseUrl: string) => void | Promise<void>
+  onGatewayLogout: () => void | Promise<void>
 }
 
 export const BotSettingsSheet = ({
@@ -80,6 +83,8 @@ export const BotSettingsSheet = ({
   mcps,
   onToggleModelMcp,
   onApplyModelMcpToAll,
+  onGatewayAuth,
+  onGatewayLogout,
 }: BotSettingsSheetProps) => {
   const { t } = useI18n()
   const enabledMcps = useMemo(() => mcps.filter((mcp) => mcp.enabled !== false), [mcps])
@@ -412,6 +417,13 @@ export const BotSettingsSheet = ({
                     <div className="flex flex-1 flex-col min-h-0">
                       <ScrollArea className="h-full">
                         <div className="flex flex-col gap-6 pb-10 pl-0.5 pr-3">
+                          {bot.value === "dootask" && (
+                            <AccountPanel
+                              token={formValues[bot.value]?.["dootask_key"] ?? ""}
+                              onAuth={onGatewayAuth}
+                              onLogout={onGatewayLogout}
+                            />
+                          )}
                           {fields.map((field) => renderField(bot, field))}
                         </div>
                       </ScrollArea>

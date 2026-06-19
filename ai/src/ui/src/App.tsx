@@ -408,6 +408,34 @@ function App() {
     }
   }
 
+  // 官方厂商账号：开通/登录/退出后，把 gateway_token 与网关地址持久化到 aibotSetting
+  const persistDootaskGateway = async (overrides: Record<string, string>) => {
+    const bot: AIBotKey = "dootask"
+    const merged = { ...(formValues[bot] ?? {}), ...overrides }
+    setFormValues((prev) => ({ ...prev, [bot]: merged }))
+    try {
+      const response = await requestAPI({
+        url: "system/setting/aibot",
+        method: "post",
+        data: { ...merged, type: "save", filter: bot },
+      })
+      const savedData = (response.data ?? {}) as Record<string, string>
+      setFormValues((prev) => ({ ...prev, [bot]: savedData }))
+      setInitialValues((prev) => ({ ...prev, [bot]: savedData }))
+      await refreshBotTags()
+    } catch (error) {
+      modalError(resolveErrorMessage(error, t("errors.submitFailed")))
+    }
+  }
+
+  const handleGatewayAuth = async (token: string, baseUrl: string) => {
+    await persistDootaskGateway({ dootask_key: token, dootask_base_url: baseUrl })
+  }
+
+  const handleGatewayLogout = async () => {
+    await persistDootaskGateway({ dootask_key: "" })
+  }
+
   const handleUseDefaultModels = async (bot: AIBotKey): Promise<string | null> => {
     if (defaultsLoading[bot]) return null
     const baseUrlKey = `${bot}_base_url`
@@ -430,6 +458,16 @@ function App() {
       if (agencyValue) {
         params.set("agency", agencyValue)
       }
+    } else if (bot === "dootask") {
+      // 官方厂商：从计量代理网关按 token 档位拉模型
+      const baseUrl = formValues[bot]?.[baseUrlKey]
+      const keyValue = formValues[bot]?.[keyKey]
+      if (!baseUrl || !keyValue) {
+        modalError(t("errors.baseUrlRequired"))
+        return null
+      }
+      params.set("base_url", baseUrl)
+      params.set("key", keyValue)
     }
 
     setDefaultsLoading((prev) => ({ ...prev, [bot]: true }))
@@ -687,6 +725,8 @@ function App() {
             mcps={mcps}
             onToggleModelMcp={handleToggleModelMcp}
             onApplyModelMcpToAll={handleApplyModelMcpToAll}
+            onGatewayAuth={handleGatewayAuth}
+            onGatewayLogout={handleGatewayLogout}
           />
           <MCPEditorSheet
             open={mcpEditorOpen}

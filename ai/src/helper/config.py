@@ -20,6 +20,11 @@ STREAM_TIMEOUT = 300
 # DooTask 主程序地址（检索打点回调等服务端到服务端请求）
 MAIN_SERVER_URL = os.environ.get("MAIN_SERVER_URL", "http://nginx")
 
+# DooTask 官方 AI 厂商（计量代理）网关地址与安装实例标识。
+# 安装时由 AppStore 注入；插件以此自助 provision 账号、代理账号操作、拉模型列表。
+DOOTASK_AI_GATEWAY_URL = os.environ.get("DOOTASK_AI_GATEWAY_URL", "").rstrip("/")
+DOOTASK_AI_INSTANCE_ID = os.environ.get("DOOTASK_AI_INSTANCE_ID", "")
+
 # 自定义 MCP 配置文件路径（用户自接的外部 MCP 服务器；DooTask 内置 MCP 已退役）
 # DOOTASK_MCP_ID 仍保留：用于识别并跳过历史配置里残留的系统 MCP 条目
 MCP_CONFIG_PATH = BASE_DIR / "config" / "mcp-config.json"
@@ -170,5 +175,9 @@ CONTEXT_LIMITS = {
         "ernie-4.5-turbo-128k": 128000,
         "ernie-4.5-turbo-vl-32k": 32000,
         "default": 32000,
+    },
+    "dootask": {
+        # 官方网关聚合多家上游（含 GLM 200K 等），取保守默认避免溢出
+        "default": 128000,
     },
 }
