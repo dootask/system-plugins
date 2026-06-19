@@ -1080,6 +1080,8 @@ async def kb_reindex(request: Request, x_ingest_token: str = Header(default="", 
         - paths: 相对 KB_CONTENT_DIR 的 markdown 路径列表（incremental 模式用）
         - mode:  "reconcile"（默认，按文件 hash 对账增量收敛）
                  / "incremental"（仅指定 paths）/ "full"（全量重建）
+        - apps:  已安装应用清单 [{id,version}]（AppStore 广播事件下发的通用 INSTALLED_APPS）。
+                 reconcile/full 时作为已装应用 KB 的真相源；省略则沿用上次持久化的清单。
     """
     expected = os.environ.get("KB_INGEST_TOKEN", "")
     if not expected:
@@ -1096,16 +1098,19 @@ async def kb_reindex(request: Request, x_ingest_token: str = Header(default="", 
         body = {}
 
     paths = body.get("paths") if isinstance(body, dict) else None
+    apps = body.get("apps") if isinstance(body, dict) else None
+    if apps is not None and not isinstance(apps, list):
+        apps = None
     mode = (body.get("mode") if isinstance(body, dict) else None) or ("incremental" if paths else "reconcile")
 
     try:
         from helper.kb.ingest import ingest_paths, ingest_all, reconcile
         if mode == "full":
-            result = await ingest_all()
+            result = await ingest_all(installed_apps=apps)
         elif mode == "incremental" and paths:
             result = await ingest_paths(paths)
         else:
-            result = await reconcile()
+            result = await reconcile(installed_apps=apps)
     except Exception as exc:
         logger.exception("kb_reindex failed")
         return JSONResponse(content={"code": 500, "error": str(exc)}, status_code=500)

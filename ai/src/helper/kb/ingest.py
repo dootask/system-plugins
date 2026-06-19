@@ -14,11 +14,13 @@ CLI：python -m helper.kb.ingest [--path X] [--reconcile] [--dry-run] [--locale 
 import asyncio
 import glob as _glob
 import hashlib
+import json
 import logging
 import os
 from typing import Any, Dict, List, Optional, Tuple
 
 import frontmatter
+import yaml
 from redis.commands.vectorset.commands import QuantizationOptions
 from redis.exceptions import ResponseError
 
@@ -35,14 +37,67 @@ def _kb_root() -> str:
     return os.environ.get("KB_CONTENT_DIR", "/app/kb-content")
 
 
-def _kb_apps_root() -> Optional[str]:
-    """应用 overlay 根（KB_APPS_DIR，默认 /app/kb-apps）。
+def _apps_root() -> Optional[str]:
+    """已安装应用包根（APPS_DIR，默认 /app/apps，对应只读挂载 docker/appstore/apps）。
 
-    结构为 <app-id>/<locale>/<type>/...，由 AppStore 在应用安装时复制写入；
-    目录不存在（未挂载/无应用自带 KB）时各处会自动跳过。
+    结构为 <app-id>/<version>/...（应用包原样）。AI 不再依赖 AppStore 复制 overlay，
+    而是据广播事件下发的"已安装应用清单"到这里逐应用自取 knowledge_base 目录。
+    目录不存在（未挂载）时各处会自动跳过。
     """
-    root = os.environ.get("KB_APPS_DIR", "/app/kb-apps").strip()
+    root = os.environ.get("APPS_DIR", "/app/apps").strip()
     return root or None
+
+
+def _read_app_kb_field(config_path: str) -> Optional[str]:
+    """读应用 config.yml 的 knowledge_base 字段，返回相对目录（去前导 ./）；无则 None。
+
+    兼容标量写法（knowledge_base: ./ai-kb）与映射写法（knowledge_base: {directory: ./ai-kb}）。
+    """
+    try:
+        with open(config_path, "rb") as f:
+            cfg = yaml.safe_load(f) or {}
+    except (OSError, yaml.YAMLError):
+        return None
+    if not isinstance(cfg, dict):
+        return None
+    kb = cfg.get("knowledge_base")
+    if isinstance(kb, str):
+        directory = kb
+    elif isinstance(kb, dict):
+        directory = kb.get("directory") or ""
+    else:
+        return None
+    directory = str(directory).strip().lstrip("./").strip()
+    return directory or None
+
+
+def _resolve_app_kb_dir(apps_root: str, app_id: str, version: str) -> Optional[str]:
+    """定位某已安装应用的 knowledge_base 物理目录（优先版本目录、回退应用根）。
+
+    复刻 AppStore 旧 mergeConfigs 的版本覆盖优先级：版本目录 config.yml 声明的字段
+    优先于应用根 config.yml；目录解析同样"版本目录优先、回退应用根"。
+    """
+    app_dir = os.path.join(apps_root, app_id)
+    version_dir = os.path.join(app_dir, version) if version else ""
+
+    # 字段值：版本目录优先
+    kb_rel = None
+    if version_dir:
+        kb_rel = _read_app_kb_field(os.path.join(version_dir, "config.yml"))
+    if not kb_rel:
+        kb_rel = _read_app_kb_field(os.path.join(app_dir, "config.yml"))
+    if not kb_rel:
+        return None
+
+    # 物理目录：版本目录优先、回退应用根
+    candidates = []
+    if version_dir:
+        candidates.append(os.path.join(version_dir, kb_rel))
+    candidates.append(os.path.join(app_dir, kb_rel))
+    for p in candidates:
+        if os.path.isdir(p):
+            return p
+    return None
 
 
 def _path_key(root_type: str, rel_path: str) -> str:
@@ -103,17 +158,50 @@ def _list_md_files(root: str, locale: str = "zh") -> List[str]:
     )
 
 
-def _list_app_md_files(apps_root: str, locale: str = "zh") -> List[str]:
-    """列出 overlay 根下各应用 <app-id>/<locale>/** 的 markdown 相对路径。
+def _list_installed_app_kb_files(
+    apps_root: str, installed: List[Dict[str, Any]], locale: str = "zh"
+) -> List[Tuple[str, str]]:
+    """对已安装应用清单逐个解析 knowledge_base 目录，列出 (logical_rel, abs_path)。
 
-    返回相对 apps_root 的路径（含 <app-id> 段，如 approve/zh/concept/x.md），
-    使记账键天然按应用命名空间隔离，卸载某应用时其条目可被精确对账删除。
+    logical_rel = "<app-id>/<locale>/..."（剥掉 version 与 kb 目录名），使记账键
+    path:apps:<app-id>/zh/... 跨版本稳定、与历史索引完全一致：升级零 churn，且
+    卸载某应用时其条目可被精确对账删除（清单里没有 → 不在 disk → removed）。
     """
-    pattern = os.path.join(apps_root, "*", locale, "**", "*.md")
-    return sorted(
-        os.path.relpath(p, apps_root)
-        for p in _glob.glob(pattern, recursive=True)
-    )
+    out: List[Tuple[str, str]] = []
+    for item in installed or []:
+        app_id = (item.get("id") or "").strip() if isinstance(item, dict) else ""
+        version = (item.get("version") or "").strip() if isinstance(item, dict) else ""
+        if not app_id:
+            continue
+        kb_dir = _resolve_app_kb_dir(apps_root, app_id, version)
+        if not kb_dir:
+            continue
+        pattern = os.path.join(kb_dir, locale, "**", "*.md")
+        for p in _glob.glob(pattern, recursive=True):
+            rel_in_kb = os.path.relpath(p, kb_dir)  # 如 zh/concept/x.md
+            logical_rel = f"{app_id}/{rel_in_kb}"
+            out.append((logical_rel, p))
+    return sorted(out)
+
+
+async def _save_installed_apps(installed: List[Dict[str, Any]]) -> None:
+    """把"上次收到的已安装应用清单"持久化到 META_KEY，供容器重启时自愈对账。"""
+    try:
+        await get_raw_client().hset(META_KEY, b"installed_apps", json.dumps(installed).encode())
+    except Exception as e:
+        logger.warning(f"save installed_apps failed: {e}")
+
+
+async def _load_installed_apps() -> List[Dict[str, Any]]:
+    """读回持久化的已安装应用清单；无/损坏返回空列表。"""
+    try:
+        raw = await get_raw_client().hget(META_KEY, b"installed_apps")
+        if not raw:
+            return []
+        data = json.loads(raw.decode())
+        return data if isinstance(data, list) else []
+    except Exception:
+        return []
 
 
 def _file_hash(raw: bytes) -> str:
@@ -178,10 +266,15 @@ async def _write_bookkeeping(rel_path: str, chunk_id: str, count: int, file_hash
     })
 
 
-async def ingest_one(rel_path: str, kb_root: Optional[str] = None, root_type: str = "core") -> Dict[str, Any]:
-    """ingest 单个 markdown 文件。"""
-    root = kb_root or _kb_root()
-    full = os.path.join(root, rel_path)
+async def ingest_one(
+    rel_path: str, kb_root: Optional[str] = None, root_type: str = "core", abs_path: Optional[str] = None
+) -> Dict[str, Any]:
+    """ingest 单个 markdown 文件。
+
+    记账键始终用 rel_path（logical）；abs_path 给定时从该绝对路径读文件内容
+    （apps 用：物理路径含 version/kb 目录，但 logical rel 不含，保证记账键跨版本稳定）。
+    """
+    full = abs_path if abs_path else os.path.join(kb_root or _kb_root(), rel_path)
 
     if not os.path.isfile(full):
         return {"path": rel_path, "ok": False, "error": "file not found"}
@@ -258,14 +351,23 @@ async def ingest_one(rel_path: str, kb_root: Optional[str] = None, root_type: st
     return {"path": rel_path, "id": fm["id"], "chunks": len(chunks), "ok": True, "error": None}
 
 
-async def ingest_paths(paths: List[str], kb_root: Optional[str] = None, root_type: str = "core") -> Dict[str, Any]:
-    """批量 ingest。失败的不阻塞其他文件。"""
+async def ingest_paths(
+    paths: List[str],
+    kb_root: Optional[str] = None,
+    root_type: str = "core",
+    abs_paths: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """批量 ingest。失败的不阻塞其他文件。
+
+    abs_paths（与 paths 等长、一一对应）给定时按绝对路径读文件，paths 仅作 logical rel 记账。
+    """
     results: List[Dict[str, Any]] = []
     total = len(paths)
     progress_every = 50
     for idx, p in enumerate(paths, 1):
+        ap = abs_paths[idx - 1] if abs_paths else None
         try:
-            results.append(await ingest_one(p, kb_root, root_type))
+            results.append(await ingest_one(p, kb_root, root_type, abs_path=ap))
         except Exception as e:
             logger.exception(f"ingest failed for {p}")
             results.append({"path": p, "ok": False, "error": str(e)})
@@ -295,11 +397,17 @@ async def ingest_all(
     kb_root: Optional[str] = None,
     kb_apps_root: Optional[str] = None,
     locales: Optional[List[str]] = None,
+    installed_apps: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """全量 ingest（核心根 + 应用 overlay 根）。"""
+    """全量 ingest（核心根 + 已安装应用自带 KB）。
+
+    installed_apps 来自广播事件下发的清单；为 None 时读回持久化清单（容器自起场景）。
+    """
     core_root = kb_root or _kb_root()
-    apps_root = kb_apps_root if kb_apps_root is not None else _kb_apps_root()
+    apps_root = kb_apps_root if kb_apps_root is not None else _apps_root()
     locales = locales or ["zh"]  # P0 只跑中文；P1 加 en
+
+    installed = installed_apps if installed_apps is not None else await _load_installed_apps()
 
     merged: Dict[str, Any] = {"ingested": 0, "failed": 0, "total_chunks": 0, "errors": []}
 
@@ -313,13 +421,17 @@ async def ingest_all(
     else:
         logger.warning(f"KB content dir not found: {core_root}; skipping core ingest")
 
-    if apps_root and os.path.isdir(apps_root):
-        app_paths: List[str] = []
+    if apps_root and os.path.isdir(apps_root) and installed:
+        pairs: List[Tuple[str, str]] = []
         for loc in locales:
-            app_paths.extend(_list_app_md_files(apps_root, loc))
-        logger.info(f"ingest_all apps: {len(app_paths)} files from {apps_root}")
-        if app_paths:
-            _merge_result(merged, await ingest_paths(app_paths, kb_root=apps_root, root_type="apps"))
+            pairs.extend(_list_installed_app_kb_files(apps_root, installed, loc))
+        logger.info(f"ingest_all apps: {len(pairs)} files from {len(installed)} installed apps")
+        if pairs:
+            _merge_result(merged, await ingest_paths(
+                [lr for lr, _ in pairs], root_type="apps", abs_paths=[ap for _, ap in pairs]))
+
+    if installed_apps is not None:
+        await _save_installed_apps(installed_apps)
 
     return merged
 
@@ -328,21 +440,34 @@ async def reconcile(
     kb_root: Optional[str] = None,
     kb_apps_root: Optional[str] = None,
     locales: Optional[List[str]] = None,
+    installed_apps: Optional[List[Dict[str, Any]]] = None,
 ) -> Dict[str, Any]:
-    """按文件内容 hash 对账，增量收敛核心根 + 应用 overlay 根的增/删/改 markdown。
+    """按文件内容 hash 对账，增量收敛核心根 + 已安装应用自带 KB 的增/删/改 markdown。
 
     无变化时只做本地哈希比对，零 embedding API 调用、零写入。
     meta 缺 path:* 账（如从旧版本升级）时相关文件会被视为变更，触发一次性重灌补账。
     core 与 apps 按 root_type 分别记账（path:{rel} vs path:apps:{rel}），相同相对路径
     不会互相误删。
+
+    installed_apps 是 apps 根的真相源：
+      - 不为 None（来自事件，含显式空列表）→ apps 根权威，扫描 + 允许删除清单外条目；
+      - 为 None（容器自起）→ 读回持久化清单；持久化为空时视为"未知"，不扫 apps、不删，
+        避免无清单时误删既有应用条目（下一个事件会补账）。
     """
     core_root = kb_root or _kb_root()
-    apps_root = kb_apps_root if kb_apps_root is not None else _kb_apps_root()
+    apps_root = kb_apps_root if kb_apps_root is not None else _apps_root()
     locales = locales or ["zh"]
 
+    if installed_apps is not None:
+        installed, apps_known = installed_apps, True
+    else:
+        installed = await _load_installed_apps()
+        apps_known = len(installed) > 0
+
     # 扫描磁盘：disk[(root_type, rel)] = hash；scanned 记录"本次确实扫了"的根，
-    # 未扫到的根（目录缺失/未挂载）其 indexed 条目不参与 removed 判定，避免误删。
+    # 未扫到的根（目录缺失/未挂载/无权威清单）其 indexed 条目不参与 removed 判定，避免误删。
     disk: Dict[Tuple[str, str], str] = {}
+    apps_abs: Dict[str, str] = {}  # logical_rel -> abs_path（apps 改动重灌时按绝对路径读）
     scanned: set = set()
     if os.path.isdir(core_root):
         scanned.add("core")
@@ -356,13 +481,14 @@ async def reconcile(
     else:
         logger.warning(f"KB content dir not found: {core_root}; skip core reconcile")
 
-    if apps_root and os.path.isdir(apps_root):
+    if apps_root and os.path.isdir(apps_root) and apps_known:
         scanned.add("apps")
         for loc in locales:
-            for rel in _list_app_md_files(apps_root, loc):
+            for logical_rel, abs_path in _list_installed_app_kb_files(apps_root, installed, loc):
                 try:
-                    with open(os.path.join(apps_root, rel), "rb") as f:
-                        disk[("apps", rel)] = _file_hash(f.read())
+                    with open(abs_path, "rb") as f:
+                        disk[("apps", logical_rel)] = _file_hash(f.read())
+                    apps_abs[logical_rel] = abs_path
                 except OSError:
                     continue
 
@@ -383,6 +509,10 @@ async def reconcile(
         await _delete_old_chunks(indexed[(rt, rel)][1])
         await r.hdel(META_KEY, _path_key(rt, rel))
 
+    # 收到权威清单即落持久化（即便本次无内容变化，也要刷新已装集合，供下次自起对账）
+    if installed_apps is not None:
+        await _save_installed_apps(installed_apps)
+
     if not changed:
         return {"changed": 0, "removed": len(removed), "ingested": 0, "failed": 0, "total_chunks": 0, "errors": []}
 
@@ -394,7 +524,8 @@ async def reconcile(
     if core_changed:
         _merge_result(merged, await ingest_paths(core_changed, kb_root=core_root, root_type="core"))
     if apps_changed:
-        _merge_result(merged, await ingest_paths(apps_changed, kb_root=apps_root, root_type="apps"))
+        _merge_result(merged, await ingest_paths(
+            apps_changed, root_type="apps", abs_paths=[apps_abs[rel] for rel in apps_changed]))
 
     # 同一路径换了 chunk id：清掉旧 id 留下的孤儿
     for rt, rel in changed:
