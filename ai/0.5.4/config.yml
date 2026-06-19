@@ -49,3 +49,11 @@ require_version:
 hooks:
   upgrade: |
     exit 0
+  # 订阅应用生命周期广播（任一应用装/更/卸）→ 触发知识库 reconcile，使 AI 助手可检索的
+  # 应用文档始终与"装了哪些应用"一致。令牌走 ${KB_INGEST_TOKEN} 占位符，由 config 解析时
+  # 替换（不落明文）；hook 在 AppStore 容器内执行，经 docker 网络访问 ai:5001。
+  app_install:
+    cmd: 'curl -sf -m 15 -X POST http://ai:5001/kb/reindex -H "X-Ingest-Token: ${KB_INGEST_TOKEN}" -H "Content-Type: application/json" -d ''{"mode":"reconcile"}'''
+  # 装/更/卸三事件触发同一次 reconcile，用 @ 引用复用 app_install 的命令，避免重复
+  app_update: '@app_install'
+  app_uninstall: '@app_install'
