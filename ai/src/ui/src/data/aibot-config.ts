@@ -24,6 +24,8 @@ export type ExtraFieldConfig = {
 
 export interface BotConfig {
   extraFields?: ExtraFieldConfig[]
+  /** 隐藏的基础字段（按原始 prop，如 "key"/"base_url"/"agency"）：值仍保留，仅不在表单展示 */
+  hiddenFields?: string[]
 }
 
 export interface SystemConfig {
@@ -43,10 +45,10 @@ const createFields = (lang: Language): FieldConfig[] => {
       label: isZh ? "模型列表" : "Model List",
       prop: "models",
       type: "textarea",
-      maxlength: 1000,
+      maxlength: 4000,
       showWordLimit: 0.9,
       placeholder: isZh ? "一行一个模型名称" : "One model name per line",
-      functions: isZh ? "使用默认模型列表" : "Use default model list",
+      functions: isZh ? "获取模型列表" : "Fetch model list",
     },
     {
       label: isZh ? "默认模型" : "Default Model",
@@ -97,20 +99,9 @@ const createAiList = (lang: Language): Record<AIBotKey, BotConfig> => {
   const isZh = lang === "zh"
   return {
     dootask: {
+      // 官方厂商：令牌/网关地址由账号面板自动管理，代理对官方网关无意义，统一隐藏
+      hiddenFields: ["key", "base_url", "agency"],
       extraFields: [
-        {
-          prop: "key",
-          label: isZh ? "账号令牌" : "Account Token",
-          tip: isZh
-            ? "由上方账号面板自动管理，无需手动填写"
-            : "Managed automatically by the account panel above; no need to fill in manually.",
-        },
-        {
-          prop: "base_url",
-          tip: isZh
-            ? "官方网关地址，自动配置"
-            : "Official gateway URL, configured automatically.",
-        },
         {
           prop: "models",
           tip: isZh
@@ -199,8 +190,8 @@ const createAiList = (lang: Language): Record<AIBotKey, BotConfig> => {
         {
           prop: "models",
           tip: isZh
-            ? "点击下方按钮可获取默认模型列表"
-            : "Click the button below to fetch the default model list.",
+            ? "点击下方按钮可获取模型列表"
+            : "Click the button below to fetch the model list.",
         },
       ],
     },

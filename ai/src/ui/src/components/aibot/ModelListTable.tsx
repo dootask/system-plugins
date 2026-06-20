@@ -1,6 +1,8 @@
 import {
+  forwardRef,
   useCallback,
   useEffect,
+  useImperativeHandle,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -103,6 +105,7 @@ export interface ModelListTableProps {
   addButtonLabel: string
   emptyLabel: string
   removeLabel: string
+  removeSelectedLabel: string
   modelPlaceholder: string
   labelPlaceholder: string
   maxLength?: number
@@ -110,9 +113,16 @@ export interface ModelListTableProps {
   mcps?: MCPConfig[]
   onToggleModelMcp?: (modelId: string, mcpId: string, checked: boolean) => void
   onApplyModelMcpToAll?: (sourceModelId: string, allModelIds: string[]) => void
+  // 新拉取加入的模型 code，命中行用背景色高亮
+  highlightedValues?: string[]
 }
 
-export const ModelListTable = ({
+export interface ModelListTableHandle {
+  /** 同步读取当前最新序列化值（绕过 onChange 的 React 异步刷新，供保存时长度校验用） */
+  getSerializedValue: () => string
+}
+
+export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTableProps>(({
   value,
   onChange,
   modelLabel,
@@ -121,6 +131,7 @@ export const ModelListTable = ({
   addButtonLabel,
   emptyLabel,
   removeLabel,
+  removeSelectedLabel,
   modelPlaceholder,
   labelPlaceholder,
   maxLength,
@@ -128,8 +139,13 @@ export const ModelListTable = ({
   mcps,
   onToggleModelMcp,
   onApplyModelMcpToAll,
-}: ModelListTableProps) => {
+  highlightedValues,
+}, ref) => {
   const { t } = useI18n()
+  const highlightedSet = useMemo(
+    () => new Set((highlightedValues ?? []).filter(Boolean)),
+    [highlightedValues],
+  )
   const enabledMcps = useMemo(
     () => (mcps ?? []).filter((mcp) => mcp.enabled !== false),
     [mcps],
@@ -138,23 +154,58 @@ export const ModelListTable = ({
   const rowsRef = useRef(rows)
   const lastSerializedRef = useRef(value)
   const activeCellRef = useRef<{ rowId: string; key: ModelTableCellKey } | null>(null)
+  // 勾选的行（按 row.id）
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
+  // 获取模型列表后，待自动勾选的模型 code（由 highlightedValues 触发，等行刷新后映射成 row.id）
+  const pendingSelectValuesRef = useRef<Set<string> | null>(null)
 
   const serializedValue = useMemo(() => serializeRows(rows), [rows])
+  const selectedCount = useMemo(
+    () => rows.reduce((n, row) => (selectedIds.has(row.id) ? n + 1 : n), 0),
+    [rows, selectedIds],
+  )
+
+  // 供父级保存时同步读取最新值（rowsRef 始终最新，不受 onChange 的异步 setState 影响）
+  useImperativeHandle(
+    ref,
+    () => ({ getSerializedValue: () => serializeRows(rowsRef.current) }),
+    [],
+  )
 
   useEffect(() => {
     rowsRef.current = rows
   }, [rows])
+
+  // highlightedValues 变化 = 一次新的"获取模型列表"：自动勾选这些模型，原有列表保持不选；为空则清空选择
+  useEffect(() => {
+    const values = (highlightedValues ?? []).filter(Boolean)
+    if (values.length === 0) {
+      pendingSelectValuesRef.current = null
+      setSelectedIds(new Set())
+      return
+    }
+    const set = new Set(values)
+    // value 若同帧变化（合并新模型），行尚未刷新 → 暂存，待下方 value 同步 effect 用最新行映射
+    pendingSelectValuesRef.current = set
+    // value 未变化时行已是最新，立即映射兜底
+    setSelectedIds(
+      new Set(rowsRef.current.filter((r) => set.has(r.value.trim())).map((r) => r.id)),
+    )
+  }, [highlightedValues])
 
   useEffect(() => {
     if (value === lastSerializedRef.current) {
       return
     }
     lastSerializedRef.current = value
-    setRows((previous) => {
-      const next = parseRows(value, previous)
-      rowsRef.current = next
-      return next
-    })
+    const next = parseRows(value, rowsRef.current)
+    rowsRef.current = next
+    setRows(next)
+    const pending = pendingSelectValuesRef.current
+    if (pending) {
+      pendingSelectValuesRef.current = null
+      setSelectedIds(new Set(next.filter((r) => pending.has(r.value.trim())).map((r) => r.id)))
+    }
   }, [value])
 
   const commitRows = useCallback(
@@ -247,8 +298,61 @@ export const ModelListTable = ({
     updateRows((prev) => [...prev, createRow()], true)
   }, [updateRows])
 
+  const handleToggleAll = useCallback((checked: boolean) => {
+    setSelectedIds(checked ? new Set(rowsRef.current.map((row) => row.id)) : new Set())
+  }, [])
+
+  const handleToggleRow = useCallback((rowId: string, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (checked) {
+        next.add(rowId)
+      } else {
+        next.delete(rowId)
+      }
+      return next
+    })
+  }, [])
+
+  const handleRemoveSelected = useCallback(() => {
+    updateRows((prev) => prev.filter((row) => !selectedIds.has(row.id)), true)
+    setSelectedIds(new Set())
+  }, [updateRows, selectedIds])
+
   const columns = useMemo<ColumnDef<ModelTableRow>[]>(
     () => [
+      {
+        id: "select",
+        header: ({ table }) => {
+          const allRows = table.getRowModel().rows
+          const total = allRows.length
+          const selected = allRows.reduce(
+            (n, item) => (selectedIds.has(item.original.id) ? n + 1 : n),
+            0,
+          )
+          return (
+            <Checkbox
+              checked={total > 0 && selected === total}
+              indeterminate={selected > 0 && selected < total}
+              disabled={disabled || total === 0}
+              onCheckedChange={(checked) => handleToggleAll(checked)}
+              className="justify-center"
+            />
+          )
+        },
+        cell: ({ row }) => (
+          <Checkbox
+            checked={selectedIds.has(row.original.id)}
+            disabled={disabled}
+            onCheckedChange={(checked) => handleToggleRow(row.original.id, checked)}
+            className="justify-center"
+          />
+        ),
+        meta: {
+          headerClassName: "w-[40px]",
+          cellClassName: "w-[40px] text-center",
+        },
+      },
       {
         accessorKey: "value",
         header: () => modelLabel,
@@ -263,6 +367,10 @@ export const ModelListTable = ({
             data-model-cell={`${row.original.id}-value`}
           />
         ),
+        meta: {
+          headerClassName: "min-w-[160px]",
+          cellClassName: "min-w-[160px]",
+        },
       },
       {
         accessorKey: "label",
@@ -278,6 +386,10 @@ export const ModelListTable = ({
             data-model-cell={`${row.original.id}-label`}
           />
         ),
+        meta: {
+          headerClassName: "min-w-[160px]",
+          cellClassName: "min-w-[160px]",
+        },
       },
       {
         id: "thinking",
@@ -456,6 +568,9 @@ export const ModelListTable = ({
       actionLabel,
       disabled,
       displayLabel,
+      selectedIds,
+      handleToggleAll,
+      handleToggleRow,
       handleCellBlur,
       handleCellChange,
       handleCellFocus,
@@ -511,7 +626,7 @@ export const ModelListTable = ({
 
   return (
     <div className="rounded-md border">
-      <div className="overflow-hidden border-b">
+      <div className="overflow-x-auto border-b">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
@@ -520,6 +635,7 @@ export const ModelListTable = ({
                   <TableHead
                     key={header.id}
                     className={cn(
+                      "whitespace-nowrap",
                       header.column.columnDef.meta?.headerClassName,
                     )}
                   >
@@ -534,11 +650,16 @@ export const ModelListTable = ({
           <TableBody>
             {table.getRowModel().rows.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id}>
+                <TableRow
+                  key={row.id}
+                  className={cn(
+                    highlightedSet.has(row.original.value.trim()) && "bg-muted/50",
+                  )}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
-                      className={cn(cell.column.columnDef.meta?.cellClassName)}
+                      className={cn("whitespace-nowrap", cell.column.columnDef.meta?.cellClassName)}
                     >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </TableCell>
@@ -555,7 +676,7 @@ export const ModelListTable = ({
           </TableBody>
         </Table>
       </div>
-      <div className="m-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+      <div className="m-3 flex flex-wrap items-center gap-2">
         <Button
           type="button"
           variant="outline"
@@ -565,7 +686,20 @@ export const ModelListTable = ({
         >
           {addButtonLabel}
         </Button>
+        {selectedCount > 0 && (
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            onClick={handleRemoveSelected}
+            disabled={disabled}
+          >
+            {removeSelectedLabel} ({selectedCount})
+          </Button>
+        )}
       </div>
     </div>
   )
-}
+})
+
+ModelListTable.displayName = "ModelListTable"

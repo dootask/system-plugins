@@ -138,5 +138,11 @@ export const mergeFields = (
     }
   })
 
-  return prefixed.sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
+  // 隐藏字段：值仍保留在 formValues 中（如官方厂商的 key/base_url 由账号面板自动写入），仅不在表单里展示
+  const hidden = new Set(botConfig?.hiddenFields ?? [])
+  const visible = hidden.size
+    ? prefixed.filter((field) => !hidden.has(field.originalProp))
+    : prefixed
+
+  return visible.sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
 }

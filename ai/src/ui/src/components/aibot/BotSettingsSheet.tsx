@@ -1,10 +1,11 @@
-import { useMemo, useState, useCallback, useEffect } from "react"
+import { useMemo, useState, useCallback, useEffect, useRef } from "react"
 
 import { Plug } from "lucide-react"
+import { messageError } from "@dootask/tools"
 
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ModelListTable } from "@/components/aibot/ModelListTable"
+import { ModelListTable, type ModelListTableHandle } from "@/components/aibot/ModelListTable"
 import { AccountPanel } from "@/components/aibot/AccountPanel"
 import {
   Sheet,
@@ -101,6 +102,10 @@ export const BotSettingsSheet = ({
     field: GeneratedField
   } | null>(null)
   const [modelEditorValue, setModelEditorValue] = useState("")
+  // 表格句柄：保存时同步读取最新序列化值，规避 onChange 的异步刷新
+  const modelTableRef = useRef<ModelListTableHandle>(null)
+  // 本次「获取模型列表」新加入的模型 code，用于在表格里高亮
+  const [highlightedModelValues, setHighlightedModelValues] = useState<string[]>([])
 
   const hasChanges = useMemo(() => {
     const result: Record<AIBotKey, boolean> = {} as Record<AIBotKey, boolean>
@@ -130,6 +135,7 @@ export const BotSettingsSheet = ({
   useEffect(() => {
     if (!open) {
       setModelEditor(null)
+      setHighlightedModelValues([])
     }
   }, [open])
 
@@ -155,6 +161,7 @@ export const BotSettingsSheet = ({
       const currentValue = formValues[bot.value]?.[field.prop] ?? ""
       setModelEditor({ bot, field })
       setModelEditorValue(currentValue)
+      setHighlightedModelValues([])
     },
     [formValues],
   )
@@ -164,23 +171,54 @@ export const BotSettingsSheet = ({
   }, [])
 
   const handleSaveModelEditor = useCallback(() => {
-    if (!modelEditor || !modelEditorHasChanges) {
+    if (!modelEditor) {
       setModelEditor(null)
       return
     }
-    onChangeField(modelEditor.bot.value, modelEditor.field.prop, modelEditorValue)
+    // 同步读取表格最新值，避免“输入未失焦即点保存”时读到旧的 modelEditorValue
+    const currentValue = modelTableRef.current?.getSerializedValue() ?? modelEditorValue
+    if (currentValue === modelEditorOriginalValue) {
+      setModelEditor(null)
+      return
+    }
+    // 兜底校验：序列化后超出该字段长度上限则阻止保存（获取列表时允许临时超出，保存时拦）
+    const maxLength = modelEditor.field.maxlength
+    if (typeof maxLength === "number" && maxLength > 0 && currentValue.length > maxLength) {
+      messageError(t("sheet.models.tooLong"))
+      return
+    }
+    onChangeField(modelEditor.bot.value, modelEditor.field.prop, currentValue)
     setModelEditor(null)
-  }, [modelEditor, modelEditorHasChanges, modelEditorValue, onChangeField])
+  }, [modelEditor, modelEditorOriginalValue, modelEditorValue, onChangeField, t])
 
   const handleUseDefaultModelsInternal = useCallback(async () => {
     if (!modelEditor || modelEditorDefaultsLoading || modelEditorSaving) {
       return
     }
     const result = await onUseDefaultModels(modelEditor.bot.value)
-    if (typeof result === "string") {
-      setModelEditorValue(result)
+    if (typeof result !== "string") {
+      return
     }
-  }, [modelEditor, modelEditorDefaultsLoading, modelEditorSaving, onUseDefaultModels])
+    // 合并到现有列表：已存在的（按 code）保留，仅追加新模型，并高亮新加入的行
+    const fetched = parseModelNames(result)
+    const existing = parseModelNames(modelEditorValue)
+    const existingValues = new Set(existing.map((m) => m.value))
+    const added = fetched.filter((m) => m.value && !existingValues.has(m.value))
+    const merged = [...existing, ...added]
+    const serialized = merged.length
+      ? JSON.stringify(
+          merged.map((m) => ({ id: m.value, name: m.label || m.value, thinking: m.thinking })),
+        )
+      : ""
+    setModelEditorValue(serialized)
+    setHighlightedModelValues(added.map((m) => m.value))
+  }, [
+    modelEditor,
+    modelEditorDefaultsLoading,
+    modelEditorSaving,
+    modelEditorValue,
+    onUseDefaultModels,
+  ])
 
   const renderField = (bot: AIBotItem, field: GeneratedField) => {
     const fieldValue = formValues[bot.value]?.[field.prop] ?? ""
@@ -493,6 +531,7 @@ export const BotSettingsSheet = ({
                 <div className="space-y-2">
                   <Label className="text-sm font-medium">{modelEditor.field.label}</Label>
                   <ModelListTable
+                    ref={modelTableRef}
                     value={modelEditorValue}
                     onChange={setModelEditorValue}
                     modelLabel={t("sheet.models.column.model")}
@@ -501,10 +540,12 @@ export const BotSettingsSheet = ({
                     addButtonLabel={t("sheet.models.add")}
                     emptyLabel={t("sheet.models.empty")}
                     removeLabel={t("sheet.models.remove")}
+                    removeSelectedLabel={t("sheet.models.removeSelected")}
                     modelPlaceholder={modelEditor.field.placeholder ?? t("sheet.models.modelPlaceholder")}
                     labelPlaceholder={t("sheet.models.labelPlaceholder")}
                     maxLength={modelEditor.field.maxlength}
                     disabled={modelEditorDefaultsLoading || modelEditorSaving}
+                    highlightedValues={highlightedModelValues}
                     mcps={mcps}
                     onToggleModelMcp={(modelId, mcpId, checked) =>
                       onToggleModelMcp(modelEditor.bot.value, modelId, mcpId, checked)
@@ -516,6 +557,7 @@ export const BotSettingsSheet = ({
                 </div>
               </div>
               <ScrollBar orientation="vertical" />
+              <ScrollBar orientation="horizontal" />
             </ScrollArea>
           )}
           <SheetFooter className="gap-3 border-t pt-4">

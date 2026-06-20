@@ -81,6 +81,11 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
     void loadMe(token)
   }, [token, loadMe])
 
+  // 账号失效（登出 / Reset 清空 token 等）时复位表单态，避免停在 login/claim 出现空白按钮区
+  useEffect(() => {
+    if (!token) setMode("view")
+  }, [token])
+
   const fetchBaseUrl = useCallback(async (): Promise<string> => {
     const { ok, json } = await gateway("/config")
     return ok && json?.data?.base_url ? String(json.data.base_url) : ""
@@ -181,6 +186,13 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
   const signedIn = Boolean(token)
   const isAnonymous = account?.type !== "claimed"
 
+  // 额度桶 kind → 友好文案；未知 kind 回退到原始值，避免直接暴露字段名
+  const bucketLabel = (kind: string): string => {
+    if (kind === "rolling_5h") return t("sheet.account.bucketRolling5h")
+    if (kind === "weekly") return t("sheet.account.bucketWeekly")
+    return kind
+  }
+
   return (
     <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">
@@ -209,11 +221,14 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
             {t("sheet.account.balance")}
           </div>
           <div className="flex flex-wrap gap-2">
-            {(account.buckets ?? []).map((b) => (
-              <Badge key={b.kind} variant="secondary" className="font-normal">
-                {b.kind}: {b.balance}/{b.amount}
-              </Badge>
-            ))}
+            {(account.buckets ?? []).map((b) => {
+              const percent = b.amount > 0 ? Math.round((b.balance / b.amount) * 100) : 0
+              return (
+                <Badge key={b.kind} variant="secondary" className="font-normal">
+                  {bucketLabel(b.kind)}: {percent}%
+                </Badge>
+              )
+            })}
           </div>
         </div>
       )}
@@ -260,7 +275,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
               value={claimForm.code}
               onChange={(e) => setClaimForm((p) => ({ ...p, code: e.target.value }))}
             />
-            <Button type="button" variant="outline" size="sm" disabled={busy || !claimForm.email} onClick={handleSendCode}>
+            <Button type="button" variant="outline" disabled={busy || !claimForm.email} onClick={handleSendCode}>
               {t("sheet.account.sendCode")}
             </Button>
           </div>
@@ -291,14 +306,14 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
         )}
         {signedIn && mode !== "claim" && (
           <>
-            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => loadMe(token)}>
-              {t("sheet.account.refresh")}
-            </Button>
             {isAnonymous && (
               <Button type="button" size="sm" disabled={busy} onClick={() => setMode("claim")}>
                 {t("sheet.account.claim")}
               </Button>
             )}
+            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => loadMe(token)}>
+              {t("sheet.account.refresh")}
+            </Button>
             <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={handleLogout}>
               {t("sheet.account.logout")}
             </Button>

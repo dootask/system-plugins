@@ -468,6 +468,22 @@ function App() {
       }
       params.set("base_url", baseUrl)
       params.set("key", keyValue)
+    } else {
+      // 第三方厂商：用 API Key 直接向上游拉取模型列表；base_url 未填则用内置默认地址
+      const keyValue = formValues[bot]?.[keyKey]
+      if (!keyValue) {
+        modalError(t("errors.keyRequired"))
+        return null
+      }
+      params.set("key", keyValue)
+      const baseUrl = formValues[bot]?.[baseUrlKey]
+      if (baseUrl) {
+        params.set("base_url", baseUrl)
+      }
+      const agencyValue = formValues[bot]?.[agencyKey]
+      if (agencyValue) {
+        params.set("agency", agencyValue)
+      }
     }
 
     setDefaultsLoading((prev) => ({ ...prev, [bot]: true }))
