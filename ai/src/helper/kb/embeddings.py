@@ -1,8 +1,12 @@
 """
 Embedding 客户端（OpenAI 兼容 /v1/embeddings API）
 
-服务地址/密钥内置默认值（DooTask 官方 ai.dootask.com），EMBEDDING_BASE_URL /
-EMBEDDING_API_KEY 环境变量可覆盖（如内网 Ollama / vLLM / 硅基流动）；
+地址/密钥解析优先级：
+1. 显式环境变量 EMBEDDING_BASE_URL / EMBEDDING_API_KEY（运维覆盖，如内网 Ollama / vLLM）；
+2. Doo AI 网关（计量代理 DOOTASK_AI_GATEWAY_URL）：按本实例自助 provision token，
+   向量化用量计入该实例账号（embedding 在运营后台建议设为 0 元免费模型，不占额度）；
+3. 兜底：内置默认共享服务（ai.dootask.com）。
+网关 token 失效（401/403）时自动重新 provision；provision 失败回退到兜底，保证不挂。
 彻底关闭 RAG 用 RAG_ENABLED=false。
 
 所有方法是 async：同步网络调用会卡住 worker 事件循环上的全部并发聊天请求。
@@ -12,9 +16,11 @@ import asyncio
 import logging
 import os
 import struct
-from typing import List, Optional
+from typing import List, Optional, Tuple
 
 import httpx
+
+from helper import gateway
 
 logger = logging.getLogger("ai.kb.embeddings")
 
@@ -26,14 +32,42 @@ DEFAULT_BASE_URL = "https://ai.dootask.com/v1"
 DEFAULT_API_KEY = "sk-BLc6gtTEYAbjBKzduDL5SAvxio5rY541XHv4vrVeU9Wp7ShO"
 
 
+def _explicit_base() -> str:
+    return os.environ.get("EMBEDDING_BASE_URL", "").strip()
+
+
+def _explicit_key() -> str:
+    return os.environ.get("EMBEDDING_API_KEY", "").strip()
+
+
+def _use_gateway() -> bool:
+    """无显式覆盖且网关已配置时，走 Doo AI 计量网关。"""
+    return not _explicit_base() and not _explicit_key() and gateway.gateway_configured()
+
+
 def _base_url() -> str:
-    """约定填到 /v1，代码拼 /embeddings。"""
-    url = os.environ.get("EMBEDDING_BASE_URL", "").strip()
-    return (url or DEFAULT_BASE_URL).rstrip("/")
+    """约定填到 /v1，代码拼 /embeddings。仅用于日志/探测展示。"""
+    if _explicit_base():
+        return _explicit_base().rstrip("/")
+    if _use_gateway():
+        return gateway.gateway_base_url().rstrip("/")
+    return DEFAULT_BASE_URL.rstrip("/")
 
 
-def _api_key() -> str:
-    return os.environ.get("EMBEDDING_API_KEY", "").strip() or DEFAULT_API_KEY
+async def _resolve(force: bool = False) -> Tuple[str, str]:
+    """解析本次调用的 (base_url, api_key)。force=True 时强制重开网关 token。"""
+    # 1. 运维显式覆盖
+    eb, ek = _explicit_base(), _explicit_key()
+    if eb or ek:
+        return (eb or DEFAULT_BASE_URL).rstrip("/"), (ek or DEFAULT_API_KEY)
+    # 2. Doo AI 计量网关：自助 provision 本实例 token
+    if gateway.gateway_configured():
+        tk = await gateway.get_server_token(force=force)
+        if tk:
+            return gateway.gateway_base_url().rstrip("/"), tk
+        logger.warning("embedding: 网关 token 获取失败，回退默认 embedding 服务")
+    # 3. 兜底：内置默认共享服务
+    return DEFAULT_BASE_URL.rstrip("/"), DEFAULT_API_KEY
 
 
 def model_name() -> str:
@@ -58,12 +92,9 @@ class Embedder:
     def _ensure_client(self) -> httpx.AsyncClient:
         if Embedder._client is None:
             # 默认 30s：要覆盖 Ollama 卸载模型后的冷加载（实测 2-9s）
+            # 鉴权头按请求注入（网关 token 可能在运行期刷新），不写死在 client 上
             timeout = float(os.environ.get("EMBEDDING_TIMEOUT", 30))
-            headers = {}
-            api_key = _api_key()
-            if api_key:
-                headers["Authorization"] = f"Bearer {api_key}"
-            Embedder._client = httpx.AsyncClient(timeout=timeout, headers=headers)
+            Embedder._client = httpx.AsyncClient(timeout=timeout)
         return Embedder._client
 
     @property
@@ -73,13 +104,20 @@ class Embedder:
         return Embedder._dim
 
     async def _post_batch(self, texts: List[str]) -> List[List[float]]:
-        url = f"{_base_url()}/embeddings"
         payload = {"model": model_name(), "input": texts}
         client = self._ensure_client()
+        base, key = await _resolve()
+        token_refreshed = False
         last_err: Optional[Exception] = None
         for attempt in range(len(_RETRY_DELAYS) + 1):
             try:
-                resp = await client.post(url, json=payload)
+                headers = {"Authorization": f"Bearer {key}"} if key else {}
+                resp = await client.post(f"{base}/embeddings", json=payload, headers=headers)
+                if resp.status_code in (401, 403) and _use_gateway() and not token_refreshed:
+                    # 网关 token 失效 → 重新 provision 后重试（不消耗退避预算）
+                    base, key = await _resolve(force=True)
+                    token_refreshed = True
+                    continue
                 if resp.status_code == 429 or resp.status_code >= 500:
                     last_err = RuntimeError(
                         f"embedding API HTTP {resp.status_code}: {resp.text[:200]}"
