@@ -438,12 +438,41 @@ function App() {
     }
   }
 
+  // 静默拉取 Doo AI 模型列表并序列化为 dooai_models 字符串；失败返回 null（不弹错）。
+  // 供"自动开通成功后自动补齐模型列表"复用，与手动 handleUseDefaultModels 的提示/loading 解耦。
+  const fetchDooaiModels = async (baseUrl: string, key: string): Promise<string | null> => {
+    if (!baseUrl || !key) return null
+    try {
+      const params = new URLSearchParams({ type: "dooai", base_url: baseUrl, key })
+      const response = await fetch(`/ai/models/list?${params.toString()}`)
+      const result = await response.json().catch(() => null)
+      if (!response.ok || !result || result.code !== 200) return null
+      const modelsArray = Array.isArray(result.data?.models) ? result.data.models : []
+      if (!modelsArray.length) return null
+      if (typeof modelsArray[0] === "object" && "id" in modelsArray[0]) {
+        return JSON.stringify(
+          modelsArray.map((model: { id: string; name?: string; thinking?: string }) => ({
+            id: model.id,
+            name: model.name || model.id,
+            thinking: THINKING_EFFORTS.includes(model.thinking as ThinkingEffort)
+              ? (model.thinking as ThinkingEffort)
+              : "off",
+          })),
+        )
+      }
+      return (modelsArray as string[]).join("\n")
+    } catch {
+      return null
+    }
+  }
+
   // 安装后首次打开自动开通官方 Doo AI 临时账号：已开通则跳过(幂等)，未开通则最多重试 3 次，
   // 全部失败静默放弃，由账号面板的手动开通按钮兜底，绝不卡死。
   const ensureDooaiProvisioned = async () => {
     if (autoProvisionTriedRef.current) return
     autoProvisionTriedRef.current = true
 
+    let existingModels = ""
     try {
       const { data } = await requestAPI({
         url: "system/setting/aibot",
@@ -454,6 +483,7 @@ function App() {
       setFormValues((prev) => ({ ...prev, dooai: payload }))
       setInitialValues((prev) => ({ ...prev, dooai: payload }))
       if (payload.dooai_key) return // 已开通，幂等跳过
+      existingModels = (payload.dooai_models ?? "").trim()
     } catch (error) {
       console.warn("auto-provision: 读取 dooai 设置失败，跳过自动开通", error)
       return
@@ -470,7 +500,16 @@ function App() {
         const provJson = await provRes.json().catch(() => null)
         const tk = provJson?.data?.gateway_token
         if (provRes.ok && tk) {
-          await persistDootaskGateway({ dooai_key: String(tk), dooai_base_url: baseUrl })
+          const overrides: Record<string, string> = {
+            dooai_key: String(tk),
+            dooai_base_url: baseUrl,
+          }
+          // 开通成功后自动补齐模型列表（best-effort、仅在原本为空时写、失败不影响账号）
+          if (!existingModels) {
+            const models = await fetchDooaiModels(baseUrl, String(tk))
+            if (models) overrides.dooai_models = models
+          }
+          await persistDootaskGateway(overrides)
           return
         }
       } catch (error) {
