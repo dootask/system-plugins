@@ -316,7 +316,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
           </div>
           <div className="space-y-1">
             {(account.buckets ?? []).map((b) => {
-              const percent = b.amount > 0 ? Math.round((b.balance / b.amount) * 100) : 0
+              const percent = b.amount > 0 ? Math.min(100, Math.max(0, Math.round((b.balance / b.amount) * 100))) : 0
               const reset = fmtReset(b.next_reset_at, lang)
               return (
                 <div key={b.kind} className="flex items-center justify-between text-xs">
