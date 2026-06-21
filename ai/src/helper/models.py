@@ -250,9 +250,11 @@ def _fetch_dootask_models(
         model_id = item.get("id")
         if not model_id:
             continue
+        # 网关扩展字段 display_name（运营后台模型显示名）优先作友好名
+        friendly = item.get("display_name") or item.get("name") or model_id
         formatted.append({
             "id": str(model_id),
-            "name": str(item.get("name") or model_id),
+            "name": str(friendly),
             "support_mcp": True,
             "thinking": "off",
         })

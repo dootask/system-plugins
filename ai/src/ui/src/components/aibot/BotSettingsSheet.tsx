@@ -63,6 +63,8 @@ const VENDOR_BRAND: Record<string, string> = {
   deepseek: "DeepSeek",
   meta: "Meta",
   mistral: "Mistral",
+  minimax: "MiniMax",
+  kimi: "Kimi",
 }
 
 function classifyVendor(modelId: string): string {
@@ -70,6 +72,8 @@ function classifyVendor(modelId: string): string {
   if (s.includes("gpt") || s.includes("o1") || s.includes("o3") || s.includes("o4") || s.includes("dall-e") || s.includes("whisper") || s.includes("text-embedding")) return "openai"
   if (s.includes("claude")) return "anthropic"
   if (s.includes("gemini")) return "gemini"
+  if (s.includes("minimax")) return "minimax"
+  if (s.includes("kimi") || s.includes("moonshot")) return "kimi"
   if (s.includes("qwen") || s.includes("qwq")) return "qwen"
   if (s.includes("deepseek")) return "deepseek"
   if (s.includes("glm")) return "zhipu"
