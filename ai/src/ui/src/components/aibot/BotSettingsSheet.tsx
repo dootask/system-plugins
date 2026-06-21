@@ -1,8 +1,9 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react"
 
-import { Plug } from "lucide-react"
+import { Plug, Search } from "lucide-react"
 import { messageError } from "@dootask/tools"
 
+import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ModelListTable, type ModelListTableHandle } from "@/components/aibot/ModelListTable"
@@ -40,21 +41,43 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { Checkbox } from "@/components/ui/checkbox"
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion"
 
 import type { AIBotItem, AIBotKey } from "@/data/aibots"
 import type { GeneratedField, ModelOption } from "@/lib/aibot"
 import { parseModelNames } from "@/lib/aibot"
 import type { MCPConfig } from "@/data/mcp-config"
 import { useI18n } from "@/lib/i18n-context"
+
+// 「获取模型列表」按厂商分类（据模型 ID 子串归类，参考 new-api）
+const VENDOR_BRAND: Record<string, string> = {
+  openai: "OpenAI",
+  anthropic: "Anthropic",
+  gemini: "Gemini",
+  deepseek: "DeepSeek",
+  meta: "Meta",
+  mistral: "Mistral",
+}
+
+function classifyVendor(modelId: string): string {
+  const s = modelId.toLowerCase()
+  if (s.includes("gpt") || s.includes("o1") || s.includes("o3") || s.includes("o4") || s.includes("dall-e") || s.includes("whisper") || s.includes("text-embedding")) return "openai"
+  if (s.includes("claude")) return "anthropic"
+  if (s.includes("gemini")) return "gemini"
+  if (s.includes("qwen") || s.includes("qwq")) return "qwen"
+  if (s.includes("deepseek")) return "deepseek"
+  if (s.includes("glm")) return "zhipu"
+  if (s.includes("llama")) return "meta"
+  if (s.includes("mistral")) return "mistral"
+  return "other"
+}
+
 export interface BotSettingsSheetProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -130,6 +153,9 @@ export const BotSettingsSheet = ({
   } | null>(null)
   // 弹窗中已勾选待添加的模型 code
   const [fetchSelected, setFetchSelected] = useState<Set<string>>(new Set())
+  // 弹窗搜索关键字 + 展开的厂商分组（手风琴）
+  const [fetchSearch, setFetchSearch] = useState("")
+  const [openGroups, setOpenGroups] = useState<string[]>([])
 
   const hasChanges = useMemo(() => {
     const result: Record<AIBotKey, boolean> = {} as Record<AIBotKey, boolean>
@@ -255,6 +281,61 @@ export const BotSettingsSheet = ({
   const fetchAllSelected =
     fetchSelectableValues.length > 0 && fetchSelectableValues.every((v) => fetchSelected.has(v))
   const fetchSomeSelected = fetchSelectableValues.some((v) => fetchSelected.has(v))
+
+  // 厂商分组标签：品牌名直出，通义千问/智谱/其他按语言本地化
+  const categoryLabel = useCallback(
+    (key: string) => {
+      if (key === "qwen") return t("sheet.models.fetchVendorQwen")
+      if (key === "zhipu") return t("sheet.models.fetchVendorZhipu")
+      if (key === "other") return t("sheet.models.fetchVendorOther")
+      return VENDOR_BRAND[key] ?? key
+    },
+    [t],
+  )
+
+  // 按搜索过滤后，按厂商分组（其他排最后，其余按标签字母序）
+  const fetchGroups = useMemo<[string, ModelOption[]][]>(() => {
+    if (!fetchDialog) return []
+    const kw = fetchSearch.trim().toLowerCase()
+    const filtered = kw
+      ? fetchDialog.models.filter(
+          (m) =>
+            m.value.toLowerCase().includes(kw) || (m.label || "").toLowerCase().includes(kw),
+        )
+      : fetchDialog.models
+    const map = new Map<string, ModelOption[]>()
+    for (const m of filtered) {
+      const k = classifyVendor(m.value)
+      const arr = map.get(k)
+      if (arr) arr.push(m)
+      else map.set(k, [m])
+    }
+    return [...map.entries()].sort(([a], [b]) => {
+      if (a === "other") return 1
+      if (b === "other") return -1
+      return categoryLabel(a).localeCompare(categoryLabel(b))
+    })
+  }, [fetchDialog, fetchSearch, categoryLabel])
+
+  // 打开弹窗时重置搜索；仅一个分组时默认展开它，否则全部收起
+  useEffect(() => {
+    if (!fetchDialog) {
+      setFetchSearch("")
+      setOpenGroups([])
+      return
+    }
+    setFetchSearch("")
+    const keys = Array.from(new Set(fetchDialog.models.map((m) => classifyVendor(m.value))))
+    setOpenGroups(keys.length === 1 ? keys : [])
+  }, [fetchDialog])
+
+  const handleToggleGroup = useCallback((values: string[], checked: boolean) => {
+    setFetchSelected((prev) => {
+      const next = new Set(prev)
+      values.forEach((v) => (checked ? next.add(v) : next.delete(v)))
+      return next
+    })
+  }, [])
 
   const handleToggleFetchRow = useCallback((value: string, checked: boolean) => {
     setFetchSelected((prev) => {
@@ -676,62 +757,118 @@ export const BotSettingsSheet = ({
         onOpenChange={(next) => !next && handleCloseFetchDialog()}
       >
         <DialogContent
-          className="flex max-h-[80vh] w-full max-w-lg flex-col gap-0 overflow-hidden p-0"
+          className="flex max-h-[80vh] w-full max-w-2xl flex-col gap-0 overflow-hidden p-0"
           onEscapeKeyDown={(event) => event.preventDefault()}
           onPointerDownOutside={(event) => event.preventDefault()}
         >
           <DialogHeader className="space-y-1.5 border-b px-6 py-4 text-left">
-            <DialogTitle>{t("sheet.models.fetchDialogTitle")}</DialogTitle>
-            <DialogDescription>{t("sheet.models.fetchDialogDescription")}</DialogDescription>
+            <div className="flex items-center justify-between gap-2">
+              <DialogTitle>{t("sheet.models.fetchDialogTitle")}</DialogTitle>
+              <span className="text-sm font-medium text-muted-foreground">
+                {t("sheet.models.fetchFetched")} ({fetchDialog?.models.length ?? 0})
+              </span>
+            </div>
+            <DialogDescription className="sr-only">
+              {t("sheet.models.fetchDialogDescription")}
+            </DialogDescription>
           </DialogHeader>
           {fetchDialog && (
-            <ScrollArea className="flex-1">
-              <Table>
-                <TableHeader className="sticky top-0 z-10 bg-background">
-                  <TableRow>
-                    <TableHead className="w-12 pl-6">
-                      <Checkbox
-                        checked={fetchAllSelected}
-                        indeterminate={fetchSomeSelected && !fetchAllSelected}
-                        disabled={fetchSelectableValues.length === 0}
-                        onCheckedChange={(checked) => handleToggleFetchAll(checked === true)}
-                      />
-                    </TableHead>
-                    <TableHead>{t("sheet.models.column.model")}</TableHead>
-                    <TableHead>{t("sheet.models.column.label")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {fetchDialog.models.map((model) => {
-                    const exists = fetchDialog.existingValues.has(model.value)
-                    const checked = exists || fetchSelected.has(model.value)
-                    return (
-                      <TableRow key={model.value} className={exists ? "opacity-60" : undefined}>
-                        <TableCell className="pl-6">
-                          <Checkbox
-                            checked={checked}
-                            disabled={exists}
-                            onCheckedChange={(value) =>
-                              handleToggleFetchRow(model.value, value === true)
-                            }
-                          />
-                        </TableCell>
-                        <TableCell className="font-mono text-xs break-all">{model.value}</TableCell>
-                        <TableCell className="break-all">
-                          {exists ? (
-                            <Badge variant="secondary" className="font-normal">
-                              {t("sheet.models.fetchExisting")}
-                            </Badge>
-                          ) : (
-                            <span className="text-muted-foreground">{model.label || model.value}</span>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </ScrollArea>
+            <>
+              <div className="border-b px-6 py-3">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={fetchSearch}
+                    onChange={(e) => setFetchSearch(e.target.value)}
+                    placeholder={t("sheet.models.fetchSearchPlaceholder")}
+                    className="pl-9"
+                  />
+                </div>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-6 py-1">
+                {fetchGroups.length === 0 ? (
+                  <div className="py-8 text-center text-sm text-muted-foreground">
+                    {t("sheet.models.fetchNoResult")}
+                  </div>
+                ) : (
+                  <Accordion type="multiple" value={openGroups} onValueChange={setOpenGroups}>
+                    {fetchGroups.map(([key, models]) => {
+                      const selectable = models
+                        .filter((m) => !fetchDialog.existingValues.has(m.value))
+                        .map((m) => m.value)
+                      const selCount = selectable.filter((v) => fetchSelected.has(v)).length
+                      const allSel = selectable.length > 0 && selCount === selectable.length
+                      const someSel = selCount > 0 && !allSel
+                      return (
+                        <AccordionItem key={key} value={key}>
+                          <div className="flex items-center gap-3">
+                            <AccordionTrigger className="flex-1">
+                              <span>
+                                {categoryLabel(key)} ({models.length})
+                              </span>
+                            </AccordionTrigger>
+                            <span className="text-xs text-muted-foreground">
+                              {selCount} / {selectable.length}
+                            </span>
+                            <Checkbox
+                              checked={allSel}
+                              indeterminate={someSel}
+                              disabled={selectable.length === 0}
+                              onCheckedChange={(c) => handleToggleGroup(selectable, c === true)}
+                            />
+                          </div>
+                          <AccordionContent>
+                            <div className="grid grid-cols-1 gap-x-6 gap-y-2 pb-3 pl-6 sm:grid-cols-2">
+                              {models.map((model) => {
+                                const exists = fetchDialog.existingValues.has(model.value)
+                                const checked = exists || fetchSelected.has(model.value)
+                                return (
+                                  <label
+                                    key={model.value}
+                                    className={cn(
+                                      "flex items-center gap-2",
+                                      exists ? "opacity-60" : "cursor-pointer",
+                                    )}
+                                  >
+                                    <Checkbox
+                                      checked={checked}
+                                      disabled={exists}
+                                      onCheckedChange={(value) =>
+                                        handleToggleFetchRow(model.value, value === true)
+                                      }
+                                    />
+                                    <span className="truncate font-mono text-xs" title={model.value}>
+                                      {model.value}
+                                    </span>
+                                    {exists && (
+                                      <Badge variant="secondary" className="font-normal">
+                                        {t("sheet.models.fetchExisting")}
+                                      </Badge>
+                                    )}
+                                  </label>
+                                )
+                              })}
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      )
+                    })}
+                  </Accordion>
+                )}
+              </div>
+              <div className="flex items-center justify-between border-t px-6 py-3 text-sm">
+                <span className="text-muted-foreground">
+                  {t("sheet.models.fetchSelectedCount")} {fetchSelected.size} /{" "}
+                  {fetchSelectableValues.length}
+                </span>
+                <Checkbox
+                  checked={fetchAllSelected}
+                  indeterminate={fetchSomeSelected && !fetchAllSelected}
+                  disabled={fetchSelectableValues.length === 0}
+                  onCheckedChange={(checked) => handleToggleFetchAll(checked === true)}
+                />
+              </div>
+            </>
           )}
           <DialogFooter className="gap-3 border-t px-6 py-4">
             <Button type="button" variant="outline" onClick={handleCloseFetchDialog}>

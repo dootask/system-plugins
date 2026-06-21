@@ -1051,6 +1051,10 @@ async def gateway_provision():
 @app.post('/gateway/login')
 async def gateway_login(request: Request):
     body = await request.json()
+    if not isinstance(body, dict):
+        body = {}
+    # 注入本实例 ID：后端在“名下 0 个 AI 账号”时据此绑定/新建本实例账号
+    body.setdefault("instance_id", DOOTASK_AI_INSTANCE_ID)
     return await _gateway_call("POST", "/login", json_body=body)
 
 
