@@ -473,6 +473,7 @@ function App() {
     autoProvisionTriedRef.current = true
 
     let existingModels = ""
+    let existingDefaultModel = ""
     try {
       const { data } = await requestAPI({
         url: "system/setting/aibot",
@@ -484,6 +485,7 @@ function App() {
       setInitialValues((prev) => ({ ...prev, dooai: payload }))
       if (payload.dooai_key) return // 已开通，幂等跳过
       existingModels = (payload.dooai_models ?? "").trim()
+      existingDefaultModel = (payload.dooai_model ?? "").trim()
     } catch (error) {
       console.warn("auto-provision: 读取 dooai 设置失败，跳过自动开通", error)
       return
@@ -504,10 +506,21 @@ function App() {
             dooai_key: String(tk),
             dooai_base_url: baseUrl,
           }
-          // 开通成功后自动补齐模型列表（best-effort、仅在原本为空时写、失败不影响账号）
-          if (!existingModels) {
-            const models = await fetchDooaiModels(baseUrl, String(tk))
-            if (models) overrides.dooai_models = models
+          // 开通成功后自动补齐模型列表（best-effort、仅在原本为空时拉、失败不影响账号）
+          let modelsStr = existingModels
+          if (!modelsStr) {
+            const fetched = await fetchDooaiModels(baseUrl, String(tk))
+            if (fetched) {
+              modelsStr = fetched
+              overrides.dooai_models = fetched
+            }
+          }
+          // 默认模型：未设置或不在列表中 → 取列表第一个
+          if (modelsStr) {
+            const ids = parseModelNames(modelsStr).map((o) => o.value)
+            if (ids.length && (!existingDefaultModel || !ids.includes(existingDefaultModel))) {
+              overrides.dooai_model = ids[0]
+            }
           }
           await persistDootaskGateway(overrides)
           return
