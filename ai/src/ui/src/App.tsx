@@ -103,6 +103,7 @@ function App() {
   const visionEditorOpenRef = useRef(visionEditorOpen)
   const interceptReleaseRef = useRef<(() => void) | null>(null)
   const modelEditorBackHandlerRef = useRef<() => boolean>(() => false)
+  const autoProvisionTriedRef = useRef(false)
 
   const fieldMap = useMemo(() => fieldMapFactory(bots, systemConfig), [bots, systemConfig])
 
@@ -163,10 +164,12 @@ function App() {
         // ignore; best effort
       }
 
+      let isAdminLocal = false
       try {
         const user = await getUserInfo()
         if (user?.identity?.includes("admin")) {
           setIsAdmin(true)
+          isAdminLocal = true
         }
       } catch {
         // cannot determine admin state, keep default false
@@ -175,11 +178,18 @@ function App() {
       await refreshBotTags()
       await loadMcps()
       await loadVision()
+
+      // 安装后首次打开：官方 Doo AI 未开通则自动开通临时账号（实例级配置，仅管理员）
+      if (isAdminLocal) {
+        await ensureDooaiProvisioned()
+      }
     }
 
     init().catch((error) => {
       console.error("Failed to initialize AI assistant UI", error)
     })
+    // 仅挂载时初始化一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const loadMcps = async () => {
@@ -426,6 +436,49 @@ function App() {
     } catch (error) {
       modalError(resolveErrorMessage(error, t("errors.submitFailed")))
     }
+  }
+
+  // 安装后首次打开自动开通官方 Doo AI 临时账号：已开通则跳过(幂等)，未开通则最多重试 3 次，
+  // 全部失败静默放弃，由账号面板的手动开通按钮兜底，绝不卡死。
+  const ensureDooaiProvisioned = async () => {
+    if (autoProvisionTriedRef.current) return
+    autoProvisionTriedRef.current = true
+
+    try {
+      const { data } = await requestAPI({
+        url: "system/setting/aibot",
+        method: "get",
+        data: { type: "get", filter: "dooai" },
+      })
+      const payload = (data ?? {}) as Record<string, string>
+      setFormValues((prev) => ({ ...prev, dooai: payload }))
+      setInitialValues((prev) => ({ ...prev, dooai: payload }))
+      if (payload.dooai_key) return // 已开通，幂等跳过
+    } catch (error) {
+      console.warn("auto-provision: 读取 dooai 设置失败，跳过自动开通", error)
+      return
+    }
+
+    const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const cfgRes = await fetch("/ai/gateway/config")
+        const cfgJson = await cfgRes.json().catch(() => null)
+        const baseUrl =
+          cfgRes.ok && cfgJson?.data?.base_url ? String(cfgJson.data.base_url) : ""
+        const provRes = await fetch("/ai/gateway/provision", { method: "POST" })
+        const provJson = await provRes.json().catch(() => null)
+        const tk = provJson?.data?.gateway_token
+        if (provRes.ok && tk) {
+          await persistDootaskGateway({ dooai_key: String(tk), dooai_base_url: baseUrl })
+          return
+        }
+      } catch (error) {
+        console.warn(`auto-provision: 第 ${attempt + 1} 次自动开通失败`, error)
+      }
+      if (attempt < 2) await sleep(800 * (attempt + 1))
+    }
+    console.warn("auto-provision: 自动开通连续失败，回退手动开通")
   }
 
   const handleGatewayAuth = async (token: string, baseUrl: string) => {
