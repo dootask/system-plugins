@@ -98,15 +98,15 @@ const createFields = (lang: Language): FieldConfig[] => {
 const createAiList = (lang: Language): Record<AIBotKey, BotConfig> => {
   const isZh = lang === "zh"
   return {
-    dootask: {
-      // 官方厂商：令牌/网关地址由账号面板自动管理，代理对官方网关无意义，统一隐藏
+    dooai: {
+      // Doo AI 厂商：令牌/网关地址由账号面板自动管理，代理对官方网关无意义，统一隐藏
       hiddenFields: ["key", "base_url", "agency"],
       extraFields: [
         {
           prop: "models",
           tip: isZh
-            ? "登录后点击下方按钮拉取官方模型列表"
-            : "After signing in, click the button below to fetch the official model list.",
+            ? "登录后点击下方按钮拉取 Doo AI 模型列表"
+            : "After signing in, click the button below to fetch the Doo AI model list.",
         },
       ],
     },

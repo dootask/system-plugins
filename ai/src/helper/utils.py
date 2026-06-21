@@ -142,8 +142,8 @@ def get_model_instance(model_type, model_name, api_key, **kwargs):
         "cohere": (ChatCohere, None),
         "ollama": (ChatOllama, None),
         "grok": (ChatXAI, None),
-        # DooTask 官方厂商：OpenAI 兼容，base_url 指向 AppStore 计量代理 /v1
-        "dootask": (ChatOpenAI, {
+        # Doo AI 厂商：OpenAI 兼容，base_url 指向 AppStore 计量代理 /v1
+        "dooai": (ChatOpenAI, {
             "openai_api_key": api_key,
         }),
     }
@@ -199,7 +199,7 @@ def get_model_instance(model_type, model_name, api_key, **kwargs):
             # langchain-ollama drops the response `thinking` field unless reasoning is truthy.
             if thinking_level != "off":
                 config.update({"reasoning": True})
-        elif model_type == "dootask":
+        elif model_type == "dooai":
             # 官方网关走 OpenAI 风格 reasoning_effort，由上游网关翻译给各上游
             if thinking_level != "off":
                 config.update({"reasoning_effort": thinking_level})

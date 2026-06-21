@@ -176,7 +176,7 @@ CONTEXT_LIMITS = {
         "ernie-4.5-turbo-vl-32k": 32000,
         "default": 32000,
     },
-    "dootask": {
+    "dooai": {
         # 官方网关聚合多家上游（含 GLM 200K 等），取保守默认避免溢出
         "default": 128000,
     },

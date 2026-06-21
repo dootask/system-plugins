@@ -32,9 +32,26 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"
+import { Checkbox } from "@/components/ui/checkbox"
 
 import type { AIBotItem, AIBotKey } from "@/data/aibots"
-import type { GeneratedField } from "@/lib/aibot"
+import type { GeneratedField, ModelOption } from "@/lib/aibot"
 import { parseModelNames } from "@/lib/aibot"
 import type { MCPConfig } from "@/data/mcp-config"
 import { useI18n } from "@/lib/i18n-context"
@@ -106,6 +123,13 @@ export const BotSettingsSheet = ({
   const modelTableRef = useRef<ModelListTableHandle>(null)
   // 本次「获取模型列表」新加入的模型 code，用于在表格里高亮
   const [highlightedModelValues, setHighlightedModelValues] = useState<string[]>([])
+  // 「获取模型列表」选择弹窗：拉取到的全部模型 + 已存在的 code 集合
+  const [fetchDialog, setFetchDialog] = useState<{
+    models: ModelOption[]
+    existingValues: Set<string>
+  } | null>(null)
+  // 弹窗中已勾选待添加的模型 code
+  const [fetchSelected, setFetchSelected] = useState<Set<string>>(new Set())
 
   const hasChanges = useMemo(() => {
     const result: Record<AIBotKey, boolean> = {} as Record<AIBotKey, boolean>
@@ -136,6 +160,7 @@ export const BotSettingsSheet = ({
     if (!open) {
       setModelEditor(null)
       setHighlightedModelValues([])
+      setFetchDialog(null)
     }
   }, [open])
 
@@ -144,6 +169,10 @@ export const BotSettingsSheet = ({
       return
     }
     const handler = () => {
+      if (fetchDialog) {
+        setFetchDialog(null)
+        return true
+      }
       if (modelEditor) {
         setModelEditor(null)
         return true
@@ -154,7 +183,7 @@ export const BotSettingsSheet = ({
     return () => {
       onRegisterModelEditorBackHandler(() => false)
     }
-  }, [modelEditor, onRegisterModelEditorBackHandler])
+  }, [fetchDialog, modelEditor, onRegisterModelEditorBackHandler])
 
   const handleOpenModelEditor = useCallback(
     (bot: AIBotItem, field: GeneratedField) => {
@@ -199,19 +228,12 @@ export const BotSettingsSheet = ({
     if (typeof result !== "string") {
       return
     }
-    // 合并到现有列表：已存在的（按 code）保留，仅追加新模型，并高亮新加入的行
-    const fetched = parseModelNames(result)
+    // 拉取成功：弹出选择弹窗，默认勾选「未存在」的模型，已存在的禁止勾选
+    const fetched = parseModelNames(result).filter((m) => m.value)
     const existing = parseModelNames(modelEditorValue)
     const existingValues = new Set(existing.map((m) => m.value))
-    const added = fetched.filter((m) => m.value && !existingValues.has(m.value))
-    const merged = [...existing, ...added]
-    const serialized = merged.length
-      ? JSON.stringify(
-          merged.map((m) => ({ id: m.value, name: m.label || m.value, thinking: m.thinking })),
-        )
-      : ""
-    setModelEditorValue(serialized)
-    setHighlightedModelValues(added.map((m) => m.value))
+    setFetchDialog({ models: fetched, existingValues })
+    setFetchSelected(new Set(fetched.filter((m) => !existingValues.has(m.value)).map((m) => m.value)))
   }, [
     modelEditor,
     modelEditorDefaultsLoading,
@@ -219,6 +241,63 @@ export const BotSettingsSheet = ({
     modelEditorValue,
     onUseDefaultModels,
   ])
+
+  // 弹窗中可勾选（未存在）的模型
+  const fetchSelectableValues = useMemo(
+    () =>
+      fetchDialog
+        ? fetchDialog.models
+            .filter((m) => !fetchDialog.existingValues.has(m.value))
+            .map((m) => m.value)
+        : [],
+    [fetchDialog],
+  )
+  const fetchAllSelected =
+    fetchSelectableValues.length > 0 && fetchSelectableValues.every((v) => fetchSelected.has(v))
+  const fetchSomeSelected = fetchSelectableValues.some((v) => fetchSelected.has(v))
+
+  const handleToggleFetchRow = useCallback((value: string, checked: boolean) => {
+    setFetchSelected((prev) => {
+      const next = new Set(prev)
+      if (checked) {
+        next.add(value)
+      } else {
+        next.delete(value)
+      }
+      return next
+    })
+  }, [])
+
+  const handleToggleFetchAll = useCallback(
+    (checked: boolean) => {
+      setFetchSelected(checked ? new Set(fetchSelectableValues) : new Set())
+    },
+    [fetchSelectableValues],
+  )
+
+  const handleCloseFetchDialog = useCallback(() => {
+    setFetchDialog(null)
+  }, [])
+
+  const handleConfirmFetchDialog = useCallback(() => {
+    if (!fetchDialog) {
+      return
+    }
+    // 仅追加用户勾选的新模型，保留原有列表，高亮本次新加入的行
+    const added = fetchDialog.models.filter(
+      (m) => !fetchDialog.existingValues.has(m.value) && fetchSelected.has(m.value),
+    )
+    if (added.length) {
+      const existing = parseModelNames(modelEditorValue)
+      const merged = [...existing, ...added]
+      const serialized = JSON.stringify(
+        merged.map((m) => ({ id: m.value, name: m.label || m.value, thinking: m.thinking })),
+      )
+      setModelEditorValue(serialized)
+      setHighlightedModelValues(added.map((m) => m.value))
+    }
+    setFetchDialog(null)
+  }, [fetchDialog, fetchSelected, modelEditorValue])
 
   const renderField = (bot: AIBotItem, field: GeneratedField) => {
     const fieldValue = formValues[bot.value]?.[field.prop] ?? ""
@@ -455,9 +534,9 @@ export const BotSettingsSheet = ({
                     <div className="flex flex-1 flex-col min-h-0">
                       <ScrollArea className="h-full">
                         <div className="flex flex-col gap-6 pb-10 pl-0.5 pr-3">
-                          {bot.value === "dootask" && (
+                          {bot.value === "dooai" && (
                             <AccountPanel
-                              token={formValues[bot.value]?.["dootask_key"] ?? ""}
+                              token={formValues[bot.value]?.["dooai_key"] ?? ""}
                               onAuth={onGatewayAuth}
                               onLogout={onGatewayLogout}
                             />
@@ -592,6 +671,82 @@ export const BotSettingsSheet = ({
           </SheetFooter>
         </SheetContent>
       </Sheet>
+      <Dialog
+        open={Boolean(fetchDialog)}
+        onOpenChange={(next) => !next && handleCloseFetchDialog()}
+      >
+        <DialogContent
+          className="flex max-h-[80vh] w-full max-w-lg flex-col gap-0 overflow-hidden p-0"
+          onEscapeKeyDown={(event) => event.preventDefault()}
+          onPointerDownOutside={(event) => event.preventDefault()}
+        >
+          <DialogHeader className="space-y-1.5 border-b px-6 py-4 text-left">
+            <DialogTitle>{t("sheet.models.fetchDialogTitle")}</DialogTitle>
+            <DialogDescription>{t("sheet.models.fetchDialogDescription")}</DialogDescription>
+          </DialogHeader>
+          {fetchDialog && (
+            <ScrollArea className="flex-1">
+              <Table>
+                <TableHeader className="sticky top-0 z-10 bg-background">
+                  <TableRow>
+                    <TableHead className="w-12 pl-6">
+                      <Checkbox
+                        checked={fetchAllSelected}
+                        indeterminate={fetchSomeSelected && !fetchAllSelected}
+                        disabled={fetchSelectableValues.length === 0}
+                        onCheckedChange={(checked) => handleToggleFetchAll(checked === true)}
+                      />
+                    </TableHead>
+                    <TableHead>{t("sheet.models.column.model")}</TableHead>
+                    <TableHead>{t("sheet.models.column.label")}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {fetchDialog.models.map((model) => {
+                    const exists = fetchDialog.existingValues.has(model.value)
+                    const checked = exists || fetchSelected.has(model.value)
+                    return (
+                      <TableRow key={model.value} className={exists ? "opacity-60" : undefined}>
+                        <TableCell className="pl-6">
+                          <Checkbox
+                            checked={checked}
+                            disabled={exists}
+                            onCheckedChange={(value) =>
+                              handleToggleFetchRow(model.value, value === true)
+                            }
+                          />
+                        </TableCell>
+                        <TableCell className="font-mono text-xs break-all">{model.value}</TableCell>
+                        <TableCell className="break-all">
+                          {exists ? (
+                            <Badge variant="secondary" className="font-normal">
+                              {t("sheet.models.fetchExisting")}
+                            </Badge>
+                          ) : (
+                            <span className="text-muted-foreground">{model.label || model.value}</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          )}
+          <DialogFooter className="gap-3 border-t px-6 py-4">
+            <Button type="button" variant="outline" onClick={handleCloseFetchDialog}>
+              {t("sheet.models.cancel")}
+            </Button>
+            <Button
+              type="button"
+              onClick={handleConfirmFetchDialog}
+              disabled={fetchSelected.size === 0}
+            >
+              {`${t("sheet.models.fetchConfirm")} (${fetchSelected.size})`}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

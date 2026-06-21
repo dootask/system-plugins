@@ -410,7 +410,7 @@ function App() {
 
   // 官方厂商账号：开通/登录/退出后，把 gateway_token 与网关地址持久化到 aibotSetting
   const persistDootaskGateway = async (overrides: Record<string, string>) => {
-    const bot: AIBotKey = "dootask"
+    const bot: AIBotKey = "dooai"
     const merged = { ...(formValues[bot] ?? {}), ...overrides }
     setFormValues((prev) => ({ ...prev, [bot]: merged }))
     try {
@@ -429,11 +429,11 @@ function App() {
   }
 
   const handleGatewayAuth = async (token: string, baseUrl: string) => {
-    await persistDootaskGateway({ dootask_key: token, dootask_base_url: baseUrl })
+    await persistDootaskGateway({ dooai_key: token, dooai_base_url: baseUrl })
   }
 
   const handleGatewayLogout = async () => {
-    await persistDootaskGateway({ dootask_key: "" })
+    await persistDootaskGateway({ dooai_key: "" })
   }
 
   const handleUseDefaultModels = async (bot: AIBotKey): Promise<string | null> => {
@@ -458,12 +458,12 @@ function App() {
       if (agencyValue) {
         params.set("agency", agencyValue)
       }
-    } else if (bot === "dootask") {
-      // 官方厂商：从计量代理网关按 token 档位拉模型
+    } else if (bot === "dooai") {
+      // Doo AI 厂商：从计量代理网关按 token 档位拉模型
       const baseUrl = formValues[bot]?.[baseUrlKey]
       const keyValue = formValues[bot]?.[keyKey]
       if (!baseUrl || !keyValue) {
-        modalError(t("errors.baseUrlRequired"))
+        modalError(t("errors.dootaskLoginRequired"))
         return null
       }
       params.set("base_url", baseUrl)

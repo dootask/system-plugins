@@ -1033,7 +1033,7 @@ async def _gateway_call(method: str, path: str, json_body=None, token: str = "")
 
 @app.get('/gateway/config')
 async def gateway_config():
-    """暴露网关地址供前端写入 dootask_base_url（= gateway/v1）。"""
+    """暴露网关地址供前端写入 dooai_base_url（= gateway/v1）。"""
     return JSONResponse(content={"code": 200, "data": {
         "gateway_url": DOOTASK_AI_GATEWAY_URL,
         "base_url": (DOOTASK_AI_GATEWAY_URL + "/v1") if DOOTASK_AI_GATEWAY_URL else "",

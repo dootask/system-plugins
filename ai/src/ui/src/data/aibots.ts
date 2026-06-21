@@ -2,7 +2,7 @@ import type { Language, LocalizedText } from "@/lib/i18n-core"
 import { getLocalizedText } from "@/lib/i18n-core"
 
 export type AIBotKey =
-  | "dootask"
+  | "dooai"
   | "openai"
   | "claude"
   | "deepseek"
@@ -39,15 +39,15 @@ interface AIBotDefinition {
 
 const AIBOT_DEFINITIONS: AIBotDefinition[] = [
   {
-    value: "dootask",
+    value: "dooai",
     label: {
-      zh: "DooTask 官方",
-      en: "DooTask Official",
+      zh: "Doo AI",
+      en: "Doo AI",
     },
-    src: "/ai/ui/avatars/dootask.svg",
+    src: "/ai/ui/avatars/dooai.svg",
     desc: {
-      zh: "我是 DooTask 官方 AI 助手，由 DooTask 统一提供模型与额度，登录账号即可开箱使用，无需自备各家 API Key。",
-      en: "I am the DooTask official AI assistant. Models and quota are provided by DooTask—just sign in to use it out of the box, no third-party API keys needed.",
+      zh: "我是 Doo AI 助手，由 DooTask 统一提供模型与额度，登录账号即可开箱使用，无需自备各家 API Key。",
+      en: "I am the Doo AI assistant. Models and quota are provided by DooTask—just sign in to use it out of the box, no third-party API keys needed.",
     },
   },
   {

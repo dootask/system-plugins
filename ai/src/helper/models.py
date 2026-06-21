@@ -277,7 +277,7 @@ def get_models_list(
     if model_type == "ollama":
         return _fetch_ollama_models(base_url=base_url or "", key=key or None, agency=agency or None)
 
-    if model_type == "dootask":
+    if model_type == "dooai":
         return _fetch_dootask_models(base_url=base_url or "", key=key or None)
 
     spec = UPSTREAM_SPECS.get(model_type)

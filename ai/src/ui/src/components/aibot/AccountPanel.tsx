@@ -24,11 +24,11 @@ interface AccountInfo {
 }
 
 interface AccountPanelProps {
-  /** 当前 gateway_token（来自 aibotSetting 的 dootask_key） */
+  /** 当前 gateway_token（来自 aibotSetting 的 dooai_key） */
   token: string
-  /** 开通/登录成功后回传 token 与网关 base_url，由父级持久化到 dootask_key/dootask_base_url */
+  /** 开通/登录成功后回传 token 与网关 base_url，由父级持久化到 dooai_key/dooai_base_url */
   onAuth: (token: string, baseUrl: string) => void | Promise<void>
-  /** 退出后清空 dootask_key */
+  /** 退出后清空 dooai_key */
   onLogout: () => void | Promise<void>
 }
 
