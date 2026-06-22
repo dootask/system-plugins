@@ -260,10 +260,13 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
   const handleLogout = async () => {
     setBusy(true)
     try {
-      const { ok } = await gateway("/logout", { method: "POST", headers: authHeaders(token) })
-      if (!ok) {
+      const { ok, json } = await gateway("/logout", { method: "POST", headers: authHeaders(token) })
+      // 退出 = 让 token 失效并清本地凭据。后端作废成功，或 token 本就失效（401 invalid token，
+      // 如已在别处退出/过期）都视为已退出——否则会因拿着已失效 token 反复 401 而「一直无法退出」。
+      // 仅当确属可重试的失败（网络/5xx，token 可能仍有效）才提示，但无论如何都清本地完成退出。
+      const tokenAlreadyInvalid = json?.error?.type === "invalid_request_error"
+      if (!ok && !tokenAlreadyInvalid) {
         messageError(t("sheet.account.logoutFailed"))
-        return
       }
       setAccount(null)
       await onLogout()
