@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 
 import { Loader2 } from "lucide-react"
 
-import { messageError } from "@dootask/tools"
+import { messageError, messageSuccess, modalError } from "@dootask/tools"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -106,9 +106,13 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
   const { t, lang } = useI18n()
   const [account, setAccount] = useState<AccountInfo | null>(null)
   const [mode, setMode] = useState<"view" | "login" | "claim" | "select">("view")
-  const [busy, setBusy] = useState(false)
+  const [sendingCode, setSendingCode] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [selectAccounts, setSelectAccounts] = useState<LoginAccount[]>([])
+
+  // 统一禁用判定：发码或主操作进行中时，所有可点按钮禁用
+  const pending = sendingCode || submitting
 
   const [loginForm, setLoginForm] = useState({ email: "", code: "" })
   const [claimForm, setClaimForm] = useState({ email: "", code: "" })
@@ -163,7 +167,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
   }, [])
 
   const handleProvision = async () => {
-    setBusy(true)
+    setSubmitting(true)
     try {
       const baseUrl = await fetchBaseUrl()
       const { ok, json } = await gateway("/provision", { method: "POST" })
@@ -175,17 +179,17 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
     } catch (error) {
       messageError(error instanceof Error ? error.message : t("sheet.account.provisionFailed"))
     } finally {
-      setBusy(false)
+      setSubmitting(false)
     }
   }
 
   // 用 App Store 账号登录：首次不带 account_id；名下多账号时后端返回列表，选中后带 account_id 再请求。
   // 网关地址(instance_id)由 AI 插件后端 /gateway/login 注入。
   const performLogin = async (accountId?: number) => {
-    setBusy(true)
+    setSubmitting(true)
     try {
       const baseUrl = await fetchBaseUrl()
-      const body: Record<string, unknown> = { email: loginForm.email, code: loginForm.code }
+      const body: Record<string, unknown> = { email: loginForm.email, code: loginForm.code, lang }
       if (accountId) body.account_id = accountId
       const { ok, json } = await gateway("/login", {
         method: "POST",
@@ -201,6 +205,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
         setMode("view")
         setLoginForm({ email: "", code: "" })
         setSelectAccounts([])
+        messageSuccess(t("sheet.account.loginSuccess"))
         return
       }
       // 名下多个账号：进入选择态
@@ -210,10 +215,10 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
         return
       }
       throw new Error(t("sheet.account.loginFailed"))
-    } catch (error) {
-      messageError(error instanceof Error ? error.message : t("sheet.account.loginFailed"))
+    } catch {
+      modalError(t("sheet.account.loginFailed"))
     } finally {
-      setBusy(false)
+      setSubmitting(false)
     }
   }
 
@@ -224,18 +229,20 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
   // 登录态尚无 token（开放端点，仅按邮箱+IP 限流）；认领态带 gateway_token。
   const sendEmailCode = async (email: string, headers: HeadersInit) => {
     if (!email) return
-    setBusy(true)
+    setSendingCode(true)
     try {
       const { ok } = await gateway("/email/send", {
         method: "POST",
         headers,
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email, lang }),
       })
-      if (!ok) {
-        messageError(t("sheet.account.sendCodeFailed"))
+      if (ok) {
+        messageSuccess(t("sheet.account.sendCodeSuccess"))
+      } else {
+        modalError(t("sheet.account.sendCodeFailed"))
       }
     } finally {
-      setBusy(false)
+      setSendingCode(false)
     }
   }
 
@@ -248,27 +255,28 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
     sendEmailCode(loginForm.email, { "Content-Type": "application/json" })
 
   const handleClaim = async () => {
-    setBusy(true)
+    setSubmitting(true)
     try {
       const { ok } = await gateway("/claim", {
         method: "POST",
         headers: authHeaders(token),
-        body: JSON.stringify({ email: claimForm.email, code: claimForm.code }),
+        body: JSON.stringify({ email: claimForm.email, code: claimForm.code, lang }),
       })
       if (ok) {
         setMode("view")
         setClaimForm({ email: "", code: "" })
         await loadMe(token)
+        messageSuccess(t("sheet.account.claimSuccess"))
       } else {
-        messageError(t("sheet.account.claimFailed"))
+        modalError(t("sheet.account.claimFailed"))
       }
     } finally {
-      setBusy(false)
+      setSubmitting(false)
     }
   }
 
   const handleLogout = async () => {
-    setBusy(true)
+    setSubmitting(true)
     try {
       const { ok, json } = await gateway("/logout", { method: "POST", headers: authHeaders(token) })
       // 退出 = 让 token 失效并清本地凭据。后端作废成功，或 token 本就失效（401 invalid token，
@@ -281,7 +289,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
       setAccount(null)
       await onLogout()
     } finally {
-      setBusy(false)
+      setSubmitting(false)
     }
   }
 
@@ -359,7 +367,8 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
               value={loginForm.code}
               onChange={(e) => setLoginForm((p) => ({ ...p, code: e.target.value }))}
             />
-            <Button type="button" variant="outline" disabled={busy || !loginForm.email} onClick={handleSendLoginCode}>
+            <Button type="button" variant="outline" disabled={pending || !loginForm.email} onClick={handleSendLoginCode}>
+              {sendingCode && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {t("sheet.account.sendCode")}
             </Button>
           </div>
@@ -376,7 +385,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
               type="button"
               variant="outline"
               size="sm"
-              disabled={busy}
+              disabled={pending}
               className="w-full justify-between"
               onClick={() => handleSelectAccount(a.id)}
             >
@@ -401,7 +410,8 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
               value={claimForm.code}
               onChange={(e) => setClaimForm((p) => ({ ...p, code: e.target.value }))}
             />
-            <Button type="button" variant="outline" disabled={busy || !claimForm.email} onClick={handleSendCode}>
+            <Button type="button" variant="outline" disabled={pending || !claimForm.email} onClick={handleSendCode}>
+              {sendingCode && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {t("sheet.account.sendCode")}
             </Button>
           </div>
@@ -412,20 +422,22 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
       <div className="flex flex-wrap items-center gap-2 pt-1">
         {!signedIn && mode === "view" && (
           <>
-            <Button type="button" size="sm" disabled={busy} onClick={handleProvision}>
+            <Button type="button" size="sm" disabled={pending} onClick={handleProvision}>
+              {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {t("sheet.account.provision")}
             </Button>
-            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setMode("login")}>
+            <Button type="button" size="sm" variant="outline" disabled={pending} onClick={() => setMode("login")}>
               {t("sheet.account.login")}
             </Button>
           </>
         )}
         {!signedIn && mode === "login" && (
           <>
-            <Button type="button" size="sm" disabled={busy} onClick={handleLogin}>
+            <Button type="button" size="sm" disabled={pending} onClick={handleLogin}>
+              {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {t("sheet.account.login")}
             </Button>
-            <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => setMode("view")}>
+            <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setMode("view")}>
               {t("sheet.account.cancel")}
             </Button>
           </>
@@ -435,7 +447,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
             type="button"
             size="sm"
             variant="ghost"
-            disabled={busy}
+            disabled={pending}
             onClick={() => {
               setMode("login")
               setSelectAccounts([])
@@ -447,7 +459,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
         {signedIn && mode !== "claim" && (
           <>
             {isAnonymous && (
-              <Button type="button" size="sm" disabled={busy} onClick={() => setMode("claim")}>
+              <Button type="button" size="sm" disabled={pending} onClick={() => setMode("claim")}>
                 {t("sheet.account.claim")}
               </Button>
             )}
@@ -455,26 +467,24 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
               type="button"
               size="sm"
               variant="outline"
-              disabled={busy || refreshing}
+              disabled={pending || refreshing}
               onClick={handleRefresh}
             >
-              {refreshing ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                t("sheet.account.refresh")
-              )}
+              {refreshing && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+              {t("sheet.account.refresh")}
             </Button>
-            <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={handleLogout}>
+            <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={handleLogout}>
               {t("sheet.account.logout")}
             </Button>
           </>
         )}
         {signedIn && mode === "claim" && (
           <>
-            <Button type="button" size="sm" disabled={busy} onClick={handleClaim}>
+            <Button type="button" size="sm" disabled={pending} onClick={handleClaim}>
+              {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {t("sheet.account.submit")}
             </Button>
-            <Button type="button" size="sm" variant="ghost" disabled={busy} onClick={() => setMode("view")}>
+            <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setMode("view")}>
               {t("sheet.account.cancel")}
             </Button>
           </>
