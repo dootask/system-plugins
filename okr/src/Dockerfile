@@ -9,6 +9,7 @@ RUN npm run build
 
 ### Build backend (Go embeds web/dist)
 FROM golang:1.20.2-alpine AS server
+ARG TARGETOS TARGETARCH
 
 RUN apk add --no-cache build-base sqlite-dev
 
@@ -17,7 +18,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . ./
 COPY --from=web /src/web/dist ./web/dist
-RUN env CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
+RUN env CGO_ENABLED=1 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
   go build -trimpath -ldflags "-s -w" -o /out/main main.go
 
 ### Runtime
