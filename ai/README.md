@@ -4,6 +4,7 @@
 
 This Plugin brings intelligent capabilities to DooTask by integrating several leading large language models, including:
 
+* Doo AI (official service from DooTask—models and quota included, ready to use after sign-in, no API key required)
 * ChatGPT (OpenAI)
 * Claude (Anthropic)
 * DeepSeek
@@ -18,9 +19,10 @@ Once installed, users can configure and access these AI models within DooTask fo
 
 ## Key Features
 
+* Official Doo AI service: Sign in and use it out of the box—models and quota provided by DooTask, no need to bring your own API keys
 * Multiple mainstream model integrations: Covers both Chinese and English model providers to meet diverse needs
 * Local model deployment: Deploy models like DeepSeek, LLaMA, and Mistral via Ollama for enhanced data privacy
-* MCP integration: Works with the DooTask MCP platform for unified model, permission, and invocation management, enabling flexible governance
+* AI assistant that gets things done: Find and create tasks, send messages, write report drafts, search, and even open pages and operate the interface for you
 * Boost task efficiency: Automatically generate task content, subtask suggestions, project summaries, and more
 * Native integration: AI features are embedded in tasks, comments, notes, and other modules for a seamless experience
 * Zero-configuration start: Optimized default settings allow you to use the plugin immediately without complex setup

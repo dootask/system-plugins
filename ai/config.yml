@@ -11,3 +11,4 @@ document: https://github.com/dootask/system-plugins/tree/main/ai
 tags:
   - AI
   - 助手
+knowledge_base: ./ai-kb

@@ -1,21 +1,27 @@
 ### Added
-- The AI assistant now understands DooTask better: when you ask "how do I use this feature" or "where do I find that setting", it first looks up the built-in product handbook before answering and cites its sources. If it finds nothing relevant, it says so honestly instead of making things up.
-- The core handbook ships with DooTask itself — after upgrading DooTask, just restart this plugin to pick up the latest content. No manual sync needed. (App-specific docs ship with each app — see "app-bundled knowledge bases" below.)
-- The product handbook now supports "app-bundled knowledge bases": usage docs for each micro-app (Approval, OKR, Mind Map, Flowchart, OnlyOffice, File Preview, Global Search, AI Assistant, Face Check-in, etc.) now ship with the app itself. When you install an app, the main program automatically merges that app's knowledge base into AI assistant retrieval, and removes it on uninstall — so what the assistant knows about apps always matches which apps are actually installed, and it no longer describes features that aren't there.
-- New "Embedding model" option on the install screen lets you pick the model used for handbook matching (defaults to Qwen, works out of the box; no tweaking required for most users).
-- Added Claude Fable 5 to the model list — Anthropic's newest flagship model.
-- The AI assistant and chat bots now perform operations through a unified `doo` command-line tool (query/create tasks, send messages, files, reports, search, page navigation, etc.), collapsing the previously per-tool mounting into a single command-line entry — broader coverage, more consistent behavior.
-- Page operations (open a task, navigate, operate page elements) are now driven over the main app's persistent connection, so opening the AI assistant no longer establishes an extra connection.
-- Page operations now work inside micro-app plugins: when you have a plugin open (e.g. Asset Hub, CRM) and ask the assistant to click a button or switch a menu, the action goes into the plugin itself instead of the main shell.
-- The AI assistant can manage application plugins for you: install, update, reinstall, uninstall plugins, and view installed apps, the marketplace, app logs and containers. Install/uninstall require admin permission; destructive operations are confirmed with you first.
 
-### Changed
-- Image text recognition (OCR) is retired; multimodal models now understand images directly.
-- Built-in tool calls are unified through `doo`; the legacy MCP tools module is being phased out.
-- App docs have been moved out of the main program's built-in handbook and are now carried by each app. The experience is unchanged for you: installed apps are still searchable, uninstalled ones simply no longer appear in answers. Knowledge base retrieval now spans both the "core handbook (main program)" and "bundled handbooks of installed apps"; installing/uninstalling an app converges incrementally with no manual rebuild.
+- Added "Doo AI", the official AI service from DooTask: models and quota are provided by DooTask, so you can sign in and start using it right away—no need to bring your own API keys.
+- After installing, the first time you open the AI settings an official trial account is created for you automatically, with a default model pre-selected—it works out of the box.
+- New account panel in the AI settings: sign in with your email and a verification code to bind the trial account to you, so you can keep using it across devices.
+- The account panel shows your remaining quota at a glance.
+- In model settings you can pull the official model list with one click, browse it grouped by provider, and add or remove models in bulk.
+- Model names are shown in a friendlier way, and more providers such as MiniMax and Kimi are now recognized.
+- Each model can have its own thinking depth and tool-use setting, so you can balance speed and quality per model.
+- Added Claude Fable 5 to the model list—Anthropic's newest flagship model.
+- The AI assistant now understands DooTask better: when you ask "how do I use this feature" or "where is this setting", it checks the built-in product handbook first and cites its sources. If it finds nothing, it says so honestly instead of making things up.
+- The handbook now supports "app-bundled guides": after you install an app (Approval, OKR, Mind Map, Flowchart, OnlyOffice, File Preview, Global Search, Face Check-in, etc.), the assistant automatically learns how that app works, and forgets it when the app is uninstalled—so its answers always match the apps you actually have.
+- The AI assistant can act directly on your current page: open a task, navigate, and click or fill in buttons and forms on the page.
+- Inside an open app plugin (such as Asset Hub or CRM), you can also ask the assistant to click buttons or switch menus, and the action happens inside that app.
+- The AI assistant can manage apps for you: install, update, reinstall, uninstall, and view installed apps and the app store. Installing and uninstalling require admin permission, and important actions are confirmed with you first.
+
+### Improved
+
+- The AI assistant and chat bots run actions (find/create tasks, send messages, send files, write reports, search, navigate pages, etc.) more reliably and consistently.
+- Images no longer need separate text recognition—the AI reads image content directly.
+- Signing out is more robust: even if your session has already expired, your local sign-in info is cleared and you are signed out cleanly.
 
 ### Upgrade notes
-- This feature needs DooTask's main Redis to be 8.0 or newer. On older versions it's silently disabled and AI chat keeps working as usual; upgrade Redis in DooTask if you'd like to turn it on.
-- This version requires DooTask main app v1.7.91 or newer (page operations depend on the newly added fd injection and operation dispatch endpoints). The app store will refuse to install on older versions.
-- The legacy dootask MCP sub-module is unmaintained. After upgrading we recommend uninstalling it from the app store — all its capabilities are now covered by the bundled `doo` CLI.
-- "App-bundled knowledge bases" require the DooTask main program's AppStore to broadcast app lifecycle events (carrying the list of installed apps). The AI assistant uses that list to fetch each app's knowledge base directly from the app package and reconcile automatically — the platform no longer copies knowledge bases; the AI container fetches and manages them itself. On the first start after upgrade, the bundled knowledge bases of installed apps load automatically — no manual action needed.
+
+- This version requires a recent version of the DooTask main app; on older versions the app store will refuse to install, so please upgrade the main app first.
+- The smart handbook lookup needs a recent version of the main app's data service; on older versions it is turned off automatically and normal AI chat is unaffected—upgrade the main app if you want to enable it.
+- If you previously installed the old standalone "DooTask MCP" plugin, you can uninstall it from the app store after upgrading; all of its capabilities are now built in, so nothing is lost.

@@ -13,3 +13,4 @@ fields:
       zh: 服务端口
     type: number
     default: 7788
+knowledge_base: ./ai-kb

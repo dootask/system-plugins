@@ -155,6 +155,12 @@ paths:
                 returnTo:
                   type: string
                   description: 退回目标，"initiator" 退回发起人或指定节点 id（action=return 时）
+                resubmitForm:
+                  type: object
+                  additionalProperties: true
+                  description: >-
+                    退回发起人后，发起人本人在同一次 return 调用里附带的新表单数据，
+                    引擎据此续审（仅当 action=return 且操作者为发起人时生效）。
       responses:
         "200":
           description: "{ ok: true }"
