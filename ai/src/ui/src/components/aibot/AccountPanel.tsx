@@ -110,8 +110,8 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
   const [refreshing, setRefreshing] = useState(false)
   const [selectAccounts, setSelectAccounts] = useState<LoginAccount[]>([])
 
-  const [loginForm, setLoginForm] = useState({ login: "", password: "" })
-  const [claimForm, setClaimForm] = useState({ username: "", password: "", email: "", code: "" })
+  const [loginForm, setLoginForm] = useState({ email: "", code: "" })
+  const [claimForm, setClaimForm] = useState({ email: "", code: "" })
 
   // silent=true 时（后台/缓存刷新）失败不弹错，避免打扰
   const loadMe = useCallback(async (tk: string, silent = false) => {
@@ -185,7 +185,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
     setBusy(true)
     try {
       const baseUrl = await fetchBaseUrl()
-      const body: Record<string, unknown> = { ...loginForm }
+      const body: Record<string, unknown> = { email: loginForm.email, code: loginForm.code }
       if (accountId) body.account_id = accountId
       const { ok, json } = await gateway("/login", {
         method: "POST",
@@ -199,7 +199,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
       if (tk) {
         await onAuth(String(tk), baseUrl)
         setMode("view")
-        setLoginForm({ login: "", password: "" })
+        setLoginForm({ email: "", code: "" })
         setSelectAccounts([])
         return
       }
@@ -220,14 +220,16 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
   const handleLogin = () => performLogin()
   const handleSelectAccount = (id: number) => performLogin(id)
 
-  const handleSendCode = async () => {
-    if (!claimForm.email) return
+  // 发送邮箱验证码（scene=ai_claim，登录/认领共用端点）。
+  // 登录态尚无 token（开放端点，仅按邮箱+IP 限流）；认领态带 gateway_token。
+  const sendEmailCode = async (email: string, headers: HeadersInit) => {
+    if (!email) return
     setBusy(true)
     try {
       const { ok } = await gateway("/email/send", {
         method: "POST",
-        headers: authHeaders(token),
-        body: JSON.stringify({ email: claimForm.email }),
+        headers,
+        body: JSON.stringify({ email }),
       })
       if (!ok) {
         messageError(t("sheet.account.sendCodeFailed"))
@@ -237,17 +239,25 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
     }
   }
 
+  // 认领区发码：带 gateway_token
+  const handleSendCode = () =>
+    sendEmailCode(claimForm.email, authHeaders(token))
+
+  // 登录区发码：未登录态，不带 token（开放端点）
+  const handleSendLoginCode = () =>
+    sendEmailCode(loginForm.email, { "Content-Type": "application/json" })
+
   const handleClaim = async () => {
     setBusy(true)
     try {
       const { ok } = await gateway("/claim", {
         method: "POST",
         headers: authHeaders(token),
-        body: JSON.stringify(claimForm),
+        body: JSON.stringify({ email: claimForm.email, code: claimForm.code }),
       })
       if (ok) {
         setMode("view")
-        setClaimForm({ username: "", password: "", email: "", code: "" })
+        setClaimForm({ email: "", code: "" })
         await loadMe(token)
       } else {
         messageError(t("sheet.account.claimFailed"))
@@ -335,20 +345,24 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
         </div>
       )}
 
-      {/* 登录表单 */}
+      {/* 登录表单：邮箱 + 验证码（与认领统一） */}
       {!signedIn && mode === "login" && (
         <div className="space-y-2">
           <Input
-            placeholder={t("sheet.account.username") + " / " + t("sheet.account.email")}
-            value={loginForm.login}
-            onChange={(e) => setLoginForm((p) => ({ ...p, login: e.target.value }))}
+            placeholder={t("sheet.account.email")}
+            value={loginForm.email}
+            onChange={(e) => setLoginForm((p) => ({ ...p, email: e.target.value }))}
           />
-          <Input
-            type="password"
-            placeholder={t("sheet.account.password")}
-            value={loginForm.password}
-            onChange={(e) => setLoginForm((p) => ({ ...p, password: e.target.value }))}
-          />
+          <div className="flex gap-2">
+            <Input
+              placeholder={t("sheet.account.code")}
+              value={loginForm.code}
+              onChange={(e) => setLoginForm((p) => ({ ...p, code: e.target.value }))}
+            />
+            <Button type="button" variant="outline" disabled={busy || !loginForm.email} onClick={handleSendLoginCode}>
+              {t("sheet.account.sendCode")}
+            </Button>
+          </div>
         </div>
       )}
 
@@ -376,17 +390,6 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
       {/* 认领表单 */}
       {signedIn && isAnonymous && mode === "claim" && (
         <div className="space-y-2">
-          <Input
-            placeholder={t("sheet.account.username")}
-            value={claimForm.username}
-            onChange={(e) => setClaimForm((p) => ({ ...p, username: e.target.value }))}
-          />
-          <Input
-            type="password"
-            placeholder={t("sheet.account.password")}
-            value={claimForm.password}
-            onChange={(e) => setClaimForm((p) => ({ ...p, password: e.target.value }))}
-          />
           <Input
             placeholder={t("sheet.account.email")}
             value={claimForm.email}
