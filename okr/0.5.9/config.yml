@@ -1,8 +1,8 @@
 require_version:
-  version: "> 1.4.88"
+  version: "> 1.7.90"
   reason:
-    en: "Requires new API features"
-    zh: "需要新的API功能"
+    en: "Requires the main app's AI app-command (doo app call) and knowledge base support"
+    zh: "需要主程序的 AI 应用指令（doo app call）与知识库支持"
 menu_items:
   - location: application
     label:
