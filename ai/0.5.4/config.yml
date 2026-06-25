@@ -55,9 +55,20 @@ hooks:
   # - 把广播附带的 ${INSTALLED_APPS}（已安装应用清单 JSON）原样带进 body：AI 据此到只读挂载的
   #   apps 目录里自取各应用 knowledge_base。必须用裸 ${INSTALLED_APPS}（运行时由 hook env 注入、
   #   bash 展开）；切勿写成 ${INSTALLED_APPS:-[]}——compose 规范插值会在 config 解析期把它吃成 []。
-  # - hook 在 AppStore 容器内执行，经 docker 网络访问 ai:5001。
+  # - hook 在 AppStore 容器内（bash）执行，经 docker 网络访问 ai:5001。
+  # - ai 服务可能还没起来（典型是 ai 自身安装、容器尚在启动）：重试几次等它就绪，
+  #   成功即退出；全部失败也以 0 收尾，不拖垮 install——漏掉的 delta 由服务启动期
+  #   _init_kb 的全量 reconcile 自愈。循环用固定列表迭代、不引入 shell 变量，避免
+  #   被 config 解析期的 compose 插值误伤。
   app_install:
-    cmd: 'curl -sf -m 15 -X POST http://ai:5001/kb/reindex -H "X-Ingest-Token: ${KB_INGEST_TOKEN}" -H "Content-Type: application/json" -d "{\"mode\":\"reconcile\",\"apps\":${INSTALLED_APPS}}"'
+    cmd: |
+      for _ in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
+        curl -sf -m 15 -X POST http://ai:5001/kb/reindex \
+          -H "X-Ingest-Token: ${KB_INGEST_TOKEN}" \
+          -H "Content-Type: application/json" \
+          -d "{\"mode\":\"reconcile\",\"apps\":${INSTALLED_APPS}}" && exit 0
+        sleep 10
+      done
   # 装/更/卸三事件触发同一次 reconcile，用 @ 引用复用 app_install 的命令，避免重复
   app_update: '@app_install'
   app_uninstall: '@app_install'
