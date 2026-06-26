@@ -9,6 +9,7 @@ import { cn } from '#/lib/utils'
 import { ErrorBar, Loading, SubPageBreadcrumb } from '#/components/ui/misc'
 import { FormDesigner } from '#/components/designer/FormDesigner'
 import { FlowDesigner } from '#/components/designer/FlowDesigner'
+import { TemplateImportDialog } from '#/components/views/template-import-dialog'
 import { validateFormSchema } from '#/lib/form/validate'
 // 直接从纯模块 engine/flow 引入：经 engine 桶文件会牵入 engine.ts→lib/db（node:fs），
 // 把服务端专用代码打进客户端 bundle，渲染设计器时报 "o is not a function"。
@@ -45,6 +46,7 @@ export function TemplateEditor({ idParam }: { idParam: string }) {
   const [loading, setLoading] = useState(!isNew)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [importOpen, setImportOpen] = useState(false)
 
   useEffect(() => {
     if (isNew) return
@@ -142,7 +144,25 @@ export function TemplateEditor({ idParam }: { idParam: string }) {
             {tb.label}
           </button>
         ))}
+        {/* 模板导入：仅新建时出现；样式同页签但点击不切页签，而是弹出预设选择框。 */}
+        {isNew ? (
+          <button
+            type="button"
+            onClick={() => setImportOpen(true)}
+            className="ml-auto shrink-0 border-b-2 border-transparent px-4 py-2 text-sm font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground"
+          >
+            {t('designer.tpl.tabImport')}
+          </button>
+        ) : null}
       </div>
+
+      {isNew ? (
+        <TemplateImportDialog
+          open={importOpen}
+          onOpenChange={setImportOpen}
+          onImported={() => navigate({ to: '/admin' })}
+        />
+      ) : null}
 
       {tab === 'basic' ? (
         <div className="max-w-md space-y-4">

@@ -188,4 +188,27 @@ export const designer = {
   'designer.tpl.loadFailed': { zh: '加载失败', en: 'Failed to load' },
   'designer.tpl.saveFailed': { zh: '保存失败', en: 'Failed to save' },
   'designer.tpl.saving': { zh: '保存中…', en: 'Saving…' },
+
+  // ── 模板导入（从预设模板批量导入）──
+  'designer.tpl.tabImport': { zh: '模板导入', en: 'Import' },
+  'designer.import.title': { zh: '模板导入', en: 'Import Templates' },
+  'designer.import.desc': {
+    zh: '勾选要导入的预设模板，点击导入后将直接添加到模板列表。',
+    en: 'Select preset templates to import. They will be added to the template list directly.',
+  },
+  'designer.import.exists': { zh: '已存在', en: 'Exists' },
+  'designer.import.selectAll': { zh: '全选', en: 'Select all' },
+  'designer.import.deselectAll': { zh: '全不选', en: 'Deselect all' },
+  'designer.import.empty': { zh: '暂无预设模板', en: 'No preset templates' },
+  'designer.import.loadFailed': {
+    zh: '加载预设模板失败',
+    en: 'Failed to load preset templates',
+  },
+  'designer.import.submit': { zh: '导入', en: 'Import' },
+  'designer.import.submitCount': { zh: '导入（{count}）', en: 'Import ({count})' },
+  'designer.import.dupConfirm': {
+    zh: '勾选的模板中有 {count} 个与现有模板同名，导入后会产生重复。确定继续导入吗？',
+    en: '{count} selected template(s) share a name with existing ones and will be duplicated. Continue?',
+  },
+  'designer.import.failed': { zh: '导入失败', en: 'Failed to import' },
 } satisfies Record<string, MsgEntry>

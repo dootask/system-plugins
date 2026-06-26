@@ -92,6 +92,10 @@ export const server = {
     zh: '仅管理员可操作',
     en: 'Administrators only',
   },
+  'server.err.noPresetSelected': {
+    zh: '请至少选择一个预设模板',
+    en: 'Please select at least one preset template',
+  },
   'server.err.backupNotFound': {
     zh: '备份不存在',
     en: 'Backup not found',
