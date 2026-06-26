@@ -1,0 +1,26 @@
+fields:
+  - name: APPROVE_ADMIN_USER_IDS
+    label:
+      en: Administrator
+      zh: 管理员
+    placeholder:
+      en: Select users with admin privileges
+      zh: 选择具有管理员权限的用户
+    type: user_select
+
+menu_items:
+  - location: application
+    label:
+      en: Approval
+      zh: 审批中心
+    url: "apps/approve/?theme={system_theme}&lang={system_lang}&user_id={user_id}&user_token={user_token}"
+    url_type: iframe
+    immersive: true
+    capsule:
+      visible: true            # 显示右上角胶囊（关闭/返回）；页面布局把标题/操作避开右上，避免遮挡
+
+require_version:
+  version: "> 1.7.90"
+  reason:
+    en: "Requires the main app's AI app-command (doo app call) and knowledge base support"
+    zh: "需要主程序的 AI 应用指令（doo app call）与知识库支持"
