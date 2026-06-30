@@ -19,7 +19,9 @@ interface QuotaBucket {
 
 interface AccountInfo {
   type?: string
+  instance_id?: string
   subscription_code?: string
+  subscription_name?: string
   email?: string | null
   username?: string | null
   buckets?: QuotaBucket[]
@@ -309,7 +311,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
         <Label className="text-sm font-semibold">{t("sheet.account.title")}</Label>
         {signedIn ? (
           <Badge variant={isAnonymous ? "outline" : "secondary"} className="font-normal">
-            {isAnonymous ? t("sheet.account.anonymous") : t("sheet.account.claimed")}
+            {account?.subscription_name || (isAnonymous ? t("sheet.account.anonymous") : t("sheet.account.claimed"))}
           </Badge>
         ) : (
           <Badge variant="outline" className="font-normal">
@@ -330,6 +332,9 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
           {account.email && (
             <div className="text-xs text-muted-foreground">
               {t("sheet.account.boundAccount")}: {account.email}
+              {account.instance_id && (
+                <span className="ml-1 font-mono">({account.instance_id})</span>
+              )}
             </div>
           )}
           <div className="text-xs text-muted-foreground">
