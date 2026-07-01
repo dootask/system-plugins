@@ -1043,9 +1043,19 @@ async def gateway_config():
 
 
 @app.post('/gateway/provision')
-async def gateway_provision():
+async def gateway_provision(request: Request):
     """按安装实例自助开通匿名账号，返回 gateway_token。"""
-    return await _gateway_call("POST", "/provision", json_body={"instance_id": DOOTASK_AI_INSTANCE_ID})
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    if not isinstance(body, dict):
+        body = {}
+    payload = {"instance_id": DOOTASK_AI_INSTANCE_ID}
+    # 透传前端上报的站点 origin（容器内仅见内网地址，故由面板提供）
+    if body.get("site_origin"):
+        payload["site_origin"] = body["site_origin"]
+    return await _gateway_call("POST", "/provision", json_body=payload)
 
 
 @app.post('/gateway/login')

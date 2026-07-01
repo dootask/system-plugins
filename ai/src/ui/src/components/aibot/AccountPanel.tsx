@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react"
 
 import { Loader2 } from "lucide-react"
 
-import { messageError, messageSuccess, modalError } from "@dootask/tools"
+import { messageError, messageSuccess, modalError, getBaseUrl } from "@dootask/tools"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -64,6 +64,16 @@ function authHeaders(token: string): HeadersInit {
   return {
     "Content-Type": "application/json",
     Authorization: `Bearer ${token}`,
+  }
+}
+
+// 取当前 DooTask 站点 origin（仅协议+域名+端口）：容器内只有内网地址，故由前端经 @dootask/tools 提供。
+async function siteOrigin(): Promise<string> {
+  try {
+    const base = await getBaseUrl()
+    return base ? new URL(base).origin : ""
+  } catch {
+    return ""
   }
 }
 
@@ -172,7 +182,11 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
     setSubmitting(true)
     try {
       const baseUrl = await fetchBaseUrl()
-      const { ok, json } = await gateway("/provision", { method: "POST" })
+      const { ok, json } = await gateway("/provision", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ site_origin: await siteOrigin() }),
+      })
       const tk = json?.data?.gateway_token
       if (!ok || !tk) {
         throw new Error(t("sheet.account.provisionFailed"))
@@ -191,7 +205,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
     setSubmitting(true)
     try {
       const baseUrl = await fetchBaseUrl()
-      const body: Record<string, unknown> = { email: loginForm.email, code: loginForm.code, lang }
+      const body: Record<string, unknown> = { email: loginForm.email, code: loginForm.code, lang, site_origin: await siteOrigin() }
       if (accountId) body.account_id = accountId
       const { ok, json } = await gateway("/login", {
         method: "POST",
@@ -262,7 +276,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
       const { ok } = await gateway("/claim", {
         method: "POST",
         headers: authHeaders(token),
-        body: JSON.stringify({ email: claimForm.email, code: claimForm.code, lang }),
+        body: JSON.stringify({ email: claimForm.email, code: claimForm.code, lang, site_origin: await siteOrigin() }),
       })
       if (ok) {
         setMode("view")
