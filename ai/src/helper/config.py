@@ -25,10 +25,8 @@ MAIN_SERVER_URL = os.environ.get("MAIN_SERVER_URL", "http://nginx")
 DOOTASK_AI_GATEWAY_URL = os.environ.get("DOOTASK_AI_GATEWAY_URL", "").rstrip("/")
 DOOTASK_AI_INSTANCE_ID = os.environ.get("DOOTASK_AI_INSTANCE_ID", "")
 
-# 自定义 MCP 配置文件路径（用户自接的外部 MCP 服务器；DooTask 内置 MCP 已退役）
-# DOOTASK_MCP_ID 仍保留：用于识别并跳过历史配置里残留的系统 MCP 条目
+# 自定义 MCP 配置文件路径（用户自接的外部 MCP 服务器）
 MCP_CONFIG_PATH = BASE_DIR / "config" / "mcp-config.json"
-DOOTASK_MCP_ID = "dootask-mcp"
 
 # Vision 配置文件路径
 VISION_CONFIG_PATH = BASE_DIR / "config" / "vision-config.json"

@@ -158,7 +158,6 @@ export const MCPEditorSheet = ({
       config,
       supportedModels,
       enabled,
-      isSystem: mcp?.isSystem,
     })
     onOpenChange(false)
   }
@@ -197,17 +196,15 @@ export const MCPEditorSheet = ({
                 onChange={(e) => setName(e.target.value)}
                 placeholder={t("mcp.namePlaceholder")}
                 maxLength={100}
-                disabled={mcp?.isSystem}
               />
             </div>
 
-            {/* MCP配置 - 系统MCP不显示 */}
-            {!mcp?.isSystem && (
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2 flex-wrap">
-                  <Label htmlFor="mcp-config" className="text-sm font-medium">
-                    {t("mcp.config")}
-                  </Label>
+            {/* MCP配置 */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <Label htmlFor="mcp-config" className="text-sm font-medium">
+                  {t("mcp.config")}
+                </Label>
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                     <span>{t("mcp.exampleLabel")}</span>
                     <Button
@@ -253,8 +250,7 @@ export const MCPEditorSheet = ({
                 <p className="text-xs text-muted-foreground">
                   {t("mcp.configTip")}
                 </p>
-              </div>
-            )}
+            </div>
 
             {/* 支持的模型 */}
             <div className="space-y-3">
@@ -304,7 +300,6 @@ export const MCPEditorSheet = ({
                 id="mcp-enabled"
                 checked={enabled}
                 onCheckedChange={setEnabled}
-                disabled={mcp?.isSystem}
               />
             </div>
             <div className="flex items-center gap-3">

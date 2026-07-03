@@ -94,15 +94,13 @@ export const MCPListCard = ({
                     <Settings />
                     {t("mcp.edit")}
                   </Button>
-                  {!mcp.isSystem && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => onDelete(mcp)}
-                    >
-                      {t("mcp.delete")}
-                    </Button>
-                  )}
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => onDelete(mcp)}
+                  >
+                    {t("mcp.delete")}
+                  </Button>
                 </div>
               </div>
               )

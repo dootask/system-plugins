@@ -9,20 +9,10 @@ export interface MCPConfig {
   config: string // JSON格式的MCP配置
   supportedModels: SupportedModel[] // 支持该MCP的模型列表
   enabled: boolean // 是否启用
-  isSystem?: boolean // 是否为系统MCP（如DooTask）
 }
 
 export interface MCPConfigList {
   mcps?: MCPConfig[]
-}
-
-export const DOOTASK_MCP_ID = "dootask-mcp"
-
-export const isSystemDooTaskMcp = (mcp?: Partial<MCPConfig>) => {
-  if (!mcp) {
-    return false
-  }
-  return Boolean(mcp.isSystem && mcp.id === DOOTASK_MCP_ID)
 }
 
 export const createMcpId = () => {

@@ -2,19 +2,15 @@ import {
   type MCPConfig,
   type MCPConfigList,
   createMcpId,
-  DOOTASK_MCP_ID,
-  isSystemDooTaskMcp,
 } from "@/data/mcp-config"
 
 const normalizeMcpConfig = (mcp: Partial<MCPConfig>): MCPConfig => {
-  const normalizedId = isSystemDooTaskMcp(mcp) ? DOOTASK_MCP_ID : mcp.id ?? createMcpId()
   return {
-    id: normalizedId,
+    id: mcp.id ?? createMcpId(),
     name: typeof mcp.name === "string" ? mcp.name : "",
     config: typeof mcp.config === "string" ? mcp.config : "",
     supportedModels: Array.isArray(mcp.supportedModels) ? mcp.supportedModels : [],
     enabled: mcp.enabled ?? true,
-    isSystem: mcp.isSystem,
   }
 }
 
@@ -73,15 +69,8 @@ export const saveMCPConfigs = async (mcps: MCPConfig[]): Promise<void> => {
  * 添加或更新MCP配置
  */
 export const saveMCPConfig = async (mcp: MCPConfig, existingMcps: MCPConfig[]): Promise<MCPConfig[]> => {
-  const normalizedTarget = normalizeMcpConfig(mcp)
-  const index = existingMcps.findIndex((existing) => existing.id === normalizedTarget.id)
-  const isSystemTarget = isSystemDooTaskMcp(normalizedTarget)
-  const target = isSystemTarget
-    ? {
-        ...(index >= 0 ? existingMcps[index] : normalizedTarget),
-        supportedModels: normalizedTarget.supportedModels,
-      }
-    : normalizedTarget
+  const target = normalizeMcpConfig(mcp)
+  const index = existingMcps.findIndex((existing) => existing.id === target.id)
   let newMcps: MCPConfig[]
 
   if (index >= 0) {

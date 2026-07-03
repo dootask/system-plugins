@@ -7,7 +7,7 @@ from typing import Any, Callable, Dict, List, Optional
 from langchain_core.tools import BaseTool, ToolException
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
-from helper.config import DOOTASK_MCP_ID, MCP_CONFIG_PATH
+from helper.config import MCP_CONFIG_PATH
 
 logger = logging.getLogger("ai")
 
@@ -77,10 +77,6 @@ def _normalize_mcp_config(data: Dict[str, object]) -> Dict[str, object]:
             continue
 
         normalized = dict(item)
-        is_system = bool(normalized.get("isSystem"))
-        if is_system:
-            normalized["id"] = DOOTASK_MCP_ID
-
         if not isinstance(normalized.get("supportedModels"), list):
             normalized["supportedModels"] = []
 
@@ -200,10 +196,6 @@ async def load_mcp_tools_for_model(
         if mcp.get("enabled") is False:
             continue
         if not _mcp_supports_model(mcp, model_name):
-            continue
-
-        # dootask 内置 MCP 已退役，跳过所有系统 MCP 条目；自定义 MCP 不受影响
-        if mcp.get("id") == DOOTASK_MCP_ID or mcp.get("isSystem"):
             continue
 
         server_key = str(mcp.get("id") or mcp.get("name") or "").strip()

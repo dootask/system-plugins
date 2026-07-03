@@ -174,8 +174,6 @@ async def lifespan_context(app: FastAPI):
         # Ensure default vision config exists
         ensure_default_vision_config()
 
-        # dootask 内置 MCP 已退役（AI 经 doo CLI 操作），不再探测/连接其健康端点
-        app.state.dootask_mcp = False
         vision_task = asyncio.create_task(periodic_vision_cleanup())
         redis_manager = RedisManager()
         app.state.redis_manager = redis_manager
