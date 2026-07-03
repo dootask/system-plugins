@@ -19,6 +19,8 @@ export interface ModelItem {
   support_mcp: boolean
   support_vision: boolean
   thinking: ThinkingEffort
+  // 隐藏模型：仍保存在列表中，但 DooTask 核心展示给终端用户时会跳过（不删除、便于随时恢复）
+  hidden?: boolean
 }
 
 export interface ModelOption {
@@ -27,6 +29,7 @@ export interface ModelOption {
   support_mcp: boolean
   support_vision: boolean
   thinking: ThinkingEffort
+  hidden: boolean
 }
 
 const mapModelArray = (items: Partial<ModelItem>[]): ModelOption[] =>
@@ -38,7 +41,33 @@ const mapModelArray = (items: Partial<ModelItem>[]): ModelOption[] =>
       support_mcp: item.support_mcp ?? false,
       support_vision: item.support_vision ?? false,
       thinking: normalizeThinking(item.thinking),
+      hidden: Boolean(item.hidden),
     }))
+
+// 统一序列化模型列表为存储用 JSON（收敛所有写入点，确保 hidden 标记不被丢弃）。
+// 仅在隐藏时写出 hidden:true，可见项不带该字段，保持与旧数据一致、体积最小。
+export const serializeModels = (
+  models: Array<{ value: string; label?: string; thinking?: unknown; hidden?: boolean }>,
+): string => {
+  const items = models
+    .map((m) => ({
+      id: (m.value ?? "").trim(),
+      name: (m.label ?? "").trim(),
+      thinking: normalizeThinking(m.thinking),
+      hidden: Boolean(m.hidden),
+    }))
+    .filter((m) => m.id)
+    .map((m) => {
+      const item: { id: string; name: string; thinking: ThinkingEffort; hidden?: boolean } = {
+        id: m.id,
+        name: m.name || m.id,
+        thinking: m.thinking,
+      }
+      if (m.hidden) item.hidden = true
+      return item
+    })
+  return items.length ? JSON.stringify(items) : ""
+}
 
 export const parseModelNames = (raw: string | ModelItem[] | undefined | null): ModelOption[] => {
   if (!raw) return []
@@ -74,6 +103,7 @@ export const parseModelNames = (raw: string | ModelItem[] | undefined | null): M
         support_mcp: false,
         support_vision: false,
         thinking: "off" as ThinkingEffort,
+        hidden: false,
       }
     })
     .filter((item) => item.value)

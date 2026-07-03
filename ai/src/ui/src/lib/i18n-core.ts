@@ -32,6 +32,7 @@ const TRANSLATIONS: Record<Language, TranslationTree> = {
     success: {
       save: "修改成功",
       fetchSuccess: "获取成功",
+      modelsSynced: "已同步新模型",
     },
     sheet: {
       title: "AI 设置",
@@ -67,6 +68,9 @@ const TRANSLATIONS: Record<Language, TranslationTree> = {
         empty: "暂无模型，点击下方按钮添加。",
         remove: "删除模型",
         removeSelected: "删除所选",
+        hide: "隐藏（对用户不可见）",
+        show: "显示",
+        hiddenBadge: "已隐藏",
         tooLong: "模型数量已达上限，请删除部分模型后再保存。",
         fetchDialogTitle: "选择模型",
         fetchDialogDescription: "勾选需要加入列表的模型，已存在的模型不可重复添加。",
@@ -207,6 +211,7 @@ const TRANSLATIONS: Record<Language, TranslationTree> = {
     success: {
       save: "Saved successfully",
       fetchSuccess: "Fetched successfully",
+      modelsSynced: "New models synced",
     },
     sheet: {
       title: "AI Settings",
@@ -242,6 +247,9 @@ const TRANSLATIONS: Record<Language, TranslationTree> = {
         empty: "No models yet. Use the button below to add one.",
         remove: "Remove model",
         removeSelected: "Delete selected",
+        hide: "Hide (invisible to users)",
+        show: "Show",
+        hiddenBadge: "Hidden",
         tooLong: "You've reached the model limit. Please remove some models before saving.",
         fetchDialogTitle: "Select models",
         fetchDialogDescription: "Check the models to add to the list. Models already in the list can't be added again.",

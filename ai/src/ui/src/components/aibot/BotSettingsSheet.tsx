@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react"
 
-import { Plug, Search } from "lucide-react"
+import { EyeOff, Plug, Search } from "lucide-react"
 import { messageError } from "@dootask/tools"
 
 import { cn } from "@/lib/utils"
@@ -51,7 +51,7 @@ import {
 
 import type { AIBotItem, AIBotKey } from "@/data/aibots"
 import type { GeneratedField, ModelOption } from "@/lib/aibot"
-import { parseModelNames } from "@/lib/aibot"
+import { parseModelNames, serializeModels } from "@/lib/aibot"
 import type { MCPConfig } from "@/data/mcp-config"
 import { useI18n } from "@/lib/i18n-context"
 
@@ -105,6 +105,7 @@ export interface BotSettingsSheetProps {
   onApplyModelMcpToAll: (bot: AIBotKey, sourceModelId: string, allModelIds: string[]) => void
   onGatewayAuth: (token: string, baseUrl: string) => void | Promise<void>
   onGatewayLogout: () => void | Promise<void>
+  onGatewayClaimed: () => void | Promise<void>
 }
 
 export const BotSettingsSheet = ({
@@ -130,6 +131,7 @@ export const BotSettingsSheet = ({
   onApplyModelMcpToAll,
   onGatewayAuth,
   onGatewayLogout,
+  onGatewayClaimed,
 }: BotSettingsSheetProps) => {
   const { t } = useI18n()
   const enabledMcps = useMemo(() => mcps.filter((mcp) => mcp.enabled !== false), [mcps])
@@ -375,9 +377,7 @@ export const BotSettingsSheet = ({
     if (added.length) {
       const existing = parseModelNames(modelEditorValue)
       const merged = [...existing, ...added]
-      const serialized = JSON.stringify(
-        merged.map((m) => ({ id: m.value, name: m.label || m.value, thinking: m.thinking })),
-      )
+      const serialized = serializeModels(merged)
       setModelEditorValue(serialized)
       setHighlightedModelValues(added.map((m) => m.value))
     }
@@ -406,7 +406,10 @@ export const BotSettingsSheet = ({
                     return (
                       <li
                         key={`${item.value}|${item.label}`}
-                        className="leading-relaxed flex items-center justify-between gap-2"
+                        className={cn(
+                          "leading-relaxed flex items-center justify-between gap-2",
+                          item.hidden && "opacity-55",
+                        )}
                       >
                         <div className="flex min-w-0 items-center gap-2">
                           <span className="font-medium truncate">{item.label || item.value}</span>
@@ -415,6 +418,12 @@ export const BotSettingsSheet = ({
                           )}
                         </div>
                         <div className="flex shrink-0 items-center gap-1.5">
+                          {item.hidden && (
+                            <Badge variant="outline" className="gap-1 font-normal text-muted-foreground">
+                              <EyeOff className="h-3 w-3" />
+                              {t("sheet.models.hiddenBadge")}
+                            </Badge>
+                          )}
                           {item.thinking !== "off" && (
                             <Badge variant="outline" className="font-normal">
                               {t("sheet.models.column.thinking")}: {t(`sheet.models.thinking.${item.thinking}`)}
@@ -624,6 +633,7 @@ export const BotSettingsSheet = ({
                               token={formValues[bot.value]?.["dooai_key"] ?? ""}
                               onAuth={onGatewayAuth}
                               onLogout={onGatewayLogout}
+                              onClaimed={onGatewayClaimed}
                             />
                           )}
                           {fields.map((field) => renderField(bot, field))}
@@ -677,7 +687,7 @@ export const BotSettingsSheet = ({
       <Sheet open={isModelEditorOpen} onOpenChange={(next) => !next && handleCloseModelEditor()}>
         <SheetContent
           side="right"
-          className="flex w-full max-w-xl sm:max-w-3xl lg:max-w-3xl flex-col gap-0 overflow-hidden pt-[calc(var(--safe-area-top)+1.5rem)] pb-[calc(var(--safe-area-bottom)+1.5rem)]"
+          className="flex w-full max-w-2xl sm:max-w-4xl lg:max-w-4xl flex-col gap-0 overflow-hidden pt-[calc(var(--safe-area-top)+1.5rem)] pb-[calc(var(--safe-area-bottom)+1.5rem)]"
           onEscapeKeyDown={(event) => event.preventDefault()}
           onPointerDownOutside={(event) => event.preventDefault()}
         >

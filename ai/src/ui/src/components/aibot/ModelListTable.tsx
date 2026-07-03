@@ -15,7 +15,7 @@ import {
   useReactTable,
   type ColumnDef,
 } from "@tanstack/react-table"
-import { ArrowDown, ArrowUp, Plug, Trash2 } from "lucide-react"
+import { ArrowDown, ArrowUp, Eye, EyeOff, Plug, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -42,7 +42,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table"
-import { parseModelNames, THINKING_EFFORTS, type ThinkingEffort } from "@/lib/aibot"
+import { parseModelNames, serializeModels, THINKING_EFFORTS, type ThinkingEffort } from "@/lib/aibot"
 import type { MCPConfig } from "@/data/mcp-config"
 import { useI18n } from "@/lib/i18n-context"
 import { cn } from "@/lib/utils"
@@ -52,6 +52,7 @@ type ModelTableRow = {
   value: string
   label: string
   thinking: ThinkingEffort
+  hidden: boolean
 }
 
 type ModelTableCellKey = "value" | "label"
@@ -61,21 +62,7 @@ const createRowId = () =>
     ? crypto.randomUUID()
     : Math.random().toString(36).slice(2, 12)
 
-const serializeRows = (rows: ModelTableRow[]) => {
-  const items = rows
-    .map((row) => ({
-      id: row.value.trim(),
-      name: row.label.trim(),
-      thinking: row.thinking,
-    }))
-    .filter((row) => row.id)
-    .map((row) => ({
-      id: row.id,
-      name: row.name || row.id,
-      thinking: row.thinking,
-    }))
-  return items.length ? JSON.stringify(items) : ""
-}
+const serializeRows = (rows: ModelTableRow[]) => serializeModels(rows)
 
 const parseRows = (value: string, previousRows: ModelTableRow[] = []) => {
   return parseModelNames(value).map((item, index) => {
@@ -85,6 +72,7 @@ const parseRows = (value: string, previousRows: ModelTableRow[] = []) => {
       value: item.value,
       label: item.label,
       thinking: item.thinking,
+      hidden: item.hidden,
     }
   })
 }
@@ -94,6 +82,7 @@ const createRow = (): ModelTableRow => ({
   value: "",
   label: "",
   thinking: "off",
+  hidden: false,
 })
 
 export interface ModelListTableProps {
@@ -267,6 +256,16 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
   const handleRemoveRow = useCallback(
     (rowId: string) => {
       updateRows((prev) => prev.filter((row) => row.id !== rowId), true)
+    },
+    [updateRows],
+  )
+
+  const handleToggleHidden = useCallback(
+    (rowId: string) => {
+      updateRows(
+        (prev) => prev.map((row) => (row.id === rowId ? { ...row, hidden: !row.hidden } : row)),
+        true,
+      )
     },
     [updateRows],
   )
@@ -520,8 +519,27 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
           const index = table.getRowModel().rows.findIndex((item) => item.id === row.id)
           const isFirst = index === 0
           const isLast = index === table.getRowModel().rows.length - 1
+          const isHidden = row.original.hidden
           return (
             <div className="flex items-center justify-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => handleToggleHidden(row.original.id)}
+                disabled={disabled}
+                title={isHidden ? t("sheet.models.show") : t("sheet.models.hide")}
+              >
+                {isHidden ? (
+                  <EyeOff className="h-4 w-4 text-muted-foreground" />
+                ) : (
+                  <Eye className="h-4 w-4" />
+                )}
+                <span className="sr-only">
+                  {isHidden ? t("sheet.models.show") : t("sheet.models.hide")}
+                </span>
+              </Button>
               <Button
                 type="button"
                 variant="ghost"
@@ -559,7 +577,7 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
           )
         },
         meta: {
-          headerClassName: "w-[120px]",
+          headerClassName: "w-[156px]",
           cellClassName: "text-center",
         },
       },
@@ -576,6 +594,7 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
       handleCellFocus,
       handleMoveRow,
       handleRemoveRow,
+      handleToggleHidden,
       handleThinkingChange,
       labelPlaceholder,
       modelLabel,
@@ -654,6 +673,7 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
                   key={row.id}
                   className={cn(
                     highlightedSet.has(row.original.value.trim()) && "bg-muted/50",
+                    row.original.hidden && "opacity-55",
                   )}
                 >
                   {row.getVisibleCells().map((cell) => (

@@ -24,7 +24,7 @@ import { createLocalizedAIBotList } from "@/data/aibots"
 import { getAISystemConfig, type SystemConfig } from "@/data/aibot-config"
 import type { MCPConfig } from "@/data/mcp-config"
 import { type VisionConfig, DEFAULT_VISION_CONFIG } from "@/data/vision-config"
-import { mergeFields, parseModelNames, THINKING_EFFORTS } from "@/lib/aibot"
+import { mergeFields, parseModelNames, serializeModels, THINKING_EFFORTS } from "@/lib/aibot"
 import type { GeneratedField, ThinkingEffort } from "@/lib/aibot"
 import { useI18n } from "@/lib/i18n-context"
 import { loadMCPConfigs, saveMCPConfig, saveMCPConfigs, deleteMCPConfig } from "@/lib/mcp-storage"
@@ -104,8 +104,14 @@ function App() {
   const interceptReleaseRef = useRef<(() => void) | null>(null)
   const modelEditorBackHandlerRef = useRef<() => boolean>(() => false)
   const autoProvisionTriedRef = useRef(false)
+  // 始终指向最新 formValues：增量同步在登录/认领回调里读取当前 dooai 设置，避免闭包读到旧值
+  const formValuesRef = useRef(formValues)
 
   const fieldMap = useMemo(() => fieldMapFactory(bots, systemConfig), [bots, systemConfig])
+
+  useEffect(() => {
+    formValuesRef.current = formValues
+  }, [formValues])
 
   useEffect(() => {
     settingsOpenRef.current = settingsOpen
@@ -533,8 +539,64 @@ function App() {
     console.warn("auto-provision: 自动开通连续失败，回退手动开通")
   }
 
+  // 增量同步 Doo AI 模型：拉取网关当前支持的模型，把 currentModelsStr 里缺失的项追加进去
+  // （保留已存在项及其隐藏标记，不删除、不改动已存在项）。返回待写入的 overrides 与新增数量。
+  const computeDooaiModelSync = async (
+    baseUrl: string,
+    key: string,
+    currentModelsStr: string,
+    currentDefaultModel: string,
+  ): Promise<{ overrides: Record<string, string>; added: number }> => {
+    const fetchedStr = await fetchDooaiModels(baseUrl, key)
+    if (!fetchedStr) return { overrides: {}, added: 0 }
+    const fetched = parseModelNames(fetchedStr)
+    if (!fetched.length) return { overrides: {}, added: 0 }
+    const current = parseModelNames(currentModelsStr)
+    const existing = new Set(current.map((m) => m.value))
+    const toAdd = fetched.filter((m) => !existing.has(m.value))
+    if (!toAdd.length) return { overrides: {}, added: 0 }
+    const merged = [...current, ...toAdd]
+    const overrides: Record<string, string> = { dooai_models: serializeModels(merged) }
+    // 默认模型为空或已不在列表中时，补一个可见模型（优先非隐藏项）
+    const ids = merged.map((m) => m.value)
+    if (!currentDefaultModel.trim() || !ids.includes(currentDefaultModel.trim())) {
+      const firstVisible = merged.find((m) => !m.hidden)?.value ?? ids[0]
+      if (firstVisible) overrides.dooai_model = firstVisible
+    }
+    return { overrides, added: toAdd.length }
+  }
+
   const handleGatewayAuth = async (token: string, baseUrl: string) => {
-    await persistDootaskGateway({ dooai_key: token, dooai_base_url: baseUrl })
+    // 登录/开通成功后增量同步网关模型：与 token/base_url 合并为单次持久化，避免二次保存覆盖新 token
+    const overrides: Record<string, string> = { dooai_key: token, dooai_base_url: baseUrl }
+    const dooai = formValuesRef.current.dooai ?? {}
+    const sync = await computeDooaiModelSync(
+      baseUrl,
+      token,
+      dooai.dooai_models ?? "",
+      dooai.dooai_model ?? "",
+    )
+    Object.assign(overrides, sync.overrides)
+    await persistDootaskGateway(overrides)
+    if (sync.added > 0) messageSuccess(`${t("success.modelsSynced")} +${sync.added}`)
+  }
+
+  // 认领成功后 token 不变，但账号档位可能变化 → 增量同步网关模型
+  const handleGatewayClaimed = async () => {
+    const dooai = formValuesRef.current.dooai ?? {}
+    const baseUrl = dooai.dooai_base_url ?? ""
+    const key = dooai.dooai_key ?? ""
+    if (!baseUrl || !key) return
+    const sync = await computeDooaiModelSync(
+      baseUrl,
+      key,
+      dooai.dooai_models ?? "",
+      dooai.dooai_model ?? "",
+    )
+    if (Object.keys(sync.overrides).length > 0) {
+      await persistDootaskGateway(sync.overrides)
+    }
+    if (sync.added > 0) messageSuccess(`${t("success.modelsSynced")} +${sync.added}`)
   }
 
   const handleGatewayLogout = async () => {
@@ -848,6 +910,7 @@ function App() {
             onApplyModelMcpToAll={handleApplyModelMcpToAll}
             onGatewayAuth={handleGatewayAuth}
             onGatewayLogout={handleGatewayLogout}
+            onGatewayClaimed={handleGatewayClaimed}
           />
           <MCPEditorSheet
             open={mcpEditorOpen}

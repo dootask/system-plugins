@@ -42,6 +42,8 @@ interface AccountPanelProps {
   onAuth: (token: string, baseUrl: string) => void | Promise<void>
   /** 退出后清空 dooai_key */
   onLogout: () => void | Promise<void>
+  /** 认领成功后回调（token 不变）：父级据此增量同步网关模型 */
+  onClaimed: () => void | Promise<void>
 }
 
 interface GatewayResult {
@@ -129,7 +131,7 @@ function fmtReset(iso: string | null | undefined, lang: string): string {
   return `${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
-export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => {
+export const AccountPanel = ({ token, onAuth, onLogout, onClaimed }: AccountPanelProps) => {
   const { t, lang } = useI18n()
   const [account, setAccount] = useState<AccountInfo | null>(null)
   const [mode, setMode] = useState<"view" | "login" | "claim" | "select">("view")
@@ -309,6 +311,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
         setClaimForm({ email: "", code: "" })
         await loadMe(token)
         messageSuccess(t("sheet.account.claimSuccess"))
+        await onClaimed()
       } else {
         modalError(withDetail(t("sheet.account.claimFailed"), json))
       }
@@ -406,13 +409,14 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
             value={loginForm.email}
             onChange={(e) => setLoginForm((p) => ({ ...p, email: e.target.value }))}
           />
-          <div className="flex gap-2">
+          <div className="flex items-center rounded-md border border-input bg-transparent shadow-sm transition-colors focus-within:ring-1 focus-within:ring-ring">
             <Input
               placeholder={t("sheet.account.code")}
               value={loginForm.code}
               onChange={(e) => setLoginForm((p) => ({ ...p, code: e.target.value }))}
+              className="border-0 shadow-none focus-visible:ring-0"
             />
-            <Button type="button" variant="outline" disabled={pending || cooldown > 0 || !loginForm.email} onClick={handleSendLoginCode}>
+            <Button type="button" variant="ghost" className="shrink-0 rounded-none rounded-r-md border-l border-input" disabled={pending || cooldown > 0 || !loginForm.email} onClick={handleSendLoginCode}>
               {sendingCode && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {cooldown > 0 ? `${cooldown}s` : t("sheet.account.sendCode")}
             </Button>
@@ -449,13 +453,14 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
             value={claimForm.email}
             onChange={(e) => setClaimForm((p) => ({ ...p, email: e.target.value }))}
           />
-          <div className="flex gap-2">
+          <div className="flex items-center rounded-md border border-input bg-transparent shadow-sm transition-colors focus-within:ring-1 focus-within:ring-ring">
             <Input
               placeholder={t("sheet.account.code")}
               value={claimForm.code}
               onChange={(e) => setClaimForm((p) => ({ ...p, code: e.target.value }))}
+              className="border-0 shadow-none focus-visible:ring-0"
             />
-            <Button type="button" variant="outline" disabled={pending || cooldown > 0 || !claimForm.email} onClick={handleSendCode}>
+            <Button type="button" variant="ghost" className="shrink-0 rounded-none rounded-r-md border-l border-input" disabled={pending || cooldown > 0 || !claimForm.email} onClick={handleSendCode}>
               {sendingCode && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
               {cooldown > 0 ? `${cooldown}s` : t("sheet.account.sendCode")}
             </Button>
