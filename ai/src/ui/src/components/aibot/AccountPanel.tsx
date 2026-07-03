@@ -67,6 +67,21 @@ function authHeaders(token: string): HeadersInit {
   }
 }
 
+// 从网关响应体提取后端真实错误 message：兼容 App Store 的 {code,message,data}
+// 与 AI 网关的 {error:{message}} 两种格式；取不到返回空串。
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function gatewayError(json: any): string {
+  const m = json?.message ?? json?.error?.message
+  return typeof m === "string" ? m.trim() : ""
+}
+
+// 在固定文案后追加后端真实错误：如「登录失败：invalid or expired verification code」。
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withDetail(base: string, json: any): string {
+  const detail = gatewayError(json)
+  return detail ? `${base}：${detail}` : base
+}
+
 // 取当前 DooTask 站点 origin（仅协议+域名+端口）：容器内只有内网地址，故由前端经 @dootask/tools 提供。
 async function siteOrigin(): Promise<string> {
   try {
@@ -122,12 +137,21 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
   const [submitting, setSubmitting] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
   const [selectAccounts, setSelectAccounts] = useState<LoginAccount[]>([])
+  // 发码冷却倒计时（秒）：成功后置 60，匹配后端同邮箱 1 分钟限频，倒计时期间禁用发码按钮
+  const [cooldown, setCooldown] = useState(0)
 
   // 统一禁用判定：发码或主操作进行中时，所有可点按钮禁用
   const pending = sendingCode || submitting
 
   const [loginForm, setLoginForm] = useState({ email: "", code: "" })
   const [claimForm, setClaimForm] = useState({ email: "", code: "" })
+
+  // 发码冷却每秒递减
+  useEffect(() => {
+    if (cooldown <= 0) return
+    const timer = setInterval(() => setCooldown((n) => (n <= 1 ? 0 : n - 1)), 1000)
+    return () => clearInterval(timer)
+  }, [cooldown])
 
   // silent=true 时（后台/缓存刷新）失败不弹错，避免打扰
   const loadMe = useCallback(async (tk: string, silent = false) => {
@@ -141,7 +165,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
       setAccount(data)
       writeAccountCache(tk, data)
     } else if (!silent) {
-      messageError(t("sheet.account.loadFailed"))
+      messageError(withDetail(t("sheet.account.loadFailed"), json))
     }
   }, [t])
 
@@ -189,7 +213,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
       })
       const tk = json?.data?.gateway_token
       if (!ok || !tk) {
-        throw new Error(t("sheet.account.provisionFailed"))
+        throw new Error(withDetail(t("sheet.account.provisionFailed"), json))
       }
       await onAuth(String(tk), baseUrl)
     } catch (error) {
@@ -213,7 +237,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
         body: JSON.stringify(body),
       })
       if (!ok) {
-        throw new Error(t("sheet.account.loginFailed"))
+        throw new Error(withDetail(t("sheet.account.loginFailed"), json))
       }
       const tk = json?.data?.gateway_token
       if (tk) {
@@ -230,9 +254,9 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
         setMode("select")
         return
       }
-      throw new Error(t("sheet.account.loginFailed"))
-    } catch {
-      modalError(t("sheet.account.loginFailed"))
+      throw new Error(withDetail(t("sheet.account.loginFailed"), json))
+    } catch (error) {
+      modalError(error instanceof Error ? error.message : t("sheet.account.loginFailed"))
     } finally {
       setSubmitting(false)
     }
@@ -243,19 +267,21 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
 
   // 发送邮箱验证码（scene=ai_claim，登录/认领共用端点）。
   // 登录态尚无 token（开放端点，仅按邮箱+IP 限流）；认领态带 gateway_token。
-  const sendEmailCode = async (email: string, headers: HeadersInit) => {
+  // purpose 区分发码用途：login=登录（登录邮件文案），claim=认领（认领邮件文案）。
+  const sendEmailCode = async (email: string, headers: HeadersInit, purpose: "login" | "claim") => {
     if (!email) return
     setSendingCode(true)
     try {
-      const { ok } = await gateway("/email/send", {
+      const { ok, json } = await gateway("/email/send", {
         method: "POST",
         headers,
-        body: JSON.stringify({ email, lang }),
+        body: JSON.stringify({ email, lang, purpose }),
       })
       if (ok) {
+        setCooldown(60)
         messageSuccess(t("sheet.account.sendCodeSuccess"))
       } else {
-        modalError(t("sheet.account.sendCodeFailed"))
+        modalError(withDetail(t("sheet.account.sendCodeFailed"), json))
       }
     } finally {
       setSendingCode(false)
@@ -264,16 +290,16 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
 
   // 认领区发码：带 gateway_token
   const handleSendCode = () =>
-    sendEmailCode(claimForm.email, authHeaders(token))
+    sendEmailCode(claimForm.email, authHeaders(token), "claim")
 
   // 登录区发码：未登录态，不带 token（开放端点）
   const handleSendLoginCode = () =>
-    sendEmailCode(loginForm.email, { "Content-Type": "application/json" })
+    sendEmailCode(loginForm.email, { "Content-Type": "application/json" }, "login")
 
   const handleClaim = async () => {
     setSubmitting(true)
     try {
-      const { ok } = await gateway("/claim", {
+      const { ok, json } = await gateway("/claim", {
         method: "POST",
         headers: authHeaders(token),
         body: JSON.stringify({ email: claimForm.email, code: claimForm.code, lang, site_origin: await siteOrigin() }),
@@ -284,7 +310,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
         await loadMe(token)
         messageSuccess(t("sheet.account.claimSuccess"))
       } else {
-        modalError(t("sheet.account.claimFailed"))
+        modalError(withDetail(t("sheet.account.claimFailed"), json))
       }
     } finally {
       setSubmitting(false)
@@ -300,7 +326,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
       // 仅当确属可重试的失败（网络/5xx，token 可能仍有效）才提示，但无论如何都清本地完成退出。
       const tokenAlreadyInvalid = json?.error?.type === "invalid_request_error"
       if (!ok && !tokenAlreadyInvalid) {
-        messageError(t("sheet.account.logoutFailed"))
+        messageError(withDetail(t("sheet.account.logoutFailed"), json))
       }
       setAccount(null)
       await onLogout()
@@ -386,9 +412,9 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
               value={loginForm.code}
               onChange={(e) => setLoginForm((p) => ({ ...p, code: e.target.value }))}
             />
-            <Button type="button" variant="outline" disabled={pending || !loginForm.email} onClick={handleSendLoginCode}>
+            <Button type="button" variant="outline" disabled={pending || cooldown > 0 || !loginForm.email} onClick={handleSendLoginCode}>
               {sendingCode && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {t("sheet.account.sendCode")}
+              {cooldown > 0 ? `${cooldown}s` : t("sheet.account.sendCode")}
             </Button>
           </div>
         </div>
@@ -429,9 +455,9 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
               value={claimForm.code}
               onChange={(e) => setClaimForm((p) => ({ ...p, code: e.target.value }))}
             />
-            <Button type="button" variant="outline" disabled={pending || !claimForm.email} onClick={handleSendCode}>
+            <Button type="button" variant="outline" disabled={pending || cooldown > 0 || !claimForm.email} onClick={handleSendCode}>
               {sendingCode && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {t("sheet.account.sendCode")}
+              {cooldown > 0 ? `${cooldown}s` : t("sheet.account.sendCode")}
             </Button>
           </div>
         </div>
@@ -501,7 +527,7 @@ export const AccountPanel = ({ token, onAuth, onLogout }: AccountPanelProps) => 
           <>
             <Button type="button" size="sm" disabled={pending} onClick={handleClaim}>
               {submitting && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
-              {t("sheet.account.submit")}
+              {t("sheet.account.claimSubmit")}
             </Button>
             <Button type="button" size="sm" variant="ghost" disabled={pending} onClick={() => setMode("view")}>
               {t("sheet.account.cancel")}
