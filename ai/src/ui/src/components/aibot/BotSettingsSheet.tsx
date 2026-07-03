@@ -1,7 +1,7 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from "react"
 
-import { EyeOff, Plug, Search } from "lucide-react"
-import { messageError } from "@dootask/tools"
+import { EyeOff, Loader2, Plug, Search } from "lucide-react"
+import { messageError, modalConfirm } from "@dootask/tools"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -75,6 +75,7 @@ function classifyVendor(modelId: string): string {
   if (s.includes("minimax")) return "minimax"
   if (s.includes("kimi") || s.includes("moonshot")) return "kimi"
   if (s.includes("qwen") || s.includes("qwq")) return "qwen"
+  if (s.includes("doubao") || s.includes("seedream") || s.includes("seedance")) return "doubao"
   if (s.includes("deepseek")) return "deepseek"
   if (s.includes("glm")) return "zhipu"
   if (s.includes("llama")) return "meta"
@@ -97,15 +98,18 @@ export interface BotSettingsSheetProps {
   onReload: (bot: AIBotKey) => void
   onChangeField: (bot: AIBotKey, prop: string, value: string) => void
   onSubmit: (bot: AIBotKey) => void
+  /** 局部保存（编辑模型抽屉「保存」直接入库：模型列表 + 默认模型），返回是否成功 */
+  onSaveModels: (bot: AIBotKey, overrides: Record<string, string>) => Promise<boolean>
   onReset: (bot: AIBotKey) => void
   onUseDefaultModels: (bot: AIBotKey) => Promise<string | null>
   onRegisterModelEditorBackHandler?: (handler: () => boolean) => void
   mcps: MCPConfig[]
-  onToggleModelMcp: (bot: AIBotKey, modelId: string, mcpId: string, checked: boolean) => void
-  onApplyModelMcpToAll: (bot: AIBotKey, sourceModelId: string, allModelIds: string[]) => void
+  /** 编辑模型抽屉「保存」时，把本地改动后的完整 MCP 列表整体入库，返回是否成功 */
+  onSaveMcps: (mcps: MCPConfig[]) => Promise<boolean>
   onGatewayAuth: (token: string, baseUrl: string) => void | Promise<void>
   onGatewayLogout: () => void | Promise<void>
-  onGatewayClaimed: () => void | Promise<void>
+  /** 增量同步网关模型（认领 / 刷新 / 检测到套餐变化时触发） */
+  onSyncModels: () => void | Promise<void>
 }
 
 export const BotSettingsSheet = ({
@@ -121,20 +125,26 @@ export const BotSettingsSheet = ({
   onReload,
   onReset,
   onSubmit,
+  onSaveModels,
   onUseDefaultModels,
   open,
   savingMap,
   defaultsLoadingMap,
   onRegisterModelEditorBackHandler,
   mcps,
-  onToggleModelMcp,
-  onApplyModelMcpToAll,
+  onSaveMcps,
   onGatewayAuth,
   onGatewayLogout,
-  onGatewayClaimed,
+  onSyncModels,
 }: BotSettingsSheetProps) => {
   const { t } = useI18n()
-  const enabledMcps = useMemo(() => mcps.filter((mcp) => mcp.enabled !== false), [mcps])
+  // 编辑模型抽屉里对 MCP 归属的改动先存这里（本地草稿）；null=无改动用 props.mcps。点「保存」才整体入库
+  const [mcpDraft, setMcpDraft] = useState<MCPConfig[] | null>(null)
+  const effectiveMcps = mcpDraft ?? mcps
+  const enabledMcps = useMemo(
+    () => effectiveMcps.filter((mcp) => mcp.enabled !== false),
+    [effectiveMcps],
+  )
   const mcpCountFor = useCallback(
     (modelId: string) =>
       modelId
@@ -181,7 +191,7 @@ export const BotSettingsSheet = ({
     ? formValues[modelEditor.bot.value]?.[modelEditor.field.prop] ?? ""
     : ""
   const modelEditorHasChanges = modelEditor
-    ? modelEditorValue !== modelEditorOriginalValue
+    ? modelEditorValue !== modelEditorOriginalValue || mcpDraft !== null
     : false
   const modelEditorSaving = modelEditor ? savingMap[modelEditor.bot.value] : false
   const modelEditorDefaultsLoading = modelEditor
@@ -193,6 +203,7 @@ export const BotSettingsSheet = ({
       setModelEditor(null)
       setHighlightedModelValues([])
       setFetchDialog(null)
+      setMcpDraft(null)
     }
   }, [open])
 
@@ -207,6 +218,7 @@ export const BotSettingsSheet = ({
       }
       if (modelEditor) {
         setModelEditor(null)
+        setMcpDraft(null)
         return true
       }
       return false
@@ -223,34 +235,122 @@ export const BotSettingsSheet = ({
       setModelEditor({ bot, field })
       setModelEditorValue(currentValue)
       setHighlightedModelValues([])
+      setMcpDraft(null)
     },
     [formValues],
   )
 
   const handleCloseModelEditor = useCallback(() => {
     setModelEditor(null)
+    setMcpDraft(null)
   }, [])
 
-  const handleSaveModelEditor = useCallback(() => {
+  // 抽屉内勾选/取消 MCP：只改本地草稿，不入库
+  const handleToggleModelMcpLocal = useCallback(
+    (modelId: string, mcpId: string, checked: boolean) => {
+      const label =
+        modelEditor?.bot.models?.find((m) => m.value === modelId)?.label ?? modelId
+      setMcpDraft((prev) => {
+        const base = prev ?? mcps
+        return base.map((mcp) => {
+          if (mcp.id !== mcpId) {
+            return mcp
+          }
+          const supported = mcp.supportedModels ?? []
+          const exists = supported.some((m) => m.id === modelId)
+          if (checked && !exists) {
+            return { ...mcp, supportedModels: [...supported, { id: modelId, name: label }] }
+          }
+          if (!checked && exists) {
+            return { ...mcp, supportedModels: supported.filter((m) => m.id !== modelId) }
+          }
+          return mcp
+        })
+      })
+    },
+    [mcps, modelEditor],
+  )
+
+  // 抽屉内「应用到所有模型」：只改本地草稿，不入库
+  const handleApplyModelMcpToAllLocal = useCallback(
+    async (sourceModelId: string, allModelIds: string[]) => {
+      if (!sourceModelId || allModelIds.length === 0) {
+        return
+      }
+      if (!(await modalConfirm(t("sheet.models.mcpApplyAllConfirm")))) {
+        return
+      }
+      const botModels = modelEditor?.bot.models ?? []
+      const labelFor = (id: string) => botModels.find((m) => m.value === id)?.label ?? id
+      setMcpDraft((prev) => {
+        const base = prev ?? mcps
+        return base.map((mcp) => {
+          if (mcp.enabled === false) {
+            return mcp
+          }
+          const supported = mcp.supportedModels ?? []
+          const sourceIncluded = supported.some((m) => m.id === sourceModelId)
+          const withoutTargets = supported.filter((m) => !allModelIds.includes(m.id))
+          const additions = sourceIncluded
+            ? allModelIds.map((id) => ({ id, name: labelFor(id) }))
+            : []
+          return { ...mcp, supportedModels: [...withoutTargets, ...additions] }
+        })
+      })
+    },
+    [mcps, modelEditor, t],
+  )
+
+  const handleSaveModelEditor = useCallback(async () => {
     if (!modelEditor) {
       setModelEditor(null)
       return
     }
     // 同步读取表格最新值，避免“输入未失焦即点保存”时读到旧的 modelEditorValue
     const currentValue = modelTableRef.current?.getSerializedValue() ?? modelEditorValue
-    if (currentValue === modelEditorOriginalValue) {
+    const modelChanged = currentValue !== modelEditorOriginalValue
+    const mcpChanged = mcpDraft !== null
+    // 模型列表和 MCP 归属都没改 → 直接关闭
+    if (!modelChanged && !mcpChanged) {
       setModelEditor(null)
+      setMcpDraft(null)
       return
     }
-    // 兜底校验：序列化后超出该字段长度上限则阻止保存（获取列表时允许临时超出，保存时拦）
-    const maxLength = modelEditor.field.maxlength
-    if (typeof maxLength === "number" && maxLength > 0 && currentValue.length > maxLength) {
-      messageError(t("sheet.models.tooLong"))
-      return
+    let ok = true
+    if (modelChanged) {
+      // 兜底校验：序列化后超出该字段长度上限则阻止保存（获取列表时允许临时超出，保存时拦）
+      const maxLength = modelEditor.field.maxlength
+      if (typeof maxLength === "number" && maxLength > 0 && currentValue.length > maxLength) {
+        messageError(t("sheet.models.tooLong"))
+        return
+      }
+      // 直接入库：仅提交模型列表 + 默认模型两个字段（其它字段不动）
+      const bot = modelEditor.bot.value
+      const modelsProp = modelEditor.field.prop
+      const modelProp = `${bot}_model`
+      ok = await onSaveModels(bot, {
+        [modelsProp]: currentValue,
+        [modelProp]: formValues[bot]?.[modelProp] ?? "",
+      })
     }
-    onChangeField(modelEditor.bot.value, modelEditor.field.prop, currentValue)
-    setModelEditor(null)
-  }, [modelEditor, modelEditorOriginalValue, modelEditorValue, onChangeField, t])
+    // 模型保存成功后再整体入库 MCP 归属改动
+    if (ok && mcpChanged) {
+      ok = await onSaveMcps(mcpDraft)
+    }
+    if (ok) {
+      setMcpDraft(null)
+      setModelEditor(null)
+    }
+  }, [
+    modelEditor,
+    modelEditorOriginalValue,
+    modelEditorValue,
+    mcpDraft,
+    onSaveModels,
+    onSaveMcps,
+    formValues,
+    t,
+  ])
 
   const handleUseDefaultModelsInternal = useCallback(async () => {
     if (!modelEditor || modelEditorDefaultsLoading || modelEditorSaving) {
@@ -293,6 +393,7 @@ export const BotSettingsSheet = ({
     (key: string) => {
       if (key === "qwen") return t("sheet.models.fetchVendorQwen")
       if (key === "zhipu") return t("sheet.models.fetchVendorZhipu")
+      if (key === "doubao") return t("sheet.models.fetchVendorDoubao")
       if (key === "other") return t("sheet.models.fetchVendorOther")
       return VENDOR_BRAND[key] ?? key
     },
@@ -633,7 +734,7 @@ export const BotSettingsSheet = ({
                               token={formValues[bot.value]?.["dooai_key"] ?? ""}
                               onAuth={onGatewayAuth}
                               onLogout={onGatewayLogout}
-                              onClaimed={onGatewayClaimed}
+                              onSyncModels={onSyncModels}
                             />
                           )}
                           {fields.map((field) => renderField(bot, field))}
@@ -720,13 +821,9 @@ export const BotSettingsSheet = ({
                     maxLength={modelEditor.field.maxlength}
                     disabled={modelEditorDefaultsLoading || modelEditorSaving}
                     highlightedValues={highlightedModelValues}
-                    mcps={mcps}
-                    onToggleModelMcp={(modelId, mcpId, checked) =>
-                      onToggleModelMcp(modelEditor.bot.value, modelId, mcpId, checked)
-                    }
-                    onApplyModelMcpToAll={(sourceModelId, allModelIds) =>
-                      onApplyModelMcpToAll(modelEditor.bot.value, sourceModelId, allModelIds)
-                    }
+                    mcps={effectiveMcps}
+                    onToggleModelMcp={handleToggleModelMcpLocal}
+                    onApplyModelMcpToAll={handleApplyModelMcpToAllLocal}
                   />
                 </div>
               </div>
@@ -759,6 +856,7 @@ export const BotSettingsSheet = ({
                   onClick={handleSaveModelEditor}
                   disabled={!modelEditorHasChanges || modelEditorSaving}
                 >
+                  {modelEditorSaving && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                   {t("sheet.models.save")}
                 </Button>
               </div>

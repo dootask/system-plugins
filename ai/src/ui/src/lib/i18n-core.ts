@@ -32,7 +32,6 @@ const TRANSLATIONS: Record<Language, TranslationTree> = {
     success: {
       save: "修改成功",
       fetchSuccess: "获取成功",
-      modelsSynced: "已同步新模型",
     },
     sheet: {
       title: "AI 设置",
@@ -82,6 +81,7 @@ const TRANSLATIONS: Record<Language, TranslationTree> = {
         fetchNoResult: "无匹配模型",
         fetchVendorQwen: "通义千问",
         fetchVendorZhipu: "智谱",
+        fetchVendorDoubao: "豆包",
         fetchVendorOther: "其他",
         fetchSelectAll: "全选",
         fetchExisting: "已存在",
@@ -213,7 +213,6 @@ const TRANSLATIONS: Record<Language, TranslationTree> = {
     success: {
       save: "Saved successfully",
       fetchSuccess: "Fetched successfully",
-      modelsSynced: "New models synced",
     },
     sheet: {
       title: "AI Settings",
@@ -263,6 +262,7 @@ const TRANSLATIONS: Record<Language, TranslationTree> = {
         fetchNoResult: "No matching models",
         fetchVendorQwen: "Qwen",
         fetchVendorZhipu: "Zhipu",
+        fetchVendorDoubao: "Doubao",
         fetchVendorOther: "Other",
         fetchSelectAll: "Select all",
         fetchExisting: "Already added",

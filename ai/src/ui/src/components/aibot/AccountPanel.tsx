@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 
 import { Loader2 } from "lucide-react"
 
@@ -42,8 +42,8 @@ interface AccountPanelProps {
   onAuth: (token: string, baseUrl: string) => void | Promise<void>
   /** 退出后清空 dooai_key */
   onLogout: () => void | Promise<void>
-  /** 认领成功后回调（token 不变）：父级据此增量同步网关模型 */
-  onClaimed: () => void | Promise<void>
+  /** 增量同步网关模型（token 不变时触发：认领成功 / 手动刷新 / 检测到套餐变化） */
+  onSyncModels: () => void | Promise<void>
 }
 
 interface GatewayResult {
@@ -131,7 +131,7 @@ function fmtReset(iso: string | null | undefined, lang: string): string {
   return `${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
-export const AccountPanel = ({ token, onAuth, onLogout, onClaimed }: AccountPanelProps) => {
+export const AccountPanel = ({ token, onAuth, onLogout, onSyncModels }: AccountPanelProps) => {
   const { t, lang } = useI18n()
   const [account, setAccount] = useState<AccountInfo | null>(null)
   const [mode, setMode] = useState<"view" | "login" | "claim" | "select">("view")
@@ -147,6 +147,13 @@ export const AccountPanel = ({ token, onAuth, onLogout, onClaimed }: AccountPane
 
   const [loginForm, setLoginForm] = useState({ email: "", code: "" })
   const [claimForm, setClaimForm] = useState({ email: "", code: "" })
+  // 上一次已知的套餐标识：用于在 loadMe 里检测「套餐升级/变化」→ 自动增量同步模型（B）
+  const prevSubscriptionRef = useRef<string | undefined>(undefined)
+  // 稳定引用父级同步回调：父级每次渲染都传新函数，若直接进 loadMe 依赖会导致挂载 effect 反复重跑
+  const onSyncModelsRef = useRef(onSyncModels)
+  useEffect(() => {
+    onSyncModelsRef.current = onSyncModels
+  }, [onSyncModels])
 
   // 发码冷却每秒递减
   useEffect(() => {
@@ -164,8 +171,14 @@ export const AccountPanel = ({ token, onAuth, onLogout, onClaimed }: AccountPane
     const { ok, json } = await gateway("/me", { headers: authHeaders(tk) })
     if (ok) {
       const data = json.data as AccountInfo
+      const prevSub = prevSubscriptionRef.current
       setAccount(data)
       writeAccountCache(tk, data)
+      prevSubscriptionRef.current = data.subscription_code
+      // B：检测到套餐变化（此前已知且不同，如升级）→ 自动增量同步网关模型
+      if (prevSub !== undefined && prevSub !== data.subscription_code) {
+        void onSyncModelsRef.current()
+      }
     } else if (!silent) {
       messageError(withDetail(t("sheet.account.loadFailed"), json))
     }
@@ -179,6 +192,8 @@ export const AccountPanel = ({ token, onAuth, onLogout, onClaimed }: AccountPane
     }
     const cached = readAccountCache(token)
     if (cached) setAccount(cached)
+    // 以缓存的套餐作为「上一次已知值」基线：面板关闭期间若发生升级，本次 loadMe 即可检测到并同步
+    prevSubscriptionRef.current = cached?.subscription_code
     void loadMe(token, true)
   }, [token, loadMe])
 
@@ -186,6 +201,8 @@ export const AccountPanel = ({ token, onAuth, onLogout, onClaimed }: AccountPane
     setRefreshing(true)
     try {
       await loadMe(token, false)
+      // A：刷新为用户主动操作，无论套餐是否变化都强制增量同步一次（去重由父级护栏保证）
+      await onSyncModels()
     } finally {
       setRefreshing(false)
     }
@@ -311,7 +328,7 @@ export const AccountPanel = ({ token, onAuth, onLogout, onClaimed }: AccountPane
         setClaimForm({ email: "", code: "" })
         await loadMe(token)
         messageSuccess(t("sheet.account.claimSuccess"))
-        await onClaimed()
+        await onSyncModels()
       } else {
         modalError(withDetail(t("sheet.account.claimFailed"), json))
       }

@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   appReady,
   getUserInfo,
+  modalConfirm,
   modalError,
   modalInfo,
   messageError,
@@ -106,6 +107,8 @@ function App() {
   const autoProvisionTriedRef = useRef(false)
   // 始终指向最新 formValues：增量同步在登录/认领回调里读取当前 dooai 设置，避免闭包读到旧值
   const formValuesRef = useRef(formValues)
+  // 模型增量同步进行中标记：刷新/认领/套餐变化可能并发触发，用它去重，避免同一批模型重复拉取与提示
+  const syncingModelsRef = useRef(false)
 
   const fieldMap = useMemo(() => fieldMapFactory(bots, systemConfig), [bots, systemConfig])
 
@@ -424,6 +427,33 @@ function App() {
     }
   }
 
+  // 局部保存指定字段（供编辑模型抽屉「保存」直接入库：仅提交 overrides 里的字段，其余不动）。
+  // 后端 setting__aibot 是合并语义（只覆盖传入且已存在的 key），故其它字段的库值不受影响；
+  // 本地只把已保存字段并入基线，保留外层表单里其它字段的未保存编辑。返回是否成功。
+  const handleSaveModels = async (
+    bot: AIBotKey,
+    overrides: Record<string, string>,
+  ): Promise<boolean> => {
+    setSettingsSavingMap((prev) => ({ ...prev, [bot]: true }))
+    try {
+      const response = await requestAPI({
+        url: "system/setting/aibot",
+        method: "post",
+        data: { ...overrides, type: "save", filter: bot },
+      })
+      setFormValues((prev) => ({ ...prev, [bot]: { ...(prev[bot] ?? {}), ...overrides } }))
+      setInitialValues((prev) => ({ ...prev, [bot]: { ...(prev[bot] ?? {}), ...overrides } }))
+      messageSuccess(response.msg ?? t("success.save"))
+      await refreshBotTags()
+      return true
+    } catch (error) {
+      modalError(resolveErrorMessage(error, t("errors.submitFailed")))
+      return false
+    } finally {
+      setSettingsSavingMap((prev) => ({ ...prev, [bot]: false }))
+    }
+  }
+
   // 官方厂商账号：开通/登录/退出后，把 gateway_token 与网关地址持久化到 aibotSetting
   const persistDootaskGateway = async (overrides: Record<string, string>) => {
     const bot: AIBotKey = "dooai"
@@ -552,10 +582,16 @@ function App() {
     const fetched = parseModelNames(fetchedStr)
     if (!fetched.length) return { overrides: {}, added: 0 }
     const current = parseModelNames(currentModelsStr)
+    const currentById = new Map(current.map((m) => [m.value, m]))
     const existing = new Set(current.map((m) => m.value))
     const toAdd = fetched.filter((m) => !existing.has(m.value))
     if (!toAdd.length) return { overrides: {}, added: 0 }
-    const merged = [...current, ...toAdd]
+    // 按接口返回顺序入库：命中项沿用本地已有的显示名/思考档位/隐藏标记；
+    // 接口未返回的本地历史项保留在末尾（只增不删）
+    const fetchedIds = new Set(fetched.map((m) => m.value))
+    const inApiOrder = fetched.map((m) => currentById.get(m.value) ?? m)
+    const leftovers = current.filter((m) => !fetchedIds.has(m.value))
+    const merged = [...inApiOrder, ...leftovers]
     const overrides: Record<string, string> = { dooai_models: serializeModels(merged) }
     // 默认模型为空或已不在列表中时，补一个可见模型（优先非隐藏项）
     const ids = merged.map((m) => m.value)
@@ -578,25 +614,30 @@ function App() {
     )
     Object.assign(overrides, sync.overrides)
     await persistDootaskGateway(overrides)
-    if (sync.added > 0) messageSuccess(`${t("success.modelsSynced")} +${sync.added}`)
   }
 
-  // 认领成功后 token 不变，但账号档位可能变化 → 增量同步网关模型
-  const handleGatewayClaimed = async () => {
-    const dooai = formValuesRef.current.dooai ?? {}
-    const baseUrl = dooai.dooai_base_url ?? ""
-    const key = dooai.dooai_key ?? ""
-    if (!baseUrl || !key) return
-    const sync = await computeDooaiModelSync(
-      baseUrl,
-      key,
-      dooai.dooai_models ?? "",
-      dooai.dooai_model ?? "",
-    )
-    if (Object.keys(sync.overrides).length > 0) {
-      await persistDootaskGateway(sync.overrides)
+  // 通用增量同步：token 不变但网关可见模型可能变化时触发（认领、刷新、检测到套餐升级）。
+  // 只增不删；用 syncingModelsRef 去重并发触发，避免重复拉取/重复提示。
+  const handleSyncDooaiModels = async () => {
+    if (syncingModelsRef.current) return
+    syncingModelsRef.current = true
+    try {
+      const dooai = formValuesRef.current.dooai ?? {}
+      const baseUrl = dooai.dooai_base_url ?? ""
+      const key = dooai.dooai_key ?? ""
+      if (!baseUrl || !key) return
+      const sync = await computeDooaiModelSync(
+        baseUrl,
+        key,
+        dooai.dooai_models ?? "",
+        dooai.dooai_model ?? "",
+      )
+      if (Object.keys(sync.overrides).length > 0) {
+        await persistDootaskGateway(sync.overrides)
+      }
+    } finally {
+      syncingModelsRef.current = false
     }
-    if (sync.added > 0) messageSuccess(`${t("success.modelsSynced")} +${sync.added}`)
   }
 
   const handleGatewayLogout = async () => {
@@ -729,7 +770,7 @@ function App() {
       messageError(t("errors.adminOnly"))
       return
     }
-    if (!confirm(t("mcp.deleteMessage"))) {
+    if (!(await modalConfirm(t("mcp.deleteMessage")))) {
       return
     }
     try {
@@ -751,67 +792,19 @@ function App() {
     }
   }
 
-  const handleToggleModelMcp = useCallback(
-    async (bot: AIBotKey, modelId: string, mcpId: string, checked: boolean) => {
-      const target = mcps.find((item) => item.id === mcpId)
-      if (!target) {
-        return
-      }
-      const label =
-        bots.find((item) => item.value === bot)?.models?.find((m) => m.value === modelId)?.label ??
-        modelId
-      const supported = target.supportedModels ?? []
-      const exists = supported.some((m) => m.id === modelId)
-      let nextSupported = supported
-      if (checked && !exists) {
-        nextSupported = [...supported, { id: modelId, name: label }]
-      } else if (!checked && exists) {
-        nextSupported = supported.filter((m) => m.id !== modelId)
-      } else {
-        return
-      }
+  // 编辑模型抽屉里改的 MCP 归属只改本地草稿，点「保存」时才整体入库（见 BotSettingsSheet.mcpDraft）
+  const handleSaveMcps = useCallback(
+    async (next: MCPConfig[]) => {
       try {
-        const result = await saveMCPConfig({ ...target, supportedModels: nextSupported }, mcps)
-        setMcps(result)
+        await saveMCPConfigs(next)
+        setMcps(next)
+        return true
       } catch (error) {
-        messageError(resolveErrorMessage(error, t("errors.submitFailed")))
+        modalError(resolveErrorMessage(error, t("errors.submitFailed")))
+        return false
       }
     },
-    [mcps, bots, t],
-  )
-
-  const handleApplyModelMcpToAll = useCallback(
-    async (bot: AIBotKey, sourceModelId: string, allModelIds: string[]) => {
-      if (!sourceModelId || allModelIds.length === 0) {
-        return
-      }
-      if (!confirm(t("sheet.models.mcpApplyAllConfirm"))) {
-        return
-      }
-      const botModels = bots.find((item) => item.value === bot)?.models ?? []
-      const labelFor = (id: string) =>
-        botModels.find((m) => m.value === id)?.label ?? id
-      const nextMcps = mcps.map((mcp) => {
-        if (mcp.enabled === false) {
-          return mcp
-        }
-        const supported = mcp.supportedModels ?? []
-        const sourceIncluded = supported.some((m) => m.id === sourceModelId)
-        const withoutTargets = supported.filter((m) => !allModelIds.includes(m.id))
-        const additions = sourceIncluded
-          ? allModelIds.map((id) => ({ id, name: labelFor(id) }))
-          : []
-        return { ...mcp, supportedModels: [...withoutTargets, ...additions] }
-      })
-      try {
-        await saveMCPConfigs(nextMcps)
-        setMcps(nextMcps)
-        messageSuccess(t("success.save"))
-      } catch (error) {
-        messageError(resolveErrorMessage(error, t("errors.submitFailed")))
-      }
-    },
-    [mcps, bots, t],
+    [t],
   )
 
   const handleEditVision = () => {
@@ -902,15 +895,15 @@ function App() {
             onReload={handleReload}
             onChangeField={handleChangeField}
             onSubmit={handleSubmit}
+            onSaveModels={handleSaveModels}
             onReset={handleReset}
             onUseDefaultModels={handleUseDefaultModels}
             onRegisterModelEditorBackHandler={handleRegisterModelEditorBackHandler}
             mcps={mcps}
-            onToggleModelMcp={handleToggleModelMcp}
-            onApplyModelMcpToAll={handleApplyModelMcpToAll}
+            onSaveMcps={handleSaveMcps}
             onGatewayAuth={handleGatewayAuth}
             onGatewayLogout={handleGatewayLogout}
-            onGatewayClaimed={handleGatewayClaimed}
+            onSyncModels={handleSyncDooaiModels}
           />
           <MCPEditorSheet
             open={mcpEditorOpen}
