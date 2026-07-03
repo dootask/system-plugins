@@ -139,6 +139,14 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
     () => (mcps ?? []).filter((mcp) => mcp.enabled !== false),
     [mcps],
   )
+  // MCP 相关数据/回调放进 ref，避免它们进 columns 依赖：勾选 MCP 会改变 enabledMcps，
+  // 若 columns 因此重建，flexRender 会把新的 cell 函数当成新组件类型 → 单元格（含 Popover）被卸载重挂 → 弹窗关闭。
+  const enabledMcpsRef = useRef(enabledMcps)
+  enabledMcpsRef.current = enabledMcps
+  const onToggleModelMcpRef = useRef(onToggleModelMcp)
+  onToggleModelMcpRef.current = onToggleModelMcp
+  const onApplyModelMcpToAllRef = useRef(onApplyModelMcpToAll)
+  onApplyModelMcpToAllRef.current = onApplyModelMcpToAll
   const [rows, setRows] = useState<ModelTableRow[]>(() => parseRows(value))
   const rowsRef = useRef(rows)
   const lastSerializedRef = useRef(value)
@@ -318,6 +326,16 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
     setSelectedIds(new Set())
   }, [updateRows, selectedIds])
 
+  const handleSetSelectedHidden = useCallback(
+    (hidden: boolean) => {
+      updateRows(
+        (prev) => prev.map((row) => (selectedIds.has(row.id) ? { ...row, hidden } : row)),
+        true,
+      )
+    },
+    [updateRows, selectedIds],
+  )
+
   const columns = useMemo<ColumnDef<ModelTableRow>[]>(
     () => [
       {
@@ -420,13 +438,14 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
         header: () => t("sheet.models.column.mcp"),
         cell: ({ row, table }) => {
           const modelId = row.original.value.trim()
+          const enabledMcpsNow = enabledMcpsRef.current
           const count = modelId
-            ? enabledMcps.filter((mcp) =>
+            ? enabledMcpsNow.filter((mcp) =>
                 (mcp.supportedModels ?? []).some((m) => m.id === modelId),
               ).length
             : 0
           return (
-            <Popover>
+            <Popover modal>
               <PopoverTrigger asChild>
                 <Button
                   type="button"
@@ -436,12 +455,16 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
                   disabled={disabled}
                 >
                   <Plug className="h-3.5 w-3.5" />
-                  <Badge variant="secondary" className="px-1.5">
+                  <Badge variant="secondary" className="justify-center px-1.5 min-w-[22px]">
                     {count}
                   </Badge>
                 </Button>
               </PopoverTrigger>
-              <PopoverContent align="end" className="w-72 p-0">
+              <PopoverContent
+                align="end"
+                className="pointer-events-auto w-72 p-0"
+                onOpenAutoFocus={(event) => event.preventDefault()}
+              >
                 <div className="border-b px-3 py-2.5 text-sm font-medium">
                   {t("sheet.models.mcpPickerTitle")}
                   {modelId && <span className="text-muted-foreground"> · {modelId}</span>}
@@ -450,7 +473,7 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
                   <p className="px-3 py-3 text-sm text-muted-foreground">
                     {t("sheet.models.mcpNeedId")}
                   </p>
-                ) : enabledMcps.length === 0 ? (
+                ) : enabledMcpsNow.length === 0 ? (
                   <p className="px-3 py-3 text-sm text-muted-foreground">
                     {t("sheet.models.mcpEmpty")}
                   </p>
@@ -458,7 +481,7 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
                   <>
                     <ScrollArea className="max-h-60">
                       <ul className="space-y-2 px-3 py-3">
-                        {enabledMcps.map((mcp) => {
+                        {enabledMcpsNow.map((mcp) => {
                           const checked = (mcp.supportedModels ?? []).some((m) => m.id === modelId)
                           return (
                             <li key={mcp.id} className="flex items-center gap-2">
@@ -467,7 +490,7 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
                                 checked={checked}
                                 disabled={disabled}
                                 onCheckedChange={(next) =>
-                                  onToggleModelMcp?.(modelId, mcp.id, next === true)
+                                  onToggleModelMcpRef.current?.(modelId, mcp.id, next === true)
                                 }
                               />
                               <label
@@ -481,7 +504,7 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
                         })}
                       </ul>
                     </ScrollArea>
-                    {onApplyModelMcpToAll && (
+                    {onApplyModelMcpToAllRef.current && (
                       <div className="border-t p-2">
                         <Button
                           type="button"
@@ -494,7 +517,7 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
                               .getRowModel()
                               .rows.map((item) => item.original.value.trim())
                               .filter(Boolean)
-                            onApplyModelMcpToAll(modelId, allModelIds)
+                            onApplyModelMcpToAllRef.current?.(modelId, allModelIds)
                           }}
                         >
                           {t("sheet.models.mcpApplyAll")}
@@ -601,9 +624,6 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
       modelPlaceholder,
       removeLabel,
       t,
-      enabledMcps,
-      onToggleModelMcp,
-      onApplyModelMcpToAll,
     ],
   )
 
@@ -707,15 +727,37 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
           {addButtonLabel}
         </Button>
         {selectedCount > 0 && (
-          <Button
-            type="button"
-            variant="destructive"
-            size="sm"
-            onClick={handleRemoveSelected}
-            disabled={disabled}
-          >
-            {removeSelectedLabel} ({selectedCount})
-          </Button>
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => handleSetSelectedHidden(true)}
+              disabled={disabled}
+            >
+              <EyeOff className="h-4 w-4" />
+              {t("sheet.models.hideSelected")}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => handleSetSelectedHidden(false)}
+              disabled={disabled}
+            >
+              <Eye className="h-4 w-4" />
+              {t("sheet.models.showSelected")}
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              size="sm"
+              onClick={handleRemoveSelected}
+              disabled={disabled}
+            >
+              {removeSelectedLabel} ({selectedCount})
+            </Button>
+          </>
         )}
       </div>
     </div>
