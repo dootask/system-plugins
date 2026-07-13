@@ -25,6 +25,10 @@ interface AccountInfo {
   email?: string | null
   username?: string | null
   buckets?: QuotaBucket[]
+  // 积分钱包：flat 永久额度，无 reset 周期，与订阅额度桶分开展示
+  credit_balance?: number
+  // 扣费优先级：subscription_first=订阅优先 / wallet_first=积分优先
+  wallet_priority?: string
 }
 
 // 登录时若名下有多个 AI 账号，返回的可选账号
@@ -149,6 +153,10 @@ export const AccountPanel = ({ token, onAuth, onLogout, onSyncModels }: AccountP
   const [claimForm, setClaimForm] = useState({ email: "", code: "" })
   // 上一次已知的套餐标识：用于在 loadMe 里检测「套餐升级/变化」→ 自动增量同步模型（B）
   const prevSubscriptionRef = useRef<string | undefined>(undefined)
+  // 上一次已知的积分余额：用于检测「买了积分（0→>0）」→ 自动增量同步模型。
+  // 积分对全部启用模型生效，买积分后网关 /v1/models 会多返回模型，但买积分不改 subscription_code，
+  // 故单独按余额跨越 0 触发。同步只增不删：余额归 0 不会移除已加入的模型。
+  const prevCreditRef = useRef<number | undefined>(undefined)
   // 稳定引用父级同步回调：父级每次渲染都传新函数，若直接进 loadMe 依赖会导致挂载 effect 反复重跑
   const onSyncModelsRef = useRef(onSyncModels)
   useEffect(() => {
@@ -172,11 +180,17 @@ export const AccountPanel = ({ token, onAuth, onLogout, onSyncModels }: AccountP
     if (ok) {
       const data = json.data as AccountInfo
       const prevSub = prevSubscriptionRef.current
+      const prevCredit = prevCreditRef.current
       setAccount(data)
       writeAccountCache(tk, data)
       prevSubscriptionRef.current = data.subscription_code
-      // B：检测到套餐变化（此前已知且不同，如升级）→ 自动增量同步网关模型
-      if (prevSub !== undefined && prevSub !== data.subscription_code) {
+      prevCreditRef.current = data.credit_balance
+      // B：套餐变化（此前已知且不同，如升级），或积分余额从 0 变正（买了积分）→ 自动增量同步网关模型。
+      // 只触发 0→>0：归 0 时同步无新增项、纯 no-op，无需触发（且同步只增不删，不会移除模型）。
+      const subChanged = prevSub !== undefined && prevSub !== data.subscription_code
+      const creditGainedFromZero =
+        typeof prevCredit === "number" && prevCredit <= 0 && typeof data.credit_balance === "number" && data.credit_balance > 0
+      if (subChanged || creditGainedFromZero) {
         void onSyncModelsRef.current()
       }
     } else if (!silent) {
@@ -192,8 +206,9 @@ export const AccountPanel = ({ token, onAuth, onLogout, onSyncModels }: AccountP
     }
     const cached = readAccountCache(token)
     if (cached) setAccount(cached)
-    // 以缓存的套餐作为「上一次已知值」基线：面板关闭期间若发生升级，本次 loadMe 即可检测到并同步
+    // 以缓存的套餐/积分作为「上一次已知值」基线：面板关闭期间若发生套餐升级或买积分，本次 loadMe 即可检测到并同步
     prevSubscriptionRef.current = cached?.subscription_code
+    prevCreditRef.current = cached?.credit_balance
     void loadMe(token, true)
   }, [token, loadMe])
 
@@ -365,6 +380,15 @@ export const AccountPanel = ({ token, onAuth, onLogout, onSyncModels }: AccountP
     return kind
   }
 
+  // 额度健康色随主题分亮/暗两套（主题由 URL 注入、每次挂载固定，读一次 class 即可）：
+  // 充足=绿 / 偏低=琥珀 / 紧张=红。仅进度条着色，其余保持单色克制。
+  const isDark = typeof document !== "undefined" && document.documentElement.classList.contains("dark")
+  const health = isDark
+    ? { green: "#40c057", amber: "#f0a92b", red: "#fa5252" }
+    : { green: "#2f9e44", amber: "#e8850c", red: "#e03131" }
+  const quotaColor = (percent: number): string =>
+    percent >= 50 ? health.green : percent >= 20 ? health.amber : health.red
+
   return (
     <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
       <div className="flex items-center justify-between gap-2">
@@ -386,37 +410,72 @@ export const AccountPanel = ({ token, onAuth, onLogout, onSyncModels }: AccountP
         <p className="text-xs text-muted-foreground">{t("sheet.account.intro")}</p>
       )}
 
-      {/* 已登录：所属账号 + 余额 + 操作 */}
-      {signedIn && account && (
-        <div className="space-y-2">
-          {account.email && (
-            <div className="text-xs text-muted-foreground">
-              {t("sheet.account.boundAccount")}: {account.email}
-              {account.instance_id && (
-                <span className="ml-1 font-mono">({account.instance_id})</span>
-              )}
-            </div>
-          )}
-          <div className="text-xs text-muted-foreground">
-            {t("sheet.account.balance")}
+      {/* 已登录：所属账号 + 额度/积分（Codex 风：左标题+重置，右进度条+剩余%） */}
+      {signedIn && account && (() => {
+        const buckets = account.buckets ?? []
+        const hasCredit = typeof account.credit_balance === "number"
+        const rowCount = buckets.length + (hasCredit ? 1 : 0)
+        return (
+          <div className="space-y-2">
+            {account.email && (
+              <div className="text-xs text-muted-foreground">
+                {t("sheet.account.boundAccount")}: {account.email}
+                {account.instance_id && (
+                  <span className="ml-1 font-mono">({account.instance_id})</span>
+                )}
+              </div>
+            )}
+            {rowCount > 0 && (
+              <div className="divide-y divide-border rounded-lg border bg-background">
+                {buckets.map((b) => {
+                  const percent = b.amount > 0 ? Math.min(100, Math.max(0, Math.round((b.balance / b.amount) * 100))) : 0
+                  const reset = fmtReset(b.next_reset_at, lang)
+                  const color = quotaColor(percent)
+                  return (
+                    <div key={b.kind} className="flex items-center gap-4 px-4 py-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="truncate text-sm font-medium leading-tight">{bucketLabel(b.kind)}</div>
+                        {reset && (
+                          <div className="mt-1 text-xs text-muted-foreground">{t("sheet.account.resetPrefix")}{reset}</div>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2.5">
+                        {/* 进度条按余量着色，其余单色 */}
+                        <div className="h-1.5 w-24 overflow-hidden rounded-full bg-muted">
+                          <div className="h-full rounded-full" style={{ width: `${percent}%`, backgroundColor: color }} />
+                        </div>
+                        <span className="w-[3.75rem] text-right text-xs text-muted-foreground tabular-nums">
+                          {t("sheet.account.remaining")} {percent}%
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+                {/* 积分钱包：同排版，右侧为绝对余额（无进度条）；优先级仅在与订阅额度并存时作副标题 */}
+                {hasCredit && (
+                  <div className="flex items-center gap-4 px-4 py-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-sm font-medium leading-tight">{t("sheet.account.creditBalance")}</div>
+                      {buckets.length > 0 && (account.credit_balance ?? 0) > 0 && (
+                        <div className="mt-1 text-xs text-muted-foreground">
+                          {t("sheet.account.walletPriorityLabel")}{lang === "zh" ? "：" : ": "}
+                          {account.wallet_priority === "wallet_first"
+                            ? t("sheet.account.walletPriorityWallet")
+                            : t("sheet.account.walletPrioritySubscription")}
+                        </div>
+                      )}
+                    </div>
+                    <span className="shrink-0 text-sm font-semibold tabular-nums">
+                      {account.credit_balance}
+                      <span className="ml-1 text-xs font-normal text-muted-foreground">{t("sheet.account.creditUnit")}</span>
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
-          <div className="space-y-1">
-            {(account.buckets ?? []).map((b) => {
-              const percent = b.amount > 0 ? Math.min(100, Math.max(0, Math.round((b.balance / b.amount) * 100))) : 0
-              const reset = fmtReset(b.next_reset_at, lang)
-              return (
-                <div key={b.kind} className="flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">{bucketLabel(b.kind)}</span>
-                  <span>
-                    {percent}%
-                    {reset && <span className="ml-1.5 text-muted-foreground">· {reset}</span>}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* 登录表单：邮箱 + 验证码（与认领统一） */}
       {!signedIn && mode === "login" && (
