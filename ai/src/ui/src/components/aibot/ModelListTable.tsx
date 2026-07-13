@@ -1,12 +1,16 @@
 import {
+  createContext,
   forwardRef,
   useCallback,
+  useContext,
   useEffect,
   useImperativeHandle,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
+  type ReactNode,
 } from "react"
 
 import {
@@ -14,8 +18,27 @@ import {
   getCoreRowModel,
   useReactTable,
   type ColumnDef,
+  type Row,
 } from "@tanstack/react-table"
-import { ArrowDown, ArrowUp, Eye, EyeOff, Plug, Trash2 } from "lucide-react"
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core"
+import { restrictToParentElement, restrictToVerticalAxis } from "@dnd-kit/modifiers"
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import { ArrowDown, ArrowUp, Eye, EyeOff, Move, Plug, Trash2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -84,6 +107,77 @@ const createRow = (): ModelTableRow => ({
   thinking: "off",
   hidden: false,
 })
+
+// 把当前行的拖拽手柄绑定信息下发到 actions 单元格里的 DragHandle（拖柄与 <tr> 隔着列渲染，用 context 打通）
+type RowDndValue =
+  | Pick<
+      ReturnType<typeof useSortable>,
+      "attributes" | "listeners" | "setActivatorNodeRef"
+    >
+  | null
+
+const RowDndContext = createContext<RowDndValue>(null)
+
+// 可排序的表格行：拖拽时自身跟随指针平移、其余行实时让位，形成"插入到此处"的预览
+function SortableRow({
+  id,
+  className,
+  children,
+}: {
+  id: string
+  className?: string
+  children: ReactNode
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    setActivatorNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id })
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+  return (
+    <RowDndContext.Provider value={{ attributes, listeners, setActivatorNodeRef }}>
+      <TableRow
+        ref={setNodeRef}
+        style={style}
+        className={cn(
+          className,
+          isDragging && "relative z-10 bg-background shadow-lg",
+        )}
+      >
+        {children}
+      </TableRow>
+    </RowDndContext.Provider>
+  )
+}
+
+// 拖拽手柄：按住它才触发排序，避免与单元格内输入框/选择框冲突。
+// 用 Button（ghost/icon）与同列的隐藏/删除按钮保持一致的尺寸与对齐。
+function DragHandle({ label, disabled }: { label: string; disabled?: boolean }) {
+  const dnd = useContext(RowDndContext)
+  return (
+    <Button
+      ref={dnd?.setActivatorNodeRef}
+      type="button"
+      variant="ghost"
+      size="icon"
+      disabled={disabled}
+      title={label}
+      aria-label={label}
+      {...(dnd?.attributes ?? {})}
+      {...(disabled ? {} : (dnd?.listeners ?? {}))}
+      className="h-8 w-8 cursor-grab touch-none text-muted-foreground active:cursor-grabbing"
+    >
+      <Move className="h-4 w-4" />
+    </Button>
+  )
+}
 
 export interface ModelListTableProps {
   value: string
@@ -294,6 +388,46 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
           const [item] = next.splice(currentIndex, 1)
           next.splice(targetIndex, 0, item)
           return next
+        },
+        true,
+      )
+    },
+    [updateRows],
+  )
+
+  // 仅桌面端（有精确指针的鼠标环境）启用拖拽排序；触摸端沿用上/下箭头
+  const [isDesktopPointer, setIsDesktopPointer] = useState(false)
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return
+    }
+    const query = window.matchMedia("(pointer: fine)")
+    const update = () => setIsDesktopPointer(query.matches)
+    update()
+    query.addEventListener?.("change", update)
+    return () => query.removeEventListener?.("change", update)
+  }, [])
+
+  // 指针需移动 4px 才算拖拽，避免点击手柄误触；键盘可 Tab 到手柄后用方向键排序
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  )
+
+  const handleDragEnd = useCallback(
+    (event: DragEndEvent) => {
+      const { active, over } = event
+      if (!over || active.id === over.id) {
+        return
+      }
+      updateRows(
+        (prev) => {
+          const from = prev.findIndex((row) => row.id === active.id)
+          const to = prev.findIndex((row) => row.id === over.id)
+          if (from === -1 || to === -1 || from === to) {
+            return prev
+          }
+          return arrayMove(prev, from, to)
         },
         true,
       )
@@ -545,6 +679,9 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
           const isHidden = row.original.hidden
           return (
             <div className="flex items-center justify-center gap-1">
+              {isDesktopPointer && (
+                <DragHandle label={t("sheet.models.dragHandle")} disabled={disabled} />
+              )}
               <Button
                 type="button"
                 variant="ghost"
@@ -563,28 +700,32 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
                   {isHidden ? t("sheet.models.show") : t("sheet.models.hide")}
                 </span>
               </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => handleMoveRow(row.original.id, -1)}
-                disabled={disabled || isFirst}
-              >
-                <ArrowUp className="h-4 w-4" />
-                <span className="sr-only">Move up</span>
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => handleMoveRow(row.original.id, 1)}
-                disabled={disabled || isLast}
-              >
-                <ArrowDown className="h-4 w-4" />
-                <span className="sr-only">Move down</span>
-              </Button>
+              {!isDesktopPointer && (
+                <>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handleMoveRow(row.original.id, -1)}
+                    disabled={disabled || isFirst}
+                  >
+                    <ArrowUp className="h-4 w-4" />
+                    <span className="sr-only">Move up</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8"
+                    onClick={() => handleMoveRow(row.original.id, 1)}
+                    disabled={disabled || isLast}
+                  >
+                    <ArrowDown className="h-4 w-4" />
+                    <span className="sr-only">Move down</span>
+                  </Button>
+                </>
+              )}
               <Button
                 type="button"
                 variant="ghost"
@@ -600,7 +741,7 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
           )
         },
         meta: {
-          headerClassName: "w-[156px]",
+          headerClassName: isDesktopPointer ? "w-[120px]" : "w-[156px]",
           cellClassName: "text-center",
         },
       },
@@ -619,6 +760,7 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
       handleRemoveRow,
       handleToggleHidden,
       handleThinkingChange,
+      isDesktopPointer,
       labelPlaceholder,
       modelLabel,
       modelPlaceholder,
@@ -663,6 +805,22 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
     disabled ||
     (typeof maxLength === "number" && maxLength > 0 && currentLength >= maxLength)
 
+  const rowClassName = (row: Row<ModelTableRow>) =>
+    cn(
+      highlightedSet.has(row.original.value.trim()) && "bg-muted/50",
+      row.original.hidden && "opacity-55",
+    )
+
+  const renderRowCells = (row: Row<ModelTableRow>) =>
+    row.getVisibleCells().map((cell) => (
+      <TableCell
+        key={cell.id}
+        className={cn("whitespace-nowrap", cell.column.columnDef.meta?.cellClassName)}
+      >
+        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+      </TableCell>
+    ))
+
   return (
     <div className="rounded-md border">
       <div className="overflow-x-auto border-b">
@@ -688,24 +846,31 @@ export const ModelListTable = forwardRef<ModelListTableHandle, ModelListTablePro
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className={cn(
-                    highlightedSet.has(row.original.value.trim()) && "bg-muted/50",
-                    row.original.hidden && "opacity-55",
-                  )}
+              isDesktopPointer ? (
+                <DndContext
+                  sensors={sensors}
+                  collisionDetection={closestCenter}
+                  modifiers={[restrictToVerticalAxis, restrictToParentElement]}
+                  onDragEnd={handleDragEnd}
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell
-                      key={cell.id}
-                      className={cn("whitespace-nowrap", cell.column.columnDef.meta?.cellClassName)}
-                    >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+                  <SortableContext
+                    items={table.getRowModel().rows.map((row) => row.original.id)}
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {table.getRowModel().rows.map((row) => (
+                      <SortableRow key={row.id} id={row.original.id} className={rowClassName(row)}>
+                        {renderRowCells(row)}
+                      </SortableRow>
+                    ))}
+                  </SortableContext>
+                </DndContext>
+              ) : (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow key={row.id} className={rowClassName(row)}>
+                    {renderRowCells(row)}
+                  </TableRow>
+                ))
+              )
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-16 text-center text-sm text-muted-foreground">
