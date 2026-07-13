@@ -46,23 +46,19 @@ TOOL_CALL_PATTERN = re.compile(r'\n?> <tool-use>Tool: [^<]+</tool-use>\n*')
 # 默认模型列表
 DEFAULT_MODELS = {
     "openai": [
+        {"id": "gpt-5.6-sol", "name": "GPT-5.6 Sol", "support_mcp": True, "support_vision": True},
+        {"id": "gpt-5.6-terra", "name": "GPT-5.6 Terra", "support_mcp": True, "support_vision": True},
+        {"id": "gpt-5.6-luna", "name": "GPT-5.6 Luna", "support_mcp": True, "support_vision": True},
         {"id": "gpt-5.5", "name": "GPT-5.5", "support_mcp": True, "support_vision": True},
-        {"id": "gpt-5.5-pro", "name": "GPT-5.5 Pro", "support_mcp": True, "support_vision": True},
-        {"id": "gpt-5.4", "name": "GPT-5.4", "support_mcp": True, "support_vision": True},
-        {"id": "gpt-5.4-pro", "name": "GPT-5.4 Pro", "support_mcp": True, "support_vision": True},
         {"id": "gpt-5.4-mini", "name": "GPT-5.4 Mini", "support_mcp": True, "support_vision": True},
         {"id": "gpt-5.4-nano", "name": "GPT-5.4 Nano", "support_mcp": True, "support_vision": True},
-        {"id": "gpt-5.3-codex", "name": "GPT-5.3 Codex", "support_mcp": True, "support_vision": True},
-        {"id": "gpt-5.2", "name": "GPT-5.2", "support_mcp": True, "support_vision": True},
-        {"id": "o3-pro", "name": "o3 Pro", "support_mcp": True, "support_vision": True},
-        {"id": "o3", "name": "o3", "support_mcp": True, "support_vision": True},
         {"id": "o4-mini", "name": "o4 Mini", "support_mcp": True, "support_vision": True},
     ],
     "claude": [
         {"id": "claude-fable-5", "name": "Claude Fable 5", "support_mcp": True, "support_vision": True, "thinking": "off"},
-        {"id": "claude-opus-4-8", "name": "Claude Opus 4.8", "support_mcp": True, "support_vision": True, "thinking": "medium"},
+        {"id": "claude-opus-4-8", "name": "Claude Opus 4.8", "support_mcp": True, "support_vision": True, "thinking": "off"},
+        {"id": "claude-sonnet-5", "name": "Claude Sonnet 5", "support_mcp": True, "support_vision": True, "thinking": "off"},
         {"id": "claude-opus-4-7", "name": "Claude Opus 4.7", "support_mcp": True, "support_vision": True, "thinking": "medium"},
-        {"id": "claude-opus-4-6", "name": "Claude Opus 4.6", "support_mcp": True, "support_vision": True, "thinking": "medium"},
         {"id": "claude-sonnet-4-6", "name": "Claude Sonnet 4.6", "support_mcp": True, "support_vision": True, "thinking": "medium"},
         {"id": "claude-haiku-4-5", "name": "Claude Haiku 4.5", "support_mcp": True, "support_vision": True, "thinking": "medium"},
     ],
@@ -73,18 +69,16 @@ DEFAULT_MODELS = {
     "gemini": [
         {"id": "gemini-3.5-flash", "name": "Gemini 3.5 Flash", "support_mcp": True, "support_vision": True},
         {"id": "gemini-3.1-pro-preview", "name": "Gemini 3.1 Pro", "support_mcp": True, "support_vision": True},
-        {"id": "gemini-3.1-flash-lite-preview", "name": "Gemini 3.1 Flash Lite", "support_mcp": True, "support_vision": True},
+        {"id": "gemini-3.1-flash-lite", "name": "Gemini 3.1 Flash Lite", "support_mcp": True, "support_vision": True},
         {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro", "support_mcp": True, "support_vision": True},
         {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "support_mcp": True, "support_vision": True},
     ],
     "grok": [
+        {"id": "grok-4.5", "name": "Grok 4.5", "support_mcp": True, "support_vision": True},
         {"id": "grok-4.3", "name": "Grok 4.3", "support_mcp": True, "support_vision": True},
-        {"id": "grok-4.20-0309-reasoning", "name": "Grok 4.20 Reasoning", "support_mcp": True, "support_vision": True},
-        {"id": "grok-4.20-0309-non-reasoning", "name": "Grok 4.20", "support_mcp": True, "support_vision": True},
-        {"id": "grok-4-1-fast-reasoning", "name": "Grok 4.1 Fast Reasoning", "support_mcp": True, "support_vision": True},
-        {"id": "grok-4-1-fast-non-reasoning", "name": "Grok 4.1 Fast", "support_mcp": True, "support_vision": True},
     ],
     "zhipu": [
+        {"id": "glm-5.2", "name": "GLM-5.2", "support_mcp": True, "support_vision": False},
         {"id": "glm-5.1", "name": "GLM-5.1", "support_mcp": True, "support_vision": False},
         {"id": "glm-5", "name": "GLM-5", "support_mcp": True, "support_vision": False},
         {"id": "glm-5-turbo", "name": "GLM-5 Turbo", "support_mcp": True, "support_vision": False},
@@ -94,19 +88,15 @@ DEFAULT_MODELS = {
     "qianwen": [
         {"id": "qwen3.7-max", "name": "Qwen3.7 Max", "support_mcp": True, "support_vision": False},
         {"id": "qwen3.7-plus", "name": "Qwen3.7 Plus", "support_mcp": True, "support_vision": True},
-        {"id": "qwen3.6-max-preview", "name": "Qwen3.6 Max", "support_mcp": True, "support_vision": False},
         {"id": "qwen3.6-plus", "name": "Qwen3.6 Plus", "support_mcp": True, "support_vision": True},
         {"id": "qwen3.6-flash", "name": "Qwen3.6 Flash", "support_mcp": True, "support_vision": False},
-        {"id": "qwen3-max", "name": "Qwen3 Max", "support_mcp": True, "support_vision": False},
-        {"id": "qwen-plus", "name": "Qwen Plus", "support_mcp": True, "support_vision": False},
-        {"id": "qwen-turbo", "name": "Qwen Turbo", "support_mcp": True, "support_vision": False},
     ],
     "wenxin": [
-        {"id": "ernie-5.1", "name": "ERNIE 5.1", "support_mcp": False, "support_vision": True},
+        {"id": "ernie-5.1", "name": "ERNIE 5.1", "support_mcp": False, "support_vision": False},
+        {"id": "ernie-5.0", "name": "ERNIE 5.0", "support_mcp": False, "support_vision": True},
+        {"id": "ernie-5.0-thinking-latest", "name": "ERNIE 5.0 Thinking", "support_mcp": False, "support_vision": True},
         {"id": "ernie-x1.1", "name": "ERNIE X1.1", "support_mcp": False, "support_vision": False},
-        {"id": "ernie-5.0-thinking-preview", "name": "ERNIE 5.0 Thinking", "support_mcp": False, "support_vision": True},
         {"id": "ernie-4.5-turbo-128k", "name": "ERNIE 4.5 Turbo 128K", "support_mcp": False, "support_vision": False},
-        {"id": "ernie-4.5-turbo-vl-32k", "name": "ERNIE 4.5 Turbo VL 32K", "support_mcp": False, "support_vision": True},
     ],
 }
 
@@ -115,25 +105,24 @@ DEFAULT_MODELS = {
 # 数值为官方文档的原始值
 CONTEXT_LIMITS = {
     "openai": {
-        # GPT-5.5: 1M context
+        # GPT-5.6: 1.05M context
+        "gpt-5.6-sol": 1050000,
+        "gpt-5.6-terra": 1050000,
+        "gpt-5.6-luna": 1050000,
         "gpt-5.5": 1050000,
-        "gpt-5.5-pro": 1050000,
-        # GPT-5.4: 1M context
-        "gpt-5.4": 1050000,
-        "gpt-5.4-pro": 1050000,
         "gpt-5.4-mini": 1050000,
         "gpt-5.4-nano": 1050000,
-        "gpt-5.3-codex": 1050000,
-        "gpt-5.2": 128000,
-        # o 系列: 200K context
-        "o3-pro": 200000,
-        "o3": 200000,
         "o4-mini": 200000,
         "default": 128000,
     },
     "claude": {
-        # Claude 4.6: 1M context
-        "default": 1000000,
+        "claude-fable-5": 1000000,
+        "claude-opus-4-8": 1000000,
+        "claude-sonnet-5": 1000000,
+        "claude-opus-4-7": 1000000,
+        "claude-sonnet-4-6": 1000000,
+        "claude-haiku-4-5": 200000,
+        "default": 200000,
     },
     "deepseek": {
         # DeepSeek V4: 1M context
@@ -142,16 +131,21 @@ CONTEXT_LIMITS = {
         "default": 128000,
     },
     "gemini": {
-        # Gemini 3.x/2.5: ~1M context
-        "default": 1000000,
+        # Gemini 3.x/2.5: 1,048,576 context
+        "gemini-3.5-flash": 1048576,
+        "gemini-3.1-pro-preview": 1048576,
+        "gemini-3.1-flash-lite": 1048576,
+        "gemini-2.5-pro": 1048576,
+        "gemini-2.5-flash": 1048576,
+        "default": 1048576,
     },
     "grok": {
-        # Grok 4.3: 1M context；4.20 等旧 4.x: 2M
+        "grok-4.5": 500000,
         "grok-4.3": 1000000,
-        "default": 2000000,
+        "default": 500000,
     },
     "zhipu": {
-        # GLM-5.x: 200K context
+        "glm-5.2": 1000000,
         "glm-5.1": 200000,
         "glm-5": 200000,
         "glm-5-turbo": 200000,
@@ -160,18 +154,18 @@ CONTEXT_LIMITS = {
         "default": 128000,
     },
     "qianwen": {
-        "qwen3.7-max": 256000,
-        "qwen3.7-plus": 128000,
-        "qwen3-max": 128000,
-        "qwen-plus": 32000,
-        "qwen-turbo": 32000,
+        "qwen3.7-max": 1000000,
+        "qwen3.7-plus": 1000000,
+        "qwen3.6-plus": 1000000,
+        "qwen3.6-flash": 1000000,
         "default": 32000,
     },
     "wenxin": {
         "ernie-5.1": 128000,
-        "ernie-5.0-thinking-preview": 128000,
+        "ernie-5.0": 128000,
+        "ernie-5.0-thinking-latest": 128000,
+        "ernie-x1.1": 64000,
         "ernie-4.5-turbo-128k": 128000,
-        "ernie-4.5-turbo-vl-32k": 32000,
         "default": 32000,
     },
     "dooai": {
