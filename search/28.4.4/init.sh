@@ -15,18 +15,27 @@ log() {
     echo "[search-init] $*"
 }
 
+cleanup_ok=1
 if [ -d "$DATA_DIR" ] && [ -n "$(ls -A "$DATA_DIR" 2>/dev/null)" ]; then
     prev=""
     [ -f "$MARKER" ] && prev="$(cat "$MARKER" 2>/dev/null)"
     if [ "$prev" != "$ENGINE_VERSION" ]; then
         log "engine data version '$prev' != '$ENGINE_VERSION' (legacy/ZincSearch or older Manticore), cleaning up; indexes will be rebuilt from source"
-        rm -rf "$DATA_DIR"/* 2>/dev/null || true
+        # find 连点前缀等隐藏文件一并清理（glob * 不匹配 dotfiles）；
+        # 清理失败则不更新版本标记，避免把"没清干净"记成"已清理"导致崩溃循环无自愈
+        if ! find "$DATA_DIR" -mindepth 1 -delete 2>/dev/null; then
+            cleanup_ok=0
+            log "WARNING: cleanup incomplete; keeping old marker so cleanup retries on next start"
+        fi
     fi
 fi
 
-# 记录当前引擎版本，供后续启动/升级判定（首装亦写入，避免误判为需清空）
-mkdir -p "$DATA_DIR" 2>/dev/null || true
-echo "$ENGINE_VERSION" > "$MARKER" 2>/dev/null || true
+# 记录当前引擎版本，供后续启动/升级判定（首装亦写入，避免误判为需清空）；
+# 仅在清理成功（或无需清理）时写入
+if [ "$cleanup_ok" = "1" ]; then
+    mkdir -p "$DATA_DIR" 2>/dev/null || true
+    echo "$ENGINE_VERSION" > "$MARKER" 2>/dev/null || true
+fi
 
 log "initialization done, starting Manticore..."
 
