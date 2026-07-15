@@ -1,0 +1,10 @@
+node_modules
+src/routeTree.gen.ts
+.DS_Store
+dist
+*.local
+.env
+.nitro
+.tanstack
+.output
+__unconfig*

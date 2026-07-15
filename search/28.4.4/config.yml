@@ -4,6 +4,26 @@ require_version:
     en: "Requires new API features"
     zh: "需要新的API功能"
 
+# 管理员状态仪表盘：索引覆盖/同步任务/失败队列/搜索测试台/运维操作
+menu_items:
+  - location: application/admin
+    key: status
+    label:
+      en: Search Status
+      zh: 搜索状态
+    url: "apps/search/?theme={system_theme}&lang={system_lang}&user_id={user_id}&user_token={user_token}"
+    type: iframe
+    immersive: true
+    visible_to: admin
+    # 未读语义：异常时角标推红点，管理员点开即清；未恢复则巡检（5 分钟）再推
+    badge_clear_on_open: true
+
+# 应用指令接口：doo app call search status / failures / retry-failures / clear-locks
+openapi:
+  file: ./openapi.yaml
+  service: search-dashboard
+  port: 3000
+
 # 智能（向量/语义）搜索依赖 AI 助手提供的免费向量模型，安装前必须已安装 ai 插件
 require_apps:
   - appid: ai

@@ -10,6 +10,7 @@ Manticore Search is a high-performance open-source search engine, providing inte
 - **High Performance**: Extremely fast search responses, low resource usage
 - **MySQL Compatible**: Fully compatible with MySQL protocol
 - **Chinese Support**: Built-in Chinese tokenization (ICU)
+- **Status Panel**: Admin-only "Search Status" page showing index coverage, sync progress, and the failure queue at a glance, with one-click operations and a search test bench
 
 ## Use Cases
 - Need to search file contents (Word, Excel, PDF, text, etc.)

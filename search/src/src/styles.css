@@ -1,0 +1,17 @@
+@import 'tailwindcss';
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* 移动端安全区域：默认 0，DooTask 微前端里由 lib/dootask.ts 用 getSafeArea() 覆盖 */
+  --safe-top: 0px;
+  --safe-bottom: 0px;
+}
+
+body {
+  @apply bg-slate-50 text-slate-800;
+}
+
+html.dark body {
+  @apply bg-slate-950 text-slate-200;
+}
