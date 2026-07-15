@@ -38,6 +38,16 @@ _EMBEDDINGS_DERIVED_KEY = (
     hashlib.sha256(f"{APP_KEY}:embeddings".encode()).hexdigest() if APP_KEY else ""
 )
 
+# 单条向量化输入的字符上限。主程序侧存储上限更大（文件 100000 / 消息与任务 50000，
+# 见 dootask 仓库 ManticoreFile/Msg/Task 的 MAX_CONTENT_LENGTH），超出部分在此截断。
+_EMBEDDING_INPUT_MAX_CHARS = 30000
+
+
+def _key_equal(token: str, expected: str) -> bool:
+    """常数时间比较；先编码为 bytes——str 版 compare_digest 遇到非 ASCII 字符会抛
+    TypeError（请求头按 latin-1 解码可携带任意字节），导致鉴权路径 500 而非 401。"""
+    return hmac.compare_digest(token.encode("utf-8"), expected.encode("utf-8"))
+
 from helper.invoke import parse_context, build_invoke_stream_key
 from helper.lifespan import lifespan_context
 from helper.models import (
@@ -1193,7 +1203,7 @@ async def kb_reindex(request: Request,
     """
     if not APP_KEY:
         return JSONResponse(content={"code": 500, "error": "APP_KEY not configured"}, status_code=500)
-    if not hmac.compare_digest(_bearer(authorization) or x_app_key, APP_KEY):
+    if not _key_equal(_bearer(authorization) or x_app_key, APP_KEY):
         return JSONResponse(content={"code": 401, "error": "invalid app key"}, status_code=401)
 
     if not getattr(app.state, "kb_loaded", False):
@@ -1242,8 +1252,8 @@ async def embeddings(request: Request,
     if not APP_KEY:
         return JSONResponse(content={"code": 500, "error": "APP_KEY not configured"}, status_code=500)
     token = _bearer(authorization) or x_app_key
-    if not (hmac.compare_digest(token, APP_KEY)
-            or hmac.compare_digest(token, _EMBEDDINGS_DERIVED_KEY)):
+    if not (_key_equal(token, APP_KEY)
+            or _key_equal(token, _EMBEDDINGS_DERIVED_KEY)):
         return JSONResponse(content={"code": 401, "error": "invalid app key"}, status_code=401)
 
     try:
@@ -1263,7 +1273,7 @@ async def embeddings(request: Request,
         return JSONResponse(content={"code": 200, "data": [], "model": model_name(), "dimensions": 0})
 
     # 单条输入截断，防止 Manticore 传入的全文（文件可达 10 万字符）撑爆上游模型上下文
-    texts = [t[:30000] for t in texts]
+    texts = [t[:_EMBEDDING_INPUT_MAX_CHARS] for t in texts]
 
     try:
         from helper.kb.embeddings import get_embedder, model_name
