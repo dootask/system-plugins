@@ -1,0 +1,13 @@
+require_version:
+  version: "> 1.5.18"
+  reason:
+    en: "Requires new API features"
+    zh: "需要新的API功能"
+
+# 智能（向量/语义）搜索依赖 AI 助手提供的免费向量模型，安装前必须已安装 ai 插件
+require_apps:
+  - appid: ai
+    version: ">= 0.5.8"
+    reason:
+      en: "Vector/semantic search relies on the free embedding model provided by AI Assistant"
+      zh: "向量/语义搜索依赖 AI 助手提供的免费向量模型"

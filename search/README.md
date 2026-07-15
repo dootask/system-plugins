@@ -25,13 +25,14 @@ Manticore Search is a high-performance open-source search engine, providing inte
 
 ## Notes
 - After installation, wait for the system to complete file content indexing
-- Vector search requires the AI Assistant plugin (for Embedding generation)
+- Semantic/vector search works **out of the box with zero config**: it uses the free DooTask AI embedding model provided by the AI Assistant plugin — no third-party Embedding key required (so the AI Assistant plugin must be installed first)
+- With large volumes of data, the free embedding model may be rate-limited by the gateway; to self-host embeddings, ops can override via `EMBEDDING_BASE_URL` / `EMBEDDING_API_KEY` / `EMBEDDING_MODEL` on the AI Assistant plugin
 - Recommended: at least 2GB available memory
 - Large files (>1MB) may take longer to extract content
 - Lightweight compared to other search solutions
 
 ## Technical Specifications
-- Vector Dimension: 1536 (compatible with OpenAI text-embedding-3-small)
-- Storage Engine: Manticore Search 15.x
+- Vector Dimension: 1024 (DooTask AI free embedding model qwen3-embedding:0.6b / bge-m3)
+- Storage Engine: Manticore Search 28.x
 - Index Types: KNN vector index (HNSW) + inverted full-text index
 - Chinese Tokenization: ICU Chinese morphology

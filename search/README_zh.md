@@ -25,13 +25,14 @@ Manticore Search 是一款高性能开源搜索引擎，专为 DooTask 系统提
 
 ## 注意事项
 - 首次安装后需要等待系统完成文件内容索引
-- 向量搜索需要配合 AI 助手插件使用（用于生成 Embedding）
+- 语义/向量搜索**零配置开箱即用**：依赖 AI 助手插件提供的 DooTask AI 免费向量模型，无需自行配置任何第三方 Embedding 密钥（因此必须先安装 AI 助手插件）
+- 数据量较大时，免费向量模型可能受网关限速；如需自建向量服务，运维可在 AI 助手插件上通过 `EMBEDDING_BASE_URL` / `EMBEDDING_API_KEY` / `EMBEDDING_MODEL` 覆盖
 - 建议系统至少有 2GB 可用内存
 - 大文件（>1MB）的内容提取可能需要较长时间
 - 相比其他搜索方案更加轻量级
 
 ## 技术规格
-- 向量维度：1536（兼容 OpenAI text-embedding-3-small）
-- 存储引擎：Manticore Search 15.x
+- 向量维度：1024（DooTask AI 免费向量模型 qwen3-embedding:0.6b / bge-m3）
+- 存储引擎：Manticore Search 28.x
 - 索引类型：KNN 向量索引 (HNSW) + 倒排全文索引
 - 中文分词：ICU Chinese 形态分析
