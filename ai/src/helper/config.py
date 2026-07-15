@@ -25,6 +25,10 @@ MAIN_SERVER_URL = os.environ.get("MAIN_SERVER_URL", "http://nginx")
 DOOTASK_AI_GATEWAY_URL = os.environ.get("DOOTASK_AI_GATEWAY_URL", "").rstrip("/")
 DOOTASK_AI_INSTANCE_ID = os.environ.get("DOOTASK_AI_INSTANCE_ID", "")
 
+# 主程序全局 APP_KEY（内置 compose 变量 ${APP_KEY} 注入）。
+# 用于服务端到服务端调用（如主程序 → 本插件 /embeddings）的共享密钥鉴权。
+APP_KEY = os.environ.get("APP_KEY", "")
+
 # 自定义 MCP 配置文件路径（用户自接的外部 MCP 服务器）
 MCP_CONFIG_PATH = BASE_DIR / "config" / "mcp-config.json"
 

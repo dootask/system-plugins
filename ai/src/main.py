@@ -1,5 +1,7 @@
 # 标准库导入
 import asyncio
+import hashlib
+import hmac
 import json
 import logging
 import os
@@ -27,7 +29,15 @@ from helper.config import (
     MAIN_SERVER_URL,
     DOOTASK_AI_GATEWAY_URL,
     DOOTASK_AI_INSTANCE_ID,
+    APP_KEY,
 )
+# /embeddings 专用派生密钥：sha256(APP_KEY:embeddings)。
+# 供 Manticore Auto Embeddings 写入表定义使用，避免主程序 APP_KEY（Laravel 主密钥）
+# 落入搜索引擎的元数据/数据卷；泄露派生值无法反推 APP_KEY，且只授予向量化调用权限。
+_EMBEDDINGS_DERIVED_KEY = (
+    hashlib.sha256(f"{APP_KEY}:embeddings".encode()).hexdigest() if APP_KEY else ""
+)
+
 from helper.invoke import parse_context, build_invoke_stream_key
 from helper.lifespan import lifespan_context
 from helper.models import (
@@ -1167,10 +1177,13 @@ async def vision_preview(filename: str):
     return FileResponse(filepath, media_type=media_type)
 
 @app.post('/kb/reindex')
-async def kb_reindex(request: Request, x_ingest_token: str = Header(default="", alias="X-Ingest-Token")):
+async def kb_reindex(request: Request,
+                     authorization: str = Header(default=""),
+                     x_app_key: str = Header(default="", alias="X-App-Key")):
     """手动触发 ai-kb 入库（免重启即时生效；容器启动时也会自动 reconcile 对账）。
 
-    认证：header X-Ingest-Token 必须与环境变量 KB_INGEST_TOKEN 一致。
+    认证：header Authorization: Bearer <APP_KEY> 或 X-App-Key，须与环境变量 APP_KEY 一致
+    （与 /embeddings 同一把主程序全局密钥）。
     Body (JSON):
         - paths: 相对 KB_CONTENT_DIR 的 markdown 路径列表（incremental 模式用）
         - mode:  "reconcile"（默认，按文件 hash 对账增量收敛）
@@ -1178,11 +1191,10 @@ async def kb_reindex(request: Request, x_ingest_token: str = Header(default="", 
         - apps:  已安装应用清单 [{id,version}]（AppStore 广播事件下发的通用 INSTALLED_APPS）。
                  reconcile/full 时作为已装应用 KB 的真相源；省略则沿用上次持久化的清单。
     """
-    expected = os.environ.get("KB_INGEST_TOKEN", "")
-    if not expected:
-        return JSONResponse(content={"code": 500, "error": "KB_INGEST_TOKEN not configured"}, status_code=500)
-    if x_ingest_token != expected:
-        return JSONResponse(content={"code": 403, "error": "invalid ingest token"}, status_code=403)
+    if not APP_KEY:
+        return JSONResponse(content={"code": 500, "error": "APP_KEY not configured"}, status_code=500)
+    if not hmac.compare_digest(_bearer(authorization) or x_app_key, APP_KEY):
+        return JSONResponse(content={"code": 401, "error": "invalid app key"}, status_code=401)
 
     if not getattr(app.state, "kb_loaded", False):
         return JSONResponse(content={"code": 503, "error": "ai-kb not initialized"}, status_code=503)
@@ -1211,6 +1223,58 @@ async def kb_reindex(request: Request, x_ingest_token: str = Header(default="", 
         return JSONResponse(content={"code": 500, "error": str(exc)}, status_code=500)
 
     return JSONResponse(content={"code": 200, "data": result})
+
+
+@app.post('/embeddings')
+async def embeddings(request: Request,
+                     authorization: str = Header(default=""),
+                     x_app_key: str = Header(default="", alias="X-App-Key")):
+    """OpenAI 兼容的向量化端点（服务端到服务端，供主程序 Manticore 搜索复用免费向量模型）。
+
+    认证：header Authorization: Bearer <token> 或 X-App-Key，token 须等于环境变量 APP_KEY
+    或派生密钥 sha256(APP_KEY:embeddings)（后者供 Manticore Auto Embeddings 使用）。
+    Body (JSON):
+        - input: 字符串或字符串数组，待向量化文本（单条超过 30000 字符会被截断）。
+    复用知识库的 Embedder（网关 → 兜底、重试），模型固定为插件 EMBEDDING_MODEL，
+    不受 RAG_ENABLED 影响（搜索独立于 KB RAG）。
+    返回：{"data":[{"index":i,"embedding":[...]}...], "model":..., "dimensions":N}
+    """
+    if not APP_KEY:
+        return JSONResponse(content={"code": 500, "error": "APP_KEY not configured"}, status_code=500)
+    token = _bearer(authorization) or x_app_key
+    if not (hmac.compare_digest(token, APP_KEY)
+            or hmac.compare_digest(token, _EMBEDDINGS_DERIVED_KEY)):
+        return JSONResponse(content={"code": 401, "error": "invalid app key"}, status_code=401)
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    raw = body.get("input") if isinstance(body, dict) else None
+    if isinstance(raw, str):
+        texts = [raw]
+    elif isinstance(raw, list) and all(isinstance(t, str) for t in raw):
+        texts = raw
+    else:
+        return JSONResponse(content={"code": 400, "error": "input must be a string or array of strings"}, status_code=400)
+
+    if not texts:
+        from helper.kb.embeddings import model_name
+        return JSONResponse(content={"code": 200, "data": [], "model": model_name(), "dimensions": 0})
+
+    # 单条输入截断，防止 Manticore 传入的全文（文件可达 10 万字符）撑爆上游模型上下文
+    texts = [t[:30000] for t in texts]
+
+    try:
+        from helper.kb.embeddings import get_embedder, model_name
+        vecs = await get_embedder().encode(texts)
+    except Exception as exc:
+        logger.exception("embeddings failed")
+        return JSONResponse(content={"code": 500, "error": str(exc)}, status_code=500)
+
+    data = [{"index": i, "embedding": v} for i, v in enumerate(vecs)]
+    dim = len(vecs[0]) if vecs else 0
+    return JSONResponse(content={"code": 200, "data": data, "model": model_name(), "dimensions": dim})
 
 
 @app.get('/health')
