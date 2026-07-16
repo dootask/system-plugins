@@ -1,7 +1,9 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { api, ApiError } from '#/lib/api'
 import { useDooTask } from '#/lib/dootask'
+import { confirmDialog, notifyError, notifySuccess } from '#/lib/dialogs'
 import {
   fmtBytes,
   fmtDuration,
@@ -12,15 +14,14 @@ import {
   type MsgKey,
 } from '#/lib/i18n'
 import type { DashboardStatus } from '#/lib/status'
+import { Btn, Card, CardHeader, Chip, Dot, Progress } from '#/components/ui'
 import {
-  Btn,
-  Card,
-  CardHeader,
-  Chip,
-  ConfirmModal,
-  Dot,
-  Progress,
-} from '#/components/ui'
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '#/components/ui/select'
 
 export const Route = createFileRoute('/')({
   validateSearch: (s: Record<string, unknown>) => ({
@@ -45,6 +46,8 @@ interface TestHit {
   score: number
   source: 'fulltext' | 'vector' | 'both'
 }
+
+const REFRESH_SECONDS = 10
 
 const TYPE_ICONS: Record<string, string> = {
   msg: '💬',
@@ -78,9 +81,11 @@ function Dashboard() {
   const [status, setStatus] = useState<DashboardStatus | null>(null)
   const [failures, setFailures] = useState<Array<FailureItem>>([])
   const [authError, setAuthError] = useState<number | null>(null)
+  const [countdown, setCountdown] = useState(REFRESH_SECONDS)
   const [toast, setToast] = useState<string | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  // 脱离宿主时 notifySuccess/notifyError 的兜底展示
   const showToast = useCallback((msg: string) => {
     setToast(msg)
     if (toastTimer.current) clearTimeout(toastTimer.current)
@@ -88,6 +93,7 @@ function Dashboard() {
   }, [])
 
   const refresh = useCallback(async () => {
+    setCountdown(REFRESH_SECONDS)
     try {
       const [s, f] = await Promise.all([
         api<DashboardStatus>('/status'),
@@ -105,13 +111,22 @@ function Dashboard() {
 
   useEffect(() => {
     void refresh()
-    const timer = setInterval(() => void refresh(), 10_000)
+    // 每秒递减的真实倒计时，归零即刷新（手动操作触发的 refresh 也会重置它）
+    const timer = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          void refresh()
+          return REFRESH_SECONDS
+        }
+        return prev - 1
+      })
+    }, 1000)
     return () => clearInterval(timer)
   }, [refresh])
 
   if (authError) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-6 text-center text-sm text-slate-500 dark:text-slate-400">
+      <div className="min-h-screen flex items-center justify-center p-6 text-center text-sm text-slate-500 dark:text-neutral-400">
         {authError === 403 ? t('notAdmin') : t('unauthorized')}
       </div>
     )
@@ -125,7 +140,7 @@ function Dashboard() {
         paddingBottom: 'calc(var(--safe-bottom) + 1rem)',
       }}
     >
-      <Header t={t} status={status} />
+      <Header t={t} status={status} countdown={countdown} />
       <Overview t={t} locale={locale} status={status} />
       <Coverage t={t} locale={locale} status={status} refresh={refresh} showToast={showToast} />
       <div className="grid lg:grid-cols-2 gap-4">
@@ -140,11 +155,11 @@ function Dashboard() {
       </div>
       <SearchTest t={t} />
       <DangerZone t={t} refresh={refresh} showToast={showToast} />
-      <div className="text-center text-xs text-slate-300 dark:text-slate-600 pb-2">
+      <div className="text-center text-xs text-slate-300 dark:text-neutral-600 pb-2">
         {t('adminOnly')}
       </div>
       {toast ? (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 text-xs rounded-full px-4 py-2 shadow-lg">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 dark:bg-neutral-100 text-white dark:text-neutral-900 text-xs rounded-full px-4 py-2 shadow-lg">
           {toast}
         </div>
       ) : null}
@@ -154,11 +169,19 @@ function Dashboard() {
 
 type T = ReturnType<typeof makeT>
 
-function Header({ t, status }: { t: T; status: DashboardStatus | null }) {
+function Header({
+  t,
+  status,
+  countdown,
+}: {
+  t: T
+  status: DashboardStatus | null
+  countdown: number
+}) {
   const online = status?.engine.online
   return (
     // 右侧留白给主程序悬浮胶囊（更多/关闭）
-    <div className="flex items-center justify-between pr-20">
+    <div className="flex items-center gap-3 pr-25">
       <div className="flex items-center gap-3">
         <h1 className="text-xl font-semibold">{t('title')}</h1>
         {status ? (
@@ -174,8 +197,8 @@ function Header({ t, status }: { t: T; status: DashboardStatus | null }) {
           </span>
         ) : null}
       </div>
-      <div className="text-xs text-slate-400 dark:text-slate-500 hidden sm:block">
-        {t('autoRefresh')}
+      <div className="text-xs text-slate-400 dark:text-neutral-500 tabular-nums hidden sm:block">
+        {t('autoRefresh', { n: countdown })}
       </div>
     </div>
   )
@@ -199,23 +222,23 @@ function Overview({
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
       <Card className="p-4">
-        <div className="text-xs text-slate-400 dark:text-slate-500 mb-1">{t('cardEngine')}</div>
+        <div className="text-xs text-slate-400 dark:text-neutral-500 mb-1">{t('cardEngine')}</div>
         <div className="text-lg font-semibold truncate">
           {s ? `Manticore ${s.engine.version || '—'}` : '…'}
         </div>
-        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">
+        <div className="text-xs text-slate-500 dark:text-neutral-400 mt-1 truncate">
           {s
             ? `${t('up')} ${fmtDuration(locale, s.engine.uptimeSec)} · ${t('disk')} ${fmtBytes(s.engine.diskBytes)}`
             : ''}
         </div>
       </Card>
       <Card className="p-4">
-        <div className="text-xs text-slate-400 dark:text-slate-500 mb-1">{t('cardVector')}</div>
+        <div className="text-xs text-slate-400 dark:text-neutral-500 mb-1">{t('cardVector')}</div>
         <div className="text-lg font-semibold flex items-center gap-2">
           {s ? (vs?.reachable ? t('ok') : t('unreachable')) : '…'}
           {s ? <Dot color={vs?.reachable ? 'green' : 'red'} /> : null}
         </div>
-        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1 truncate">
+        <div className="text-xs text-slate-500 dark:text-neutral-400 mt-1 truncate">
           {vs?.model || vs?.cachedModel || '—'}
           {vs?.dims ? ` · ${vs.dims} ${t('dims')}` : ''}
         </div>
@@ -224,26 +247,26 @@ function Overview({
         ) : null}
       </Card>
       <Card className="p-4">
-        <div className="text-xs text-slate-400 dark:text-slate-500 mb-1">{t('cardIndexed')}</div>
+        <div className="text-xs text-slate-400 dark:text-neutral-500 mb-1">{t('cardIndexed')}</div>
         <div className="text-lg font-semibold">
           {s ? fmtNum(s.totals.indexed) : '…'}{' '}
           <span className="text-sm font-normal text-slate-400">{t('unit')}</span>
         </div>
-        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+        <div className="text-xs text-slate-500 dark:text-neutral-400 mt-1">
           {s?.totals.ratePerMin ? t('perMinNow', { n: fmtNum(s.totals.ratePerMin) }) : ''}
         </div>
       </Card>
       <Card
         className={`p-4 ${failTotal > 0 ? 'border-amber-200 dark:border-amber-900 bg-amber-50/50 dark:bg-amber-950/30' : ''}`}
       >
-        <div className="text-xs text-slate-400 dark:text-slate-500 mb-1">{t('cardFailures')}</div>
+        <div className="text-xs text-slate-400 dark:text-neutral-500 mb-1">{t('cardFailures')}</div>
         <div
           className={`text-lg font-semibold ${failTotal > 0 ? 'text-amber-700 dark:text-amber-400' : ''}`}
         >
           {s ? fmtNum(failTotal) : '…'}{' '}
           <span className="text-sm font-normal text-slate-400">{t('unit')}</span>
         </div>
-        <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+        <div className="text-xs text-slate-500 dark:text-neutral-400 mt-1">
           {s
             ? failTotal > 0 && s.failures.oldestAgeSec != null
               ? `${t('oldestAgo', { t: fmtDuration(locale, s.failures.oldestAgeSec) })} · ${t('autoRetrying')}`
@@ -268,7 +291,6 @@ function Coverage({
   refresh: () => Promise<void>
   showToast: (m: string) => void
 }) {
-  const [confirmType, setConfirmType] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const history = status?.totals.history ?? []
   const deltas: Array<number> = []
@@ -278,17 +300,23 @@ function Coverage({
   }
   const maxDelta = Math.max(1, ...deltas)
 
-  const doRefill = async (type: string) => {
+  const askRefill = async (type: string) => {
+    const okd = await confirmDialog({
+      title: t('refillConfirmTitle', { type: makeTypeLabel(t, type) }),
+      content: t('refillConfirmDesc'),
+      okText: t('confirm'),
+      cancelText: t('cancel'),
+    })
+    if (!okd) return
     setBusy(true)
     try {
       await api('/refill', { method: 'POST', json: { type } })
-      showToast(t('refillStarted'))
+      void notifySuccess(t('refillStarted'), showToast)
       await refresh()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : t('loadFailed'))
+      void notifyError(e instanceof Error ? e.message : t('loadFailed'), showToast)
     } finally {
       setBusy(false)
-      setConfirmType(null)
     }
   }
 
@@ -298,29 +326,29 @@ function Coverage({
       <div className="overflow-x-auto">
         <table className="w-full text-sm min-w-[560px]">
           <thead>
-            <tr className="text-xs text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800">
-              <th className="text-left font-medium px-4 sm:px-5 py-2">{t('colType')}</th>
-              <th className="text-right font-medium px-3 py-2">{t('colSource')}</th>
-              <th className="text-right font-medium px-3 py-2">{t('colIndexed')}</th>
+            <tr className="text-xs text-slate-400 dark:text-neutral-500 border-b border-slate-100 dark:border-neutral-800">
+              <th className="text-left font-medium px-4 sm:px-5 py-2 whitespace-nowrap">{t('colType')}</th>
+              <th className="text-right font-medium px-3 py-2 whitespace-nowrap">{t('colSource')}</th>
+              <th className="text-right font-medium px-3 py-2 whitespace-nowrap">{t('colIndexed')}</th>
               <th className="text-left font-medium px-4 py-2 w-52">{t('colCoverage')}</th>
-              <th className="text-left font-medium px-3 py-2">{t('colState')}</th>
+              <th className="text-left font-medium px-3 py-2 whitespace-nowrap">{t('colState')}</th>
               <th className="px-3 py-2" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-50 dark:divide-slate-800/60">
+          <tbody className="divide-y divide-slate-50 dark:divide-neutral-800/60">
             {(status?.coverage ?? []).map((row) => (
               <tr key={row.type}>
                 <td className="px-4 sm:px-5 py-3 font-medium whitespace-nowrap">
                   {TYPE_ICONS[row.type]} {t(TYPE_LABEL_KEYS[row.type])}
                 </td>
-                <td className="px-3 py-3 text-right text-slate-500 dark:text-slate-400">
+                <td className="px-3 py-3 text-right text-slate-500 dark:text-neutral-400 whitespace-nowrap">
                   {fmtNum(row.source)}
                 </td>
-                <td className="px-3 py-3 text-right">{fmtNum(row.indexed)}</td>
+                <td className="px-3 py-3 text-right whitespace-nowrap">{fmtNum(row.indexed)}</td>
                 <td className="px-4 py-3">
                   <Progress percent={row.percent} tone={row.state === 'synced' ? 'green' : 'blue'} />
                 </td>
-                <td className="px-3 py-3">
+                <td className="px-3 py-3 whitespace-nowrap">
                   {row.state === 'synced' ? (
                     <Chip tone="green">{t('synced')}</Chip>
                   ) : row.state === 'missing' ? (
@@ -335,8 +363,8 @@ function Coverage({
                     </Chip>
                   )}
                 </td>
-                <td className="px-3 py-3 text-right">
-                  <Btn tone="gray" onClick={() => setConfirmType(row.type)}>
+                <td className="px-3 py-3 text-right whitespace-nowrap">
+                  <Btn tone="gray" className='min-w-11.5 min-h-6.5' busy={busy} onClick={() => void askRefill(row.type)}>
                     {t('refill')}
                   </Btn>
                 </td>
@@ -346,8 +374,8 @@ function Coverage({
         </table>
       </div>
       {deltas.length >= 2 ? (
-        <div className="px-4 sm:px-5 py-3 border-t border-slate-100 dark:border-slate-800 flex items-end gap-3">
-          <span className="text-xs text-slate-400 dark:text-slate-500 pb-0.5 shrink-0">
+        <div className="px-4 sm:px-5 py-3 border-t border-slate-100 dark:border-neutral-800 flex items-end gap-3">
+          <span className="text-xs text-slate-400 dark:text-neutral-500 pb-0.5 shrink-0">
             {t('writeRate')}
           </span>
           <div className="flex items-end gap-[3px] h-8 flex-1 overflow-hidden">
@@ -359,23 +387,11 @@ function Coverage({
               />
             ))}
           </div>
-          <span className="text-xs text-slate-500 dark:text-slate-400 pb-0.5 shrink-0">
+          <span className="text-xs text-slate-500 dark:text-neutral-400 pb-0.5 shrink-0">
             {t('rowsPerMin', { n: fmtNum(Math.round(deltas[deltas.length - 1])) })}
           </span>
         </div>
       ) : null}
-      <ConfirmModal
-        open={confirmType !== null}
-        title={t('refillConfirmTitle', {
-          type: confirmType ? makeTypeLabel(t, confirmType) : '',
-        })}
-        desc={t('refillConfirmDesc')}
-        confirmLabel={busy ? '…' : t('confirm')}
-        cancelLabel={t('cancel')}
-        danger
-        onConfirm={() => confirmType && void doRefill(confirmType)}
-        onClose={() => setConfirmType(null)}
-      />
     </Card>
   )
 }
@@ -399,16 +415,15 @@ function SyncTasks({
 }) {
   const [busy, setBusy] = useState(false)
   const cron = status?.cron
-  const anyStuck = status?.syncTasks.some((x) => x.stuck)
 
   const clearLocks = async () => {
     setBusy(true)
     try {
       const r = await api<{ cleared: number }>('/locks/clear', { method: 'POST' })
-      showToast(t('clearLocksDone', { n: r.cleared }))
+      void notifySuccess(t('clearLocksDone', { n: r.cleared }), showToast)
       await refresh()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : t('loadFailed'))
+      void notifyError(e instanceof Error ? e.message : t('loadFailed'), showToast)
     } finally {
       setBusy(false)
     }
@@ -419,7 +434,7 @@ function SyncTasks({
       <CardHeader
         title={t('syncTasks')}
         right={
-          <span className="text-xs text-slate-400 dark:text-slate-500">
+          <span className="text-xs text-slate-400 dark:text-neutral-500">
             {cron
               ? cron.lastRunAgoSec == null
                 ? t('cronUnknown')
@@ -430,7 +445,7 @@ function SyncTasks({
           </span>
         }
       />
-      <div className="divide-y divide-slate-50 dark:divide-slate-800/60 text-sm">
+      <div className="divide-y divide-slate-50 dark:divide-neutral-800/60 text-sm">
         {(status?.syncTasks ?? []).map((task) => (
           <div
             key={task.key}
@@ -456,7 +471,6 @@ function SyncTasks({
           </div>
         ))}
       </div>
-      {anyStuck === false && !busy ? null : null}
     </Card>
   )
 }
@@ -481,17 +495,17 @@ function FailureQueue({
     setBusy(true)
     try {
       await fn()
-      if (okMsg) showToast(okMsg)
+      if (okMsg) void notifySuccess(okMsg, showToast)
       await refresh()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : t('loadFailed'))
+      void notifyError(e instanceof Error ? e.message : t('loadFailed'), showToast)
     } finally {
       setBusy(false)
     }
   }
 
   return (
-    <Card>
+    <Card className='flex flex-col'>
       <CardHeader
         title={
           <>
@@ -512,11 +526,11 @@ function FailureQueue({
         }
       />
       {failures.length === 0 ? (
-        <div className="px-5 py-8 text-center text-xs text-slate-400 dark:text-slate-500">
+        <div className="flex flex-1 items-center justify-center px-5 py-8 text-xs text-slate-400 dark:text-neutral-500">
           {t('emptyQueue')} 🎉
         </div>
       ) : (
-        <div className="divide-y divide-slate-50 dark:divide-slate-800/60 text-sm">
+        <div className="divide-y divide-slate-50 dark:divide-neutral-800/60 text-sm">
           {failures.map((f) => (
             <div key={f.id} className="px-4 sm:px-5 py-2.5">
               <div className="flex items-center justify-between gap-2">
@@ -547,7 +561,7 @@ function FailureQueue({
                   </button>
                 </span>
               </div>
-              <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5 truncate">
+              <div className="text-xs text-slate-400 dark:text-neutral-500 mt-0.5 truncate">
                 {f.error_message || '—'} · {t('retriedTimes', { n: f.retry_count })} ·{' '}
                 {f.nextRetryInMinutes > 0
                   ? t('nextRetryIn', { n: f.nextRetryInMinutes })
@@ -594,41 +608,48 @@ function SearchTest({ t }: { t: T }) {
     <Card>
       <CardHeader title={t('searchTest')} hint={t('searchTestHint')} />
       <div className="p-4 sm:p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row gap-2">
+        {/* flex-wrap：空间不够时控件组整体换行，输入框靠 min-w 保住宽度不被挤压 */}
+        <div className="flex flex-wrap gap-2">
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && void run()}
-            className="flex-1 text-sm border border-slate-200 dark:border-slate-700 bg-transparent rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+            className="flex-1 min-w-56 h-9 text-sm border border-slate-200 dark:border-neutral-700 bg-transparent rounded-lg px-3 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
             placeholder={t('queryPlaceholder')}
           />
           <div className="flex gap-2">
-            <select
-              value={type}
-              onChange={(e) => setType(e.target.value)}
-              className="text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg px-2 py-2 text-slate-600 dark:text-slate-300"
-            >
-              {(['msg', 'file', 'task', 'project', 'user'] as const).map((v) => (
-                <option key={v} value={v}>
-                  {t(TYPE_LABEL_KEYS[v])}
-                </option>
-              ))}
-            </select>
-            <select
-              value={mode}
-              onChange={(e) => setMode(e.target.value)}
-              className="text-sm border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg px-2 py-2 text-slate-600 dark:text-slate-300"
-            >
-              <option value="hybrid">{t('modeHybrid')}</option>
-              <option value="fulltext">{t('modeFulltext')}</option>
-              <option value="vector">{t('modeVector')}</option>
-            </select>
-            <Btn tone="primary" busy={busy} onClick={() => void run()} className="px-4 py-2">
+            <Select value={type} onValueChange={setType}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {(['msg', 'file', 'task', 'project', 'user'] as const).map((v) => (
+                  <SelectItem key={v} value={v}>
+                    {t(TYPE_LABEL_KEYS[v])}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={mode} onValueChange={setMode}>
+              <SelectTrigger>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="hybrid">{t('modeHybrid')}</SelectItem>
+                <SelectItem value="fulltext">{t('modeFulltext')}</SelectItem>
+                <SelectItem value="vector">{t('modeVector')}</SelectItem>
+              </SelectContent>
+            </Select>
+            <Btn tone="primary" busy={busy} onClick={() => void run()} className="px-4 h-9 min-w-15">
               {t('search')}
             </Btn>
           </div>
         </div>
-        {hits !== null ? (
+        {busy ? (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="size-5 animate-spin text-slate-400 dark:text-neutral-500" />
+          </div>
+        ) : hits !== null ? (
           hits.length === 0 ? (
             <div className="text-center text-xs text-slate-400 py-4">{t('noHits')}</div>
           ) : (
@@ -637,14 +658,14 @@ function SearchTest({ t }: { t: T }) {
               {hits.map((h, i) => (
                 <div
                   key={`${h.id}-${i}`}
-                  className="flex items-center gap-3 text-sm border border-slate-100 dark:border-slate-800 rounded-lg px-3 py-2"
+                  className="flex items-center gap-3 text-sm border border-slate-100 dark:border-neutral-800 rounded-lg px-3 py-2"
                 >
                   <span className="text-xs text-slate-400 shrink-0">#{i + 1}</span>
                   <span className="flex-1 truncate">{h.snippet || `id=${h.id}`}</span>
                   <span className="text-xs text-slate-400 shrink-0 hidden sm:inline">
                     {srcLabel(h.source)} {h.score.toFixed(2)}
                   </span>
-                  <div className="w-16 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full shrink-0 hidden sm:block">
+                  <div className="w-16 h-1.5 bg-slate-100 dark:bg-neutral-800 rounded-full shrink-0 hidden sm:block">
                     <div
                       className={`h-full rounded-full ${h.source === 'fulltext' ? 'bg-blue-500' : 'bg-violet-500'}`}
                       style={{ width: `${Math.min(100, Math.round(h.score * 100))}%` }}
@@ -669,20 +690,33 @@ function DangerZone({
   refresh: () => Promise<void>
   showToast: (m: string) => void
 }) {
-  const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
 
-  const doRebuild = async () => {
+  const askRebuild = async () => {
+    // 破坏性大：连续两次 modalConfirm
+    const first = await confirmDialog({
+      title: t('rebuildTitle'),
+      content: t('rebuildDesc'),
+      okText: t('confirm'),
+      cancelText: t('cancel'),
+    })
+    if (!first) return
+    const second = await confirmDialog({
+      title: t('rebuildAgainTitle'),
+      content: t('rebuildAgainDesc'),
+      okText: t('confirm'),
+      cancelText: t('cancel'),
+    })
+    if (!second) return
     setBusy(true)
     try {
       await api('/rebuild', { method: 'POST', json: { confirm: 'REBUILD' } })
-      showToast(t('rebuildStarted'))
+      void notifySuccess(t('rebuildStarted'), showToast)
       await refresh()
     } catch (e) {
-      showToast(e instanceof Error ? e.message : t('loadFailed'))
+      void notifyError(e instanceof Error ? e.message : t('loadFailed'), showToast)
     } finally {
       setBusy(false)
-      setOpen(false)
     }
   }
 
@@ -694,24 +728,17 @@ function DangerZone({
       <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <div className="text-sm font-medium">{t('rebuildTitle')}</div>
-          <div className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{t('rebuildDesc')}</div>
+          <div className="text-xs text-slate-400 dark:text-neutral-500 mt-0.5">{t('rebuildDesc')}</div>
         </div>
-        <Btn tone="red" busy={busy} onClick={() => setOpen(true)} className="px-4 py-2 shrink-0 self-start sm:self-auto">
+        <Btn
+          tone="red"
+          busy={busy}
+          onClick={() => void askRebuild()}
+          className="px-4 py-2 shrink-0 self-start sm:self-auto"
+        >
           {t('rebuildBtn')}
         </Btn>
       </div>
-      <ConfirmModal
-        open={open}
-        title={t('rebuildTitle')}
-        desc={t('rebuildDesc')}
-        requireWord="REBUILD"
-        requireHint={t('rebuildConfirmHint', { word: 'REBUILD' })}
-        confirmLabel={busy ? '…' : t('confirm')}
-        cancelLabel={t('cancel')}
-        danger
-        onConfirm={() => void doRebuild()}
-        onClose={() => setOpen(false)}
-      />
     </Card>
   )
 }

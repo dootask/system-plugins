@@ -12,6 +12,9 @@ import { nitro } from 'nitro/vite'
 const config = defineConfig({
   base: '/apps/search/',
   resolve: { tsconfigPaths: true },
+  // 每次构建生成唯一 ID，供 __root 给无 hash 的 styles.css 拼 ?v= 缓存破坏参数
+  //（CSS 用稳定文件名规避 SSR/client hash 不一致，代价是浏览器启发式缓存会跨版本粘住）
+  define: { __BUILD_ID__: JSON.stringify(Date.now().toString(36)) },
   build: {
     rollupOptions: {
       output: {

@@ -49,6 +49,17 @@ async function runHandshake(): Promise<void> {
     } catch {
       /* 忽略 */
     }
+    // 胶囊位置随视口宽度调整：≥sm(640px) 右距 24，窄屏 16（config.yml 静态值仅作首屏兜底）
+    try {
+      const mq = window.matchMedia('(min-width: 640px)')
+      const applyCapsule = () => {
+        tools.setCapsuleConfig({ top: 18, right: mq.matches ? 24 : 16 }).catch(() => {})
+      }
+      applyCapsule()
+      mq.addEventListener('change', applyCapsule)
+    } catch {
+      /* 忽略 */
+    }
     emit('ready')
   } catch {
     emit('standalone')

@@ -17,6 +17,11 @@ menu_items:
     visible_to: admin
     # 未读语义：异常时角标推红点，管理员点开即清；未恢复则巡检（5 分钟）再推
     badge_clear_on_open: true
+    # 胶囊
+    capsule:
+      top: 18
+      right: 24
+    max_width: 1024
 
 # 应用指令接口：doo app call search status / failures / retry-failures / clear-locks
 openapi:
