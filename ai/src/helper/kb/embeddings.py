@@ -16,16 +16,19 @@ import asyncio
 import logging
 import os
 import struct
+from functools import lru_cache
 from typing import List, Optional, Tuple
 
 import httpx
+import tiktoken
 
 from helper import gateway
 
 logger = logging.getLogger("ai.kb.embeddings")
 
-# 429/5xx/网络错误的指数退避间隔（秒）；其余 4xx 是配置错误，不重试
+# 429/5xx/网络错误以及单条 400 的指数退避间隔（秒）
 _RETRY_DELAYS = (1, 2, 4)
+_DEFAULT_MAX_TOKENS = 1800
 
 # DooTask 官方默认 embedding 服务（共享 key，服务端限流）
 DEFAULT_BASE_URL = "https://ai.dootask.com/v1"
@@ -79,6 +82,23 @@ def to_fp32(vec: List[float]) -> bytes:
     return struct.pack(f"<{len(vec)}f", *vec)
 
 
+@lru_cache(maxsize=1)
+def _token_encoder():
+    """返回向量输入使用的近似 tokenizer（词表已在镜像构建时预下载）。"""
+    name = os.environ.get("EMBEDDING_TOKEN_ENCODING", "cl100k_base").strip()
+    return tiktoken.get_encoding(name)
+
+
+def _truncate_text(text: str) -> str:
+    """按 token 截断单条输入，避免字符数与实际模型上下文偏差过大。"""
+    max_tokens = max(1, int(os.environ.get("EMBEDDING_MAX_TOKENS", _DEFAULT_MAX_TOKENS)))
+    encoder = _token_encoder()
+    tokens = encoder.encode(text)
+    if len(tokens) <= max_tokens:
+        return text
+    return encoder.decode(tokens[:max_tokens])
+
+
 class Embedder:
     _instance: Optional["Embedder"] = None
     _client: Optional[httpx.AsyncClient] = None
@@ -118,15 +138,29 @@ class Embedder:
                     base, key = await _resolve(force=True)
                     token_refreshed = True
                     continue
-                if resp.status_code == 429 or resp.status_code >= 500:
-                    last_err = RuntimeError(
-                        f"embedding API HTTP {resp.status_code}: {resp.text[:200]}"
-                    )
-                else:
-                    resp.raise_for_status()
+
+                if 200 <= resp.status_code < 300:
                     items = resp.json()["data"]
                     items.sort(key=lambda d: d.get("index", 0))
                     return [d["embedding"] for d in items]
+
+                detail = resp.text[:500]
+                last_err = RuntimeError(f"embedding API HTTP {resp.status_code}: {detail}")
+
+                # 官方网关会对过大的批次或后端瞬时拒绝返回 400：批次先二分，
+                # 单条则进入下方退避重试。输入格式由本客户端生成，不存在用户 JSON 格式错误。
+                if resp.status_code == 400:
+                    if len(texts) > 1:
+                        midpoint = len(texts) // 2
+                        left = await self._post_batch(texts[:midpoint])
+                        right = await self._post_batch(texts[midpoint:])
+                        return left + right
+                elif resp.status_code == 429 or resp.status_code >= 500:
+                    last_err = RuntimeError(
+                        f"embedding API HTTP {resp.status_code}: {detail}"
+                    )
+                else:
+                    resp.raise_for_status()
             except (httpx.TimeoutException, httpx.TransportError) as e:
                 last_err = e
             if attempt < len(_RETRY_DELAYS):
@@ -137,6 +171,7 @@ class Embedder:
         """文本批量编码。返回 list of 向量（float list），与输入同序。失败抛异常。"""
         if not texts:
             return []
+        texts = [_truncate_text(text) for text in texts]
         batch = max(1, int(os.environ.get("EMBEDDING_BATCH_SIZE", 32)))
         out: List[List[float]] = []
         for i in range(0, len(texts), batch):

@@ -1244,7 +1244,7 @@ async def embeddings(request: Request,
     认证：header Authorization: Bearer <token> 或 X-App-Key，token 须等于环境变量 APP_KEY
     或派生密钥 sha256(APP_KEY:embeddings)（后者供 Manticore Auto Embeddings 使用）。
     Body (JSON):
-        - input: 字符串或字符串数组，待向量化文本（单条超过 30000 字符会被截断）。
+        - input: 字符串或字符串数组；先做 30000 字符外层保护，再由 Embedder 按 token 截断。
     复用知识库的 Embedder（网关 → 兜底、重试），模型固定为插件 EMBEDDING_MODEL，
     不受 RAG_ENABLED 影响（搜索独立于 KB RAG）。
     返回：{"data":[{"index":i,"embedding":[...]}...], "model":..., "dimensions":N}
@@ -1272,7 +1272,7 @@ async def embeddings(request: Request,
         from helper.kb.embeddings import model_name
         return JSONResponse(content={"code": 200, "data": [], "model": model_name(), "dimensions": 0})
 
-    # 单条输入截断，防止 Manticore 传入的全文（文件可达 10 万字符）撑爆上游模型上下文
+    # 外层字符保护避免对超大全文做无意义的 token 编码；模型边界由 Embedder 按 token 控制。
     texts = [t[:_EMBEDDING_INPUT_MAX_CHARS] for t in texts]
 
     try:
