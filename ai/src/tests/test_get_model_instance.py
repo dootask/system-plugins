@@ -17,7 +17,8 @@ class _Capture:
 @pytest.fixture(autouse=True)
 def patch_models(monkeypatch):
     for name in (
-        "ChatOpenAI", "ChatAnthropic", "ChatGoogleGenerativeAI", "ChatDeepSeek",
+        "ChatOpenAI", "ReasoningCompatibleChatOpenAI", "ChatAnthropic",
+        "ChatGoogleGenerativeAI", "ChatDeepSeek",
         "ChatZhipuAI", "ChatTongyi", "ChatCohere", "ChatOllama", "ChatXAI",
     ):
         monkeypatch.setattr(utils, name, _Capture, raising=True)

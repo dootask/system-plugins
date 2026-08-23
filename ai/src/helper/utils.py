@@ -16,13 +16,71 @@ import os
 import time
 import json
 import re
-from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+from langchain_core.messages import (
+    AIMessage,
+    AIMessageChunk,
+    HumanMessage,
+    SystemMessage,
+)
 
 
 class _DictWithModelDump(dict):
     """Dict subclass that provides model_dump() for langchain-anthropic compat."""
     def model_dump(self, **kw):
         return dict(self)
+
+
+class ReasoningCompatibleChatOpenAI(ChatOpenAI):
+    """Preserve DeepSeek-style reasoning fields through OpenAI-compatible APIs."""
+
+    def _convert_chunk_to_generation_chunk(
+        self, chunk, default_chunk_class, base_generation_info
+    ):
+        generation_chunk = super()._convert_chunk_to_generation_chunk(
+            chunk, default_chunk_class, base_generation_info
+        )
+        if not generation_chunk or not isinstance(
+            generation_chunk.message, AIMessageChunk
+        ):
+            return generation_chunk
+
+        choices = (
+            chunk.get("choices")
+            or chunk.get("chunk", {}).get("choices")
+            or []
+        )
+        if not choices or not isinstance(choices[0].get("delta"), dict):
+            return generation_chunk
+
+        delta = choices[0]["delta"]
+        reasoning_content = delta.get("reasoning_content")
+        if reasoning_content is None:
+            reasoning_content = delta.get("reasoning")
+        if reasoning_content is not None:
+            generation_chunk.message.additional_kwargs[
+                "reasoning_content"
+            ] = reasoning_content
+        return generation_chunk
+
+    def _get_request_payload(self, input_, *, stop=None, **kwargs):
+        payload = super()._get_request_payload(input_, stop=stop, **kwargs)
+        try:
+            messages = self._convert_input(input_).to_messages()
+        except Exception:
+            return payload
+
+        outgoing = payload.get("messages") or []
+        if len(messages) != len(outgoing):
+            return payload
+        for source, target in zip(messages, outgoing):
+            if not isinstance(source, AIMessage) or target.get("role") != "assistant":
+                continue
+            reasoning_content = (source.additional_kwargs or {}).get(
+                "reasoning_content"
+            )
+            if reasoning_content and "reasoning_content" not in target:
+                target["reasoning_content"] = reasoning_content
+        return payload
 
 
 def _patch_anthropic_model_dump_bug():
@@ -123,7 +181,7 @@ def get_model_instance(model_type, model_name, api_key, **kwargs):
         model_type = "grok"
 
     model_configs = {
-        "openai": (ChatOpenAI, {
+        "openai": (ReasoningCompatibleChatOpenAI, {
             "openai_api_key": api_key,
         }),
         "claude": (ChatAnthropic, {
@@ -143,7 +201,7 @@ def get_model_instance(model_type, model_name, api_key, **kwargs):
         "ollama": (ChatOllama, None),
         "grok": (ChatXAI, None),
         # Doo AI 厂商：OpenAI 兼容，base_url 指向 AppStore 计量代理 /v1
-        "dooai": (ChatOpenAI, {
+        "dooai": (ReasoningCompatibleChatOpenAI, {
             "openai_api_key": api_key,
         }),
     }
