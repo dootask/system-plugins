@@ -1,0 +1,16 @@
+require_version:
+  version: "> 1.7.90"
+  reason:
+    en: "Requires the main app's AI app-command (doo app call) and knowledge base support"
+    zh: "需要主程序的 AI 应用指令（doo app call）与知识库支持"
+menu_items:
+  - location: application
+    label:
+      en: OKR Management
+      zh: OKR 管理
+    url: apps/okr/list
+    type: inline
+    icon: ./logo.svg
+    capsule:
+      top: 20
+      right: 20
