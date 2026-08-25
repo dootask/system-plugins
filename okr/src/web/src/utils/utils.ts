@@ -497,10 +497,14 @@ const utils = {
         if(!time){
             return "";
         }
-        time = time.replace(/\T/g,' ').replace(/\Z/g,'').replace(/\+08:00/g,'')
-        if( typeof time == 'number' ){
-            time = utils.formatDate('Y-m-d H:i:s', time / 1000)
+        if( typeof time != 'string' ){
+            const timestamp = Number(time)
+            if(!Number.isFinite(timestamp)){
+                return "";
+            }
+            time = utils.formatDate('Y-m-d H:i:s', timestamp / 1000)
         }
+        time = time.replace(/\T/g,' ').replace(/\Z/g,'').replace(/\+08:00/g,'')
 
         if( (time + '').split(" ").length == 1){
             time = time + (type == 1 ? ' 23:59:00' : ' 00:00:00')

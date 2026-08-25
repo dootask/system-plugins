@@ -54,7 +54,7 @@
                 </n-form-item>
 
                 <n-form-item :label="$t('周期')" path="time">
-                    <n-date-picker class="w-full" v-model:value="formValue.time" value-format="yyyy-MM-dd HH:mm:ss" type="daterange" clearable size="medium" :shortcuts="shortcuts" />
+                    <n-date-picker class="w-full" v-model:formatted-value="formValue.time" value-format="yyyy-MM-dd HH:mm:ss" type="daterange" clearable size="medium" :shortcuts="shortcuts" />
                 </n-form-item>
 
                 <n-form-item :label="$t('可见范围')">
@@ -117,7 +117,7 @@
                                 </n-form-item-gi>
 
                                 <n-form-item-gi :span="4" :label="$t('时间')" path="time">
-                                    <n-date-picker class="w-full" v-model:value="item.time" value-format="yyyy-MM-dd HH:mm:ss" type="daterange" clearable size="medium" :shortcuts="shortcuts" />
+                                    <n-date-picker class="w-full" v-model:formatted-value="item.time" value-format="yyyy-MM-dd HH:mm:ss" type="daterange" clearable size="medium" :shortcuts="shortcuts" />
                                 </n-form-item-gi>
 
                                 <!-- pc -->
@@ -533,4 +533,3 @@ defineExpose({
     box-shadow: inset #dddddd 0 0 0 1px;
 }
 </style>
-
