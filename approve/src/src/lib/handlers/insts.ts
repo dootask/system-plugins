@@ -204,14 +204,14 @@ export async function getInstDetail(request: Request): Promise<Response> {
   }
 
   const activeTask = getActiveTask(id)
-  // 当前用户可处置的待办：自己是当前 task 的 pending approver。
+  // 当前用户可处置的待办：自己是当前 task 的待处理审批人或加签人。
   const canAct =
     !!activeTask &&
     actors.some(
       (a) =>
         a.task_id === activeTask.id &&
         a.userid === auth.userId &&
-        a.role === 'approver' &&
+        (a.role === 'approver' || a.role === 'addsign') &&
         a.action === 'pending',
     )
 

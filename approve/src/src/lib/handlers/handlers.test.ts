@@ -169,6 +169,62 @@ describe('insts 列表', () => {
 })
 
 describe('insts 详情 + tasks act', () => {
+  it.each(['approve', 'reject'] as const)(
+    '加签人可以 %s，处理后不能重复审批',
+    async (action) => {
+      const defId = createDef(
+        {
+          name: '加签回归',
+          form_schema: JSON.stringify(SCHEMA),
+          flow_nodes: JSON.stringify({
+            ...FLOW,
+            childNode: { ...FLOW.childNode, approveMode: 'cosign' },
+          }),
+        },
+        1,
+      ).id
+      const created = await (
+        await createInstHandler(
+          req('/insts', {
+            method: 'POST',
+            user: 10,
+            json: { defId, formData: { title: 't', amount: 1 } },
+          }),
+        )
+      ).json()
+      const instId = created.data.id
+      const task = listTasksByInst(instId).find((t) => !t.is_finished)!
+      const act = (user: number, json: unknown) =>
+        actTaskHandler(
+          req(`/tasks/${task.id}/act`, { method: 'POST', user, json }),
+        )
+      const detail = async (user: number) =>
+        (await getInstDetail(req(`/insts/${instId}`, { user }))).json()
+
+      expect((await act(20, { action: 'addsign', addsignTo: [22] })).status).toBe(200)
+      const todo = await (
+        await listInstsHandler(req('/insts?box=todo', { user: 22 }))
+      ).json()
+      expect(todo.data.items.map((item: { id: number }) => item.id)).toContain(instId)
+      expect((await detail(22)).data.can_act).toBe(true)
+      expect((await detail(10)).data.can_act).toBe(false)
+      expect((await act(10, { action })).status).toBe(403)
+
+      expect((await act(22, { action })).status).toBe(200)
+      expect((await detail(22)).data.can_act).toBe(false)
+      expect((await act(22, { action })).status).toBe(403)
+      if (action === 'approve') {
+        expect(getInst(instId)!.state).toBe(InstState.running)
+        expect((await detail(20)).data.can_act).toBe(true)
+        expect((await act(20, { action: 'approve' })).status).toBe(200)
+      }
+      expect(getInst(instId)!.state).toBe(
+        action === 'approve' ? InstState.approved : InstState.rejected,
+      )
+      expect((await detail(22)).data.can_act).toBe(false)
+    },
+  )
+
   it('发起人可见、审批人 approve 后通过', async () => {
     const defId = seedDef()
     const create = await (
