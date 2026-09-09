@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { Database } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Database, Upload } from 'lucide-react'
 import { api, ApiError, downloadAuthed } from '#/lib/api'
 import { confirmAction, useDooTask } from '#/lib/dootask'
 import { Button } from '#/components/ui/button'
@@ -34,10 +34,17 @@ export function BackupView() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [maxUploadBytes, setMaxUploadBytes] = useState<number | null>(null)
+  const fileInput = useRef<HTMLInputElement>(null)
 
   const load = () => {
-    api<{ items: Array<BackupEntry> }>('/admin/backups')
-      .then((r) => setItems(r.items))
+    api<{ items: Array<BackupEntry>; maxUploadBytes: number }>('/admin/backups')
+      .then((r) => {
+        setItems(r.items)
+        setMaxUploadBytes(r.maxUploadBytes)
+      })
       .catch((e) =>
         setError(e instanceof ApiError ? e.message : t('backup.loadFailed')),
       )
@@ -51,6 +58,7 @@ export function BackupView() {
   const doBackup = async () => {
     setBusy(true)
     setError(null)
+    setNotice(null)
     try {
       await api('/admin/backups', { method: 'POST' })
       load()
@@ -58,6 +66,38 @@ export function BackupView() {
       setError(e instanceof ApiError ? e.message : t('backup.backupFailed'))
     } finally {
       setBusy(false)
+    }
+  }
+  const doUpload = async (file: File) => {
+    if (busy) return
+    setError(null)
+    setNotice(null)
+    if (!/\.(zip|db)$/i.test(file.name) || !file.size) {
+      setError(t('backup.invalidFile'))
+      return
+    }
+    if (maxUploadBytes !== null && file.size > maxUploadBytes) {
+      setError(t('backup.uploadTooLarge'))
+      return
+    }
+    setBusy(true)
+    setUploading(true)
+    try {
+      const result = await api<BackupEntry>(
+        `/admin/backups?name=${encodeURIComponent(file.name)}`,
+        {
+          method: 'PUT',
+          headers: { 'content-type': 'application/octet-stream' },
+          body: file,
+        },
+      )
+      setNotice(t('backup.uploaded', { name: result.name }))
+      load()
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : t('backup.operationFailed'))
+    } finally {
+      setBusy(false)
+      setUploading(false)
     }
   }
   const doDownload = async (name: string) => {
@@ -78,7 +118,12 @@ export function BackupView() {
     setBusy(true)
     setError(null)
     try {
-      await api(`/admin/backups/${name}`, { method: 'POST' })
+      setNotice(null)
+      const result = await api<{ safetyBackup: string }>(
+        `/admin/backups/${name}`,
+        { method: 'POST' },
+      )
+      setNotice(t('backup.restored', { name: result.safetyBackup }))
       load()
     } catch (e) {
       setError(e instanceof ApiError ? e.message : t('backup.restoreFailed'))
@@ -117,13 +162,38 @@ export function BackupView() {
         {t('backup.desc')}
       </p>
 
-      <div className="mb-4 flex">
-        <Button onClick={doBackup} disabled={busy} className="ml-auto">
+      <div className="mb-4 flex flex-wrap justify-end gap-2">
+        <input
+          ref={fileInput}
+          type="file"
+          accept=".zip,.db"
+          className="hidden"
+          aria-label={t('backup.upload')}
+          onChange={(event) => {
+            const file = event.target.files?.[0]
+            event.target.value = ''
+            if (file) void doUpload(file)
+          }}
+        />
+        <Button
+          variant="outline"
+          onClick={() => fileInput.current?.click()}
+          disabled={busy || maxUploadBytes === null}
+        >
+          <Upload className="size-4" />{' '}
+          {t(uploading ? 'backup.uploading' : 'backup.upload')}
+        </Button>
+        <Button onClick={doBackup} disabled={busy}>
           <Database className="size-4" /> {t('backup.now')}
         </Button>
       </div>
 
       {error ? <ErrorBar message={error} /> : null}
+      {notice ? (
+        <p role="status" className="mb-4 break-all text-sm">
+          {notice}
+        </p>
+      ) : null}
 
       {loading ? (
         <Loading />
@@ -145,7 +215,9 @@ export function BackupView() {
           <TableBody>
             {items.map((b) => (
               <TableRow key={b.name}>
-                <TableCell className="font-mono font-medium">{b.name}</TableCell>
+                <TableCell className="font-mono font-medium">
+                  {b.name}
+                </TableCell>
                 <TableCell className="text-xs text-muted-foreground">
                   {formatTime(b.createdAt)}
                 </TableCell>

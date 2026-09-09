@@ -2,6 +2,7 @@ import { createFileRoute } from '@tanstack/react-router'
 import {
   createBackupHandler,
   listBackupsHandler,
+  importBackupHandler,
 } from '#/lib/handlers/backups'
 
 // GET  /apps/approve/api/admin/backups → 备份列表（管理员）。
@@ -11,6 +12,7 @@ export const Route = createFileRoute('/api/admin/backups')({
     handlers: {
       GET: ({ request }: { request: Request }) => listBackupsHandler(request),
       POST: ({ request }: { request: Request }) => createBackupHandler(request),
+      PUT: ({ request }: { request: Request }) => importBackupHandler(request),
     },
   },
 })

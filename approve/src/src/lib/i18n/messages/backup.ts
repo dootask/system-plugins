@@ -10,6 +10,43 @@ export const backup = {
   'backup.now': { zh: '立即备份', en: 'Back Up Now' },
   'backup.download': { zh: '下载', en: 'Download' },
   'backup.restore': { zh: '还原', en: 'Restore' },
+  'backup.upload': { zh: '上传备份', en: 'Upload Backup' },
+  'backup.uploading': {
+    zh: '上传校验中...',
+    en: 'Uploading and validating...',
+  },
+  'backup.uploaded': {
+    zh: '已导入备份：{name}',
+    en: 'Backup imported: {name}',
+  },
+  'backup.uploadTooLarge': {
+    zh: '备份文件不能超过 100MB',
+    en: 'Backup files must not exceed 100MB.',
+  },
+  'backup.invalidFile': {
+    zh: '无效或不兼容的审批备份，请选择审批中心生成的 ZIP 或 DB 文件',
+    en: 'Invalid or incompatible approval backup. Select a ZIP or DB file created by Approval Center.',
+  },
+  'backup.expandedTooLarge': {
+    zh: '备份解压后不能超过 512MB 或 10000 个文件',
+    en: 'Expanded backups must not exceed 512MB or 10,000 files.',
+  },
+  'backup.busy': {
+    zh: '另一项备份操作正在进行，请稍后重试',
+    en: 'Another backup operation is in progress. Try again later.',
+  },
+  'backup.operationFailed': {
+    zh: '备份操作失败，请检查服务器日志后重试',
+    en: 'Backup operation failed. Check the server logs and try again.',
+  },
+  'backup.rollbackFailed': {
+    zh: '还原失败且自动回滚未完成，请使用还原前生成的安全备份恢复，并检查服务器日志',
+    en: 'Restore failed and automatic rollback did not complete. Use the safety backup created before restoring and check the server logs.',
+  },
+  'backup.restored': {
+    zh: '还原完成。还原前的安全备份：{name}',
+    en: 'Restore completed. Safety backup: {name}',
+  },
 
   // 表格表头
   'backup.col.name': { zh: '备份名称', en: 'Backup File' },
@@ -25,8 +62,8 @@ export const backup = {
 
   // 确认 / 错误
   'backup.restore.confirm': {
-    zh: '确认用「{name}」还原数据库？当前数据将被覆盖，且不可恢复。',
-    en: 'Restore the database from “{name}”? Restoring will overwrite current data and cannot be undone.',
+    zh: '确认用「{name}」还原？当前数据库和附件将被覆盖（旧版 DB 文件仅覆盖数据库）。还原前将自动生成安全备份，请在无人操作审批时执行。',
+    en: 'Restore from “{name}”? This overwrites the current database and attachments (legacy DB files replace only the database). A safety backup will be created first. Restore when no one is using approvals.',
   },
   'backup.restore.confirmTitle': { zh: '还原数据', en: 'Confirm restore' },
   'backup.delete.confirm': {

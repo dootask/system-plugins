@@ -9,9 +9,12 @@
  */
 import {
   copyFileSync,
+  closeSync,
   createWriteStream,
   existsSync,
   mkdirSync,
+  mkdtempSync,
+  openSync,
   readFileSync,
   readdirSync,
   renameSync,
@@ -21,9 +24,15 @@ import {
 } from 'node:fs'
 import { once } from 'node:events'
 import { resolve, sep } from 'node:path'
-import { Zip, ZipDeflate, ZipPassThrough, unzipSync } from 'fflate'
+import { Zip, ZipDeflate, ZipPassThrough } from 'fflate'
 import { closeDb, dataDir, dbFilePath, getDb } from '#/lib/db'
 import { uploadDir } from '#/lib/uploads'
+import {
+  BackupError,
+  extractBackup,
+  MAX_BACKUP_UPLOAD_BYTES,
+  validateDatabase,
+} from './backup-validation'
 
 export interface BackupEntry {
   name: string
@@ -35,6 +44,27 @@ export interface BackupEntry {
 const NAME_RE = /^approve-\d{8}-\d{6}(-\d+)?\.(zip|db)$/
 const DB_ENTRY = 'approve.db'
 const UPLOADS_PREFIX = 'uploads/'
+
+let operationActive = false
+
+async function exclusively<T>(operation: () => Promise<T>): Promise<T> {
+  if (operationActive) throw new BackupError('backup.busy', 409)
+  operationActive = true
+  try {
+    return await operation()
+  } finally {
+    operationActive = false
+  }
+}
+
+function newName(extension: 'zip' | 'db'): string {
+  const base = `approve-${tsSuffix()}`
+  let name = `${base}.${extension}`
+  let i = 1
+  while (existsSync(resolve(backupDir(), name)))
+    name = `${base}-${i++}.${extension}`
+  return name
+}
 
 function backupDir(): string {
   return resolve(dataDir(), 'backups')
@@ -75,7 +105,10 @@ interface ZipEntry {
  * 流式把若干文件打成 zip 落盘：每写完一个文件就让出事件循环等缓冲落盘，
  * 把峰值内存控制在「单个文件 + 其压缩输出」量级，避免大量大图一次性进内存。
  */
-async function writeZip(target: string, entries: Array<ZipEntry>): Promise<void> {
+async function writeZip(
+  target: string,
+  entries: Array<ZipEntry>,
+): Promise<void> {
   const out = createWriteStream(target)
   let rejectErr: ((e: Error) => void) | null = null
   const onError = new Promise<never>((_, rej) => {
@@ -117,22 +150,20 @@ async function writeZip(target: string, entries: Array<ZipEntry>): Promise<void>
 
 /** 生成一次备份（数据库快照 + 上传附件）。 */
 export async function createBackup(): Promise<BackupEntry> {
+  return exclusively(createBackupUnlocked)
+}
+
+async function createBackupUnlocked(): Promise<BackupEntry> {
   const dir = backupDir()
   mkdirSync(dir, { recursive: true })
-  let name = `approve-${tsSuffix()}.zip`
-  if (existsSync(resolve(dir, name))) {
-    const base = name.replace(/\.zip$/, '')
-    let i = 1
-    while (existsSync(resolve(dir, `${base}-${i}.zip`))) i++
-    name = `${base}-${i}.zip`
-  }
+  const name = newName('zip')
   const target = resolve(dir, name)
+  const tmpZip = resolve(dir, `.tmp-${name}`)
 
   // 在线备份：即使有并发写也产出一致性快照（WAL 安全）。
   const tmpDb = resolve(dir, `.tmp-${name}.db`)
-  await getDb().backup(tmpDb)
-
   try {
+    await getDb().backup(tmpDb)
     const uDir = uploadDir()
     const uploadFiles = existsSync(uDir)
       ? readdirSync(uDir, { withFileTypes: true })
@@ -144,7 +175,7 @@ export async function createBackup(): Promise<BackupEntry> {
       createdAt: new Date().toISOString(),
       uploads: uploadFiles.length,
     })
-    await writeZip(target, [
+    await writeZip(tmpZip, [
       {
         name: 'manifest.json',
         data: new Uint8Array(Buffer.from(manifest, 'utf8')),
@@ -157,8 +188,10 @@ export async function createBackup(): Promise<BackupEntry> {
         compress: false, // 多为已压缩的图片，再压意义不大
       })),
     ])
+    renameSync(tmpZip, target)
   } finally {
     if (existsSync(tmpDb)) rmSync(tmpDb, { force: true })
+    if (existsSync(tmpZip)) rmSync(tmpZip, { force: true })
   }
   return entryOf(name)
 }
@@ -174,6 +207,7 @@ export function resolveBackupPath(name: string): string | null {
 
 /** 删除指定备份。 */
 export function deleteBackup(name: string): boolean {
+  if (operationActive) throw new BackupError('backup.busy', 409)
   const full = resolveBackupPath(name)
   if (!full) return false
   rmSync(full, { force: true })
@@ -187,55 +221,123 @@ function clearWalShm(dbPath: string): void {
   }
 }
 
-/** 用指定备份覆盖当前数据库（与上传附件）。 */
-export function restoreBackup(name: string): boolean {
-  const src = resolveBackupPath(name)
-  if (!src) return false
-  return name.endsWith('.db') ? restoreLegacyDb(src) : restoreArchive(src)
-}
-
-/** 历史的纯 .db 备份：直接覆盖数据库文件。 */
-function restoreLegacyDb(src: string): boolean {
-  closeDb()
-  const target = dbFilePath()
-  copyFileSync(src, target)
-  clearWalShm(target)
-  getDb()
-  return true
-}
-
-/** zip 备份：还原数据库 + 原子替换 uploads 目录（旧目录留 .bak）。 */
-function restoreArchive(src: string): boolean {
-  const files = unzipSync(readFileSync(src))
-  if (!(DB_ENTRY in files)) return false
-  const dbBuf = files[DB_ENTRY]
-
-  const uDir = uploadDir()
-  const parent = resolve(uDir, '..')
-  const staging = resolve(parent, `.uploads-restore-${tsSuffix()}`)
-  if (existsSync(staging)) rmSync(staging, { recursive: true, force: true })
-  mkdirSync(staging, { recursive: true })
-  try {
-    for (const [path, buf] of Object.entries(files)) {
-      if (!path.startsWith(UPLOADS_PREFIX)) continue
-      const fname = path.slice(UPLOADS_PREFIX.length)
-      if (!fname || fname.includes('/')) continue // 防穿越
-      writeFileSync(resolve(staging, fname), buf)
+/** 本地导入只保存经过校验的备份，不触发恢复。客户端文件名只用于识别格式。 */
+export async function importBackup(
+  fileName: string,
+  body: ReadableStream<Uint8Array> | null,
+): Promise<BackupEntry> {
+  return exclusively(async () => {
+    const extension = fileName.toLowerCase().endsWith('.zip')
+      ? 'zip'
+      : fileName.toLowerCase().endsWith('.db')
+        ? 'db'
+        : null
+    if (!extension || !body) throw new BackupError('backup.invalidFile')
+    mkdirSync(backupDir(), { recursive: true })
+    const staging = mkdtempSync(resolve(backupDir(), '.import-'))
+    const source = resolve(staging, `source.${extension}`)
+    const reader = body.getReader()
+    let fd: number | undefined
+    let size = 0
+    try {
+      fd = openSync(source, 'wx')
+      for (;;) {
+        const chunk = await reader.read()
+        if (chunk.done) break
+        size += chunk.value.length
+        if (size > MAX_BACKUP_UPLOAD_BYTES)
+          throw new BackupError('backup.uploadTooLarge', 413)
+        writeFileSync(fd, chunk.value)
+      }
+      closeSync(fd)
+      fd = undefined
+      if (!size) throw new BackupError('backup.invalidFile')
+      if (extension === 'zip') await extractBackup(source, staging)
+      else {
+        // 校验可能补充旧库字段，原始导入文件仍原样保留。
+        const candidate = resolve(staging, DB_ENTRY)
+        copyFileSync(source, candidate)
+        validateDatabase(candidate)
+      }
+      const name = newName(extension)
+      renameSync(source, resolve(backupDir(), name))
+      return entryOf(name)
+    } finally {
+      if (fd !== undefined) closeSync(fd)
+      await reader.cancel().catch(() => {})
+      reader.releaseLock()
+      rmSync(staging, { recursive: true, force: true })
     }
-  } catch (e) {
-    rmSync(staging, { recursive: true, force: true })
-    throw e
-  }
+  })
+}
 
-  // 先恢复数据库（最关键），再原子替换 uploads 目录。
-  closeDb()
-  const target = dbFilePath()
-  writeFileSync(target, dbBuf)
-  clearWalShm(target)
-  if (existsSync(uDir)) {
-    renameSync(uDir, resolve(parent, `uploads.bak-${tsSuffix()}`))
-  }
-  renameSync(staging, uDir)
-  getDb()
-  return true
+/** 候选文件全部校验后再生成安全备份；数据库和附件的切换期间不让出事件循环。 */
+export async function restoreBackup(
+  name: string,
+): Promise<{ safetyBackup: string } | null> {
+  return exclusively(async () => {
+    const src = resolveBackupPath(name)
+    if (!src) return null
+    const staging = mkdtempSync(resolve(dataDir(), '.restore-'))
+    const candidate = resolve(staging, DB_ENTRY)
+    const legacy = name.endsWith('.db')
+    const recovery = { keepStaging: false }
+    try {
+      if (legacy) {
+        copyFileSync(src, candidate)
+        validateDatabase(candidate)
+      } else await extractBackup(src, staging)
+      const safety = await createBackupUnlocked()
+      const target = dbFilePath()
+      const uDir = uploadDir()
+      const oldDb = resolve(staging, 'original.db')
+      const oldUploads = resolve(staging, 'original-uploads')
+      let dbMoved = false
+      let uploadsMoved = false
+      let uploadsInstalled = false
+      try {
+        closeDb()
+        renameSync(target, oldDb)
+        dbMoved = true
+        clearWalShm(target)
+        renameSync(candidate, target)
+        if (!legacy) {
+          if (existsSync(uDir)) {
+            renameSync(uDir, oldUploads)
+            uploadsMoved = true
+          }
+          renameSync(resolve(staging, 'uploads'), uDir)
+          uploadsInstalled = true
+        }
+        getDb()
+      } catch (error) {
+        try {
+          closeDb()
+          if (dbMoved) {
+            clearWalShm(target)
+            rmSync(target, { force: true })
+            renameSync(oldDb, target)
+          }
+          if (uploadsInstalled) rmSync(uDir, { recursive: true, force: true })
+          if (uploadsMoved) renameSync(oldUploads, uDir)
+          getDb()
+        } catch (rollbackError) {
+          recovery.keepStaging = true
+          console.error('[approve] restore rollback failed', {
+            safetyBackup: safety.name,
+            staging,
+            error,
+            rollbackError,
+          })
+          throw new BackupError('backup.rollbackFailed', 500)
+        }
+        console.error('[approve] restore failed; original data restored', error)
+        throw new BackupError('backup.restoreFailed', 500)
+      }
+      return { safetyBackup: safety.name }
+    } finally {
+      if (!recovery.keepStaging)
+        rmSync(staging, { recursive: true, force: true })
+    }
+  })
 }
