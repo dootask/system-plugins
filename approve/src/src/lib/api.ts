@@ -134,6 +134,16 @@ export async function downloadAuthed(
  * FormData 不手动设 content-type（api 会让浏览器自带 multipart boundary）。
  */
 export async function uploadFile(file: File): Promise<Attachment> {
+  const { maxUploadBytes } = await api<{ maxUploadBytes: number }>('/uploads')
+  if (file.size > maxUploadBytes) {
+    throw new ApiError(
+      translate(_locale, 'server.err.fileTooLarge', {
+        name: file.name,
+        max: maxUploadBytes / 1024 / 1024,
+      }),
+      413,
+    )
+  }
   const fd = new FormData()
   fd.append('file', file)
   return api<Attachment>('/uploads', { method: 'POST', body: fd })

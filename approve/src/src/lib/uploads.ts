@@ -15,8 +15,11 @@ import { randomUUID } from 'node:crypto'
 import { dataDir } from '#/lib/db'
 import type { Attachment, UploadResult } from '#/lib/types'
 
-/** 单文件大小上限：20MB。 */
-export const MAX_UPLOAD_BYTES = 20 * 1024 * 1024
+/** 安装参数只接受 1–200MB 整数；旧安装和非法配置回退到 10MB。 */
+export function maxUploadBytes(): number {
+  const mb = Number(process.env.APPROVE_MAX_UPLOAD_MB)
+  return (Number.isInteger(mb) && mb >= 1 && mb <= 200 ? mb : 10) * 1024 * 1024
+}
 
 /** 前端访问上传文件的 URL 前缀（与 lib/api.ts 的 /apps/approve/api 对齐）。 */
 const URL_PREFIX = '/apps/approve/api/uploads/'

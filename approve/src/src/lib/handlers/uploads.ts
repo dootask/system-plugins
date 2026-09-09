@@ -5,20 +5,43 @@
  *   读取不强制鉴权：文件名为不可枚举的 UUID，且 <img> 无法携带身份头。
  */
 import { existsSync, readFileSync } from 'node:fs'
-import { badRequest, created, notFound, requireUser } from '#/lib/auth'
+import { badRequest, created, notFound, ok, requireUser } from '#/lib/auth'
 import {
-  MAX_UPLOAD_BYTES,
+  maxUploadBytes,
   resolveUploadPath,
   saveUpload,
   sniffImageType,
 } from '#/lib/uploads'
 import { serverT } from '#/lib/i18n/server'
 
+export async function uploadLimitsHandler(request: Request): Promise<Response> {
+  const auth = await requireUser(request)
+  if (auth instanceof Response) return auth
+  return ok(
+    { maxUploadBytes: maxUploadBytes() },
+    {
+      headers: { 'cache-control': 'no-store' },
+    },
+  )
+}
+
 /** POST /api/uploads → 上传单个文件，返回 { name, url, size, mime }。 */
 export async function uploadHandler(request: Request): Promise<Response> {
   const t = serverT(request)
   const auth = await requireUser(request)
   if (auth instanceof Response) return auth
+
+  const limit = maxUploadBytes()
+  const tooLarge = (name: string) =>
+    Response.json(
+      {
+        error: t('server.err.fileTooLarge', { name, max: limit / 1024 / 1024 }),
+      },
+      { status: 413 },
+    )
+  // multipart 头和字段预留 64KB；文件本身仍按实际大小检查。
+  if (Number(request.headers.get('content-length')) > limit + 64 * 1024)
+    return tooLarge('')
 
   let form: FormData
   try {
@@ -30,7 +53,7 @@ export async function uploadHandler(request: Request): Promise<Response> {
   if (!(file instanceof File) || file.size === 0) {
     return badRequest(t('server.err.missingFileField'))
   }
-  if (file.size > MAX_UPLOAD_BYTES) return badRequest(t('server.err.fileTooLarge'))
+  if (file.size > limit) return tooLarge(file.name)
   return created(await saveUpload(file))
 }
 

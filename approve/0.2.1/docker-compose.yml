@@ -6,6 +6,7 @@ services:
       - TZ=${TIMEZONE:-PRC}
       - APPROVE_ADMIN_USER_IDS=${APPROVE_ADMIN_USER_IDS}
       - APPROVE_VERSION=${PLUGIN_VERSION}
+      - APPROVE_MAX_UPLOAD_MB=${APPROVE_MAX_UPLOAD_MB:-10}
       # 以下旧 MySQL 连接信息当前不使用，仅为 M5 数据迁移预留：
       # 迁移脚本届时只读连旧库把历史审批数据导入本插件的 SQLite，平时不连。
       - DB_HOST=${DB_HOST}

@@ -798,7 +798,7 @@ function CommentImageInput({
           ) : null}
         </div>
       ) : null}
-      {error ? <p className="text-xs text-destructive">{error}</p> : null}
+      {error ? <p className="break-all text-xs text-destructive">{error}</p> : null}
       <label className="inline-flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
         <ImagePlus className="size-4" /> {t('detail.image.add')}
         <input

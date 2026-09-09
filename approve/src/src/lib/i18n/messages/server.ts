@@ -84,8 +84,8 @@ export const server = {
     en: 'Missing "file" field',
   },
   'server.err.fileTooLarge': {
-    zh: '文件超过 20MB 上限',
-    en: 'File exceeds the 20MB limit',
+    zh: '文件 {name} 超过 {max}MB 上限',
+    en: 'File {name} exceeds the {max}MB limit',
   },
   'server.err.fileNotFound': { zh: '文件不存在', en: 'File not found' },
   'server.err.adminOnly': {

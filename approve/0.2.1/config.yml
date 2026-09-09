@@ -7,6 +7,15 @@ fields:
       en: Select users with admin privileges
       zh: 选择具有管理员权限的用户
     type: user_select
+  - name: APPROVE_MAX_UPLOAD_MB
+    label:
+      en: Maximum attachment size (MB)
+      zh: 单个附件大小上限（MB）
+    description:
+      en: "Integer from 1 to 200. Empty or invalid values use 10MB. Does not change backup size limits."
+      zh: "请输入 1–200 的整数，留空或无效值使用 10MB。不改变备份容量限制。"
+    type: number
+    default: 10
 
 menu_items:
   - location: application

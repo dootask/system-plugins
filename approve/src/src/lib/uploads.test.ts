@@ -1,5 +1,25 @@
-import { describe, expect, it } from 'vitest'
-import { sanitizeAttachments, sniffImageType } from '#/lib/uploads'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  maxUploadBytes,
+  sanitizeAttachments,
+  sniffImageType,
+} from '#/lib/uploads'
+
+afterEach(() => vi.unstubAllEnvs())
+
+describe('maxUploadBytes', () => {
+  it.each([undefined, '', '0', '-1', '201', '1.5', 'abc', 'Infinity'])(
+    '非法或未配置 %s 回退 10MB',
+    (value) => {
+      vi.stubEnv('APPROVE_MAX_UPLOAD_MB', value)
+      expect(maxUploadBytes()).toBe(10 * 1024 * 1024)
+    },
+  )
+  it.each([1, 10, 20, 200])('接受 %iMB', (value) => {
+    vi.stubEnv('APPROVE_MAX_UPLOAD_MB', String(value))
+    expect(maxUploadBytes()).toBe(value * 1024 * 1024)
+  })
+})
 
 describe('sniffImageType', () => {
   it('识别 PNG/JPEG 头，未知返回 null', () => {

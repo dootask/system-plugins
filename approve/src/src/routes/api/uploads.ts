@@ -1,10 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { uploadHandler } from '#/lib/handlers/uploads'
+import { uploadHandler, uploadLimitsHandler } from '#/lib/handlers/uploads'
 
-// POST /apps/approve/api/uploads → 上传附件到主程序，返回 { fileId, name, size, ext }
+// GET 返回当前附件上限；POST 保存插件本地附件。
 export const Route = createFileRoute('/api/uploads')({
   server: {
     handlers: {
+      GET: ({ request }: { request: Request }) => uploadLimitsHandler(request),
       POST: ({ request }: { request: Request }) => uploadHandler(request),
     },
   },
