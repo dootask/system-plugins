@@ -1,0 +1,35 @@
+fields:
+  - name: APPROVE_ADMIN_USER_IDS
+    label:
+      en: Administrator
+      zh: 管理员
+    placeholder:
+      en: Select users with admin privileges
+      zh: 选择具有管理员权限的用户
+    type: user_select
+  - name: APPROVE_MAX_UPLOAD_MB
+    label:
+      en: Maximum attachment size (MB)
+      zh: 单个附件大小上限（MB）
+    description:
+      en: "Integer from 1 to 200. Empty or invalid values use 10MB. Does not change backup size limits."
+      zh: "请输入 1–200 的整数，留空或无效值使用 10MB。不改变备份容量限制。"
+    type: number
+    default: 10
+
+menu_items:
+  - location: application
+    label:
+      en: Approval
+      zh: 审批中心
+    url: "apps/approve/?theme={system_theme}&lang={system_lang}&user_id={user_id}&user_token={user_token}"
+    url_type: iframe
+    immersive: true
+    capsule:
+      visible: true            # 显示右上角胶囊（关闭/返回）；页面布局把标题/操作避开右上，避免遮挡
+
+require_version:
+  version: "> 1.7.90"
+  reason:
+    en: "Requires the main app's AI app-command (doo app call) and knowledge base support"
+    zh: "需要主程序的 AI 应用指令（doo app call）与知识库支持"
