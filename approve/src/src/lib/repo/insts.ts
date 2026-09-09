@@ -111,13 +111,41 @@ export function deleteInst(id: number): boolean {
   )
 }
 
+/** 管理员审批列表，包含作废记录；数据库分页，不受导出行数上限影响。 */
+export function listAdminInsts(f: {
+  keyword: string
+  status: string
+  page: number
+  pageSize: number
+}) {
+  const where: Array<string> = []
+  const params: Array<unknown> = []
+  if (f.keyword) {
+    where.push('instr(lower(title), lower(?)) > 0')
+    params.push(f.keyword)
+  }
+  if (f.status) {
+    where.push('status = ?')
+    params.push(f.status)
+  }
+  const clause = where.length ? ` WHERE ${where.join(' AND ')}` : ''
+  const total = (
+    getDb().prepare(`SELECT COUNT(*) AS c FROM proc_inst${clause}`).get(...params) as { c: number }
+  ).c
+  const offset = Math.min((f.page - 1) * f.pageSize, Number.MAX_SAFE_INTEGER)
+  const items = getDb()
+    .prepare(`SELECT * FROM proc_inst${clause} ORDER BY id DESC LIMIT ? OFFSET ?`)
+    .all(...params, f.pageSize, offset) as Array<ProcInstRow>
+  return { items, total }
+}
+
 /** 导出筛选（管理员全量导出用）。空字段=不限。 */
 export interface ExportFilter {
   /** 发起日期下限（YYYY-MM-DD，含当日 00:00:00）。 */
   from?: string
   /** 发起日期上限（YYYY-MM-DD，含当日 23:59:59）。 */
   to?: string
-  /** 状态白名单（running/approved/rejected/withdrawn/archived/draft）。 */
+  /** 状态白名单；不指定时排除作废记录，审计导出可显式选择 voided。 */
   statuses?: Array<string>
   /** 指定模板（仅导该模板，并据其 schema 展开表单字段列）。 */
   defId?: number
@@ -142,6 +170,8 @@ export function listForExport(f: ExportFilter): Array<ProcInstRow> {
   if (f.statuses && f.statuses.length > 0) {
     where.push(`status IN (${f.statuses.map(() => '?').join(', ')})`)
     params.push(...f.statuses)
+  } else {
+    where.push("status != 'voided'")
   }
   if (f.defId) {
     where.push('def_id = ?')
@@ -173,6 +203,8 @@ export function countForExport(f: ExportFilter): number {
   if (f.statuses && f.statuses.length > 0) {
     where.push(`status IN (${f.statuses.map(() => '?').join(', ')})`)
     params.push(...f.statuses)
+  } else {
+    where.push("status != 'voided'")
   }
   if (f.defId) {
     where.push('def_id = ?')
@@ -205,12 +237,12 @@ export function countByStatus(
     scope === 'mine'
       ? getDb()
           .prepare(
-            `SELECT status, COUNT(*) AS c FROM proc_inst WHERE initiator_id = ? GROUP BY status`,
+            `SELECT status, COUNT(*) AS c FROM proc_inst WHERE initiator_id = ? AND status != 'voided' GROUP BY status`,
           )
           .all(initiatorId)
       : getDb()
           .prepare(
-            `SELECT status, COUNT(*) AS c FROM proc_inst GROUP BY status`,
+            `SELECT status, COUNT(*) AS c FROM proc_inst WHERE status != 'voided' GROUP BY status`,
           )
           .all()
   ) as Array<{ status: string; c: number }>

@@ -73,7 +73,7 @@ export function lastDecisionByInst(): Map<number, LastDecision> {
   const rows = getDb()
     .prepare(
       `SELECT inst_id, actor_id, action, remark FROM proc_event
-         WHERE action IN ('approve','reject','return','withdraw','archive')
+         WHERE action IN ('approve','reject','return','withdraw','archive','void')
          ORDER BY id ASC`,
     )
     .all() as Array<{

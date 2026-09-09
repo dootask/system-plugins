@@ -42,15 +42,17 @@ import {
 } from '#/components/ui/misc'
 import type { DefSummary, InstSummary } from '#/lib/types'
 
-export type Box = 'todo' | 'done' | 'mine' | 'cc'
+export type Box = 'todo' | 'done' | 'mine' | 'cc' | 'admin'
 
 const TITLE_KEY: Record<Box, MsgKey> = {
+  admin: 'adminInst.title',
   todo: 'inst.title.todo',
   done: 'inst.title.done',
   mine: 'inst.title.mine',
   cc: 'inst.title.cc',
 }
 const EMPTY_HINT_KEY: Record<Box, MsgKey> = {
+  admin: 'adminInst.emptyHint',
   todo: 'inst.emptyHint.todo',
   done: 'inst.emptyHint.done',
   mine: 'inst.emptyHint.mine',
@@ -64,6 +66,7 @@ const STATUS_OPTIONS: Array<{ value: string; labelKey: MsgKey }> = [
   { value: 'rejected', labelKey: 'inst.status.rejected' },
   { value: 'withdrawn', labelKey: 'inst.status.withdrawn' },
   { value: 'archived', labelKey: 'inst.status.archived' },
+  { value: 'voided', labelKey: 'adminInst.voided' },
 ]
 
 // 模板名映射跨视图共享一次拉取即可（列表项只回 def_id）。
@@ -110,7 +113,7 @@ export function InstListView({ box, active }: { box: Box; active: boolean }) {
       })
       if (debKeyword) qs.set('keyword', debKeyword)
       if (status) qs.set('status', status)
-      const res = await api<ListResp>(`/insts?${qs.toString()}`)
+      const res = await api<ListResp>(`${box === 'admin' ? '/admin/insts' : '/insts'}?${qs.toString()}`)
       setItems(res.items)
       setTotal(res.total)
     } catch (e) {
@@ -248,7 +251,7 @@ export function InstListView({ box, active }: { box: Box; active: boolean }) {
                     navigate({
                       to: '/insts/$id',
                       params: { id: String(r.id) },
-                      search: { from: `/${box}` },
+                      search: { from: box === 'admin' ? '/admin/insts' : `/${box}` },
                     })
                   }
                 >

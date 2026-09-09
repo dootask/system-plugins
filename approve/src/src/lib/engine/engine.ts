@@ -16,6 +16,7 @@ import {
   finishTask,
   getActiveTask,
   getTask,
+  listTasksByInst,
   recordAgree,
 } from '#/lib/repo/tasks'
 import {
@@ -137,6 +138,42 @@ class Engine implements ApprovalEngine {
       }
     })
     tx()
+  }
+
+  void(instId: number, by: number, reason: string): void {
+    getDb().transaction(() => {
+      const row = getInst(instId)
+      if (!row) throw new EngineError('engine.instNotFound')
+      if (
+        row.status !== 'running' ||
+        (row.state !== InstState.pending && row.state !== InstState.running)
+      ) {
+        throw new EngineError('engine.voidUnfinishedOnly')
+      }
+      const remark = reason.trim()
+      if (!remark || remark.length > 1000) {
+        throw new EngineError('engine.voidReasonRequired')
+      }
+
+      // 异常流程可能残留多个未结束任务；全部收口，不改写已完成的审批历史。
+      for (const task of listTasksByInst(instId)) {
+        if (!task.is_finished) finishTask(task.id, 'voided', remark)
+      }
+      for (const actor of listActorsByInst(instId)) {
+        if (
+          actor.action === 'pending' &&
+          (actor.role === 'approver' || actor.role === 'addsign')
+        ) {
+          setActorAction(actor.id, 'voided')
+        }
+      }
+      updateInst(instId, {
+        status: 'voided',
+        state: InstState.voided,
+        finished_at: now(),
+      })
+      addEvent({ inst_id: instId, actor_id: by, action: 'void', remark })
+    })()
   }
 
   archive(instId: number, by: number): void {

@@ -5,6 +5,7 @@ import {
   BarChart3,
   CheckCircle2,
   Clock,
+  ClipboardList,
   DatabaseBackup,
   FilePlus2,
   Forward,
@@ -56,6 +57,7 @@ const SIDEBAR_GROUPS: Array<NavGroup> = [
   {
     labelKey: 'nav.group.manage',
     items: [
+      { to: '/admin/insts', labelKey: 'adminInst.title', icon: ClipboardList, adminOnly: true },
       { to: '/stats', labelKey: 'nav.stats', icon: BarChart3, adminOnly: true },
       {
         to: '/admin',
@@ -90,13 +92,13 @@ const BOTTOM_TABS: Array<NavItem> = [
     icon: SlidersHorizontal,
     adminOnly: true,
     // 移动端「管理」合并数据统计 / 模板管理 / 数据备份，内部用分段控件切换（见 AdminTabs）。
-    match: ['/admin', '/admin/backup', '/stats'],
+    match: ['/admin', '/admin/insts', '/admin/backup', '/stats'],
   },
 ]
 
 // 顶层路由（侧边栏/底部 Tab 可直达）：在这些页点返回 = 退出微应用回 DooTask；
 // 其余子页（详情 / 发起 / 模板编辑）点返回 = 应用内后退。
-const ROOT_PATHS = ['/', '/todo', '/done', '/cc', '/mine', '/stats', '/admin']
+const ROOT_PATHS = ['/', '/todo', '/done', '/cc', '/mine', '/stats', '/admin', '/admin/insts']
 
 function normalize(pathname: string): string {
   const p = pathname.replace(/^\/apps\/approve/, '')
@@ -126,6 +128,7 @@ const PAGE_TITLE: Record<string, MsgKey> = {
   '/stats': 'nav.stats',
   '/admin': 'nav.templates',
   '/admin/backup': 'nav.backup',
+  '/admin/insts': 'adminInst.title',
 }
 
 function titleKeyOf(pathname: string): MsgKey {

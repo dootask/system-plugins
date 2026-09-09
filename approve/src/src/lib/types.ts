@@ -181,6 +181,7 @@ export interface FlowStepNode {
 
 /** 审批单详情（GET /api/insts/:id）。 */
 export interface InstDetail {
+  can_void: boolean
   inst: InstSummary & { def_version: number; dept_id: number | null }
   form_schema: FormSchema
   form_data: Record<string, unknown>

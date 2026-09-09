@@ -53,11 +53,12 @@ export const InstState = {
   approved: 2, // 通过
   rejected: 3, // 拒绝
   withdrawn: 4, // 撤回
+  voided: 5, // 管理员作废，不可恢复
 } as const
 export type InstStateValue = (typeof InstState)[keyof typeof InstState]
 
 /** 参与人在某节点上的处置动作（对齐 proc_actor.action）。 */
-export type ActorAction = 'pending' | 'approved' | 'rejected' | 'withdrawn'
+export type ActorAction = 'pending' | 'approved' | 'rejected' | 'withdrawn' | 'voided'
 
 /** 引擎对外动作。 */
 export type EngineAction =
@@ -214,6 +215,9 @@ export interface ApprovalEngine {
 
   /** 归档：approved 之后由发起人/管理员归档（status→archived）。 */
   archive: (instId: number, by: number) => void
+
+  /** 管理员终止未结束的审批；调用入口负责管理员鉴权。 */
+  void: (instId: number, by: number, reason: string) => void
 
   /** 取运行时快照（DB → 对象视图，供详情页/影子比对）。 */
   getRuntime: (instId: number) => ProcInst | undefined

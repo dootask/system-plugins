@@ -110,7 +110,7 @@ export function StatsView() {
       {stats ? (
         <div className="space-y-5">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            <StatCard label={t('stats.card.total')} count={stats.total} highlight />
+            <StatCard label={t('adminInst.effectiveTotal')} count={stats.total} highlight />
             <StatCard label={t('stats.card.todo')} count={stats.todo} />
             {entries.map((e) => (
               <StatCard key={e.key} label={e.label} count={e.count} />
@@ -158,6 +158,7 @@ function StatCard({
 
 // 导出可选状态（不选=全部状态）。
 const EXPORT_STATUSES = [
+  ['voided', 'adminInst.voided'],
   ['running', 'stats.status.running'],
   ['approved', 'stats.status.approved'],
   ['rejected', 'stats.status.rejected'],
@@ -303,6 +304,7 @@ function ExportDialog({
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">
               {t('stats.export.statusLabel')}
+              <span className="ml-2 font-normal text-muted-foreground">{t('adminInst.exportDefault')}</span>
             </Label>
             <div className="flex flex-wrap gap-2">
               {EXPORT_STATUSES.map(([v, l]) => (

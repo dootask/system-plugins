@@ -15,6 +15,7 @@ import type { ProcDefRow, UserLite } from '#/lib/types'
 // 表单字段展开为列（同模板 schema 一致才可对齐）。下载机制见前端 downloadAuthed。
 
 const statusLabel = (s: string, t: TFunc): string => {
+  if (s === 'voided') return t('adminInst.voided')
   const key = `server.export.status.${s}` as MsgKey
   return s in STATUS_KEYS ? t(key) : s
 }
@@ -27,6 +28,7 @@ const STATUS_KEYS: Record<string, true> = {
   archived: true,
 }
 const decisionLabel = (a: string, t: TFunc): string => {
+  if (a === 'void') return t('adminInst.voidEvent')
   const key = `server.export.decision.${a}` as MsgKey
   return a in DECISION_KEYS ? t(key) : a
 }
@@ -38,6 +40,7 @@ const DECISION_KEYS: Record<string, true> = {
   archive: true,
 }
 const VALID_STATUSES = [
+  'voided',
   'running',
   'approved',
   'rejected',

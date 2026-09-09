@@ -7,6 +7,7 @@ import { confirmAction, previewImage, warnMessage } from '#/lib/dootask'
 import { useT } from '#/lib/i18n/context'
 import type { MsgKey } from '#/lib/i18n/messages'
 import { FormRenderer } from '#/components/form/FormRenderer'
+import { VoidApproval } from './void-approval'
 import { pickUsers } from '#/lib/form/picker'
 import { useUsers } from '#/lib/use-users'
 import { UserAvatar, UserChip } from '#/components/ui/user-chip'
@@ -30,7 +31,7 @@ import type {
   UserLite,
 } from '#/lib/types'
 
-// 引擎运行态：0待审(退回待修改)/1审批中/2通过/3拒绝/4撤回。
+// 引擎运行态：0待审(退回待修改)/1审批中/2通过/3拒绝/4撤回/5作废。
 const STATE_RUNNING = 1
 const STATE_RETURNED = 0
 
@@ -44,10 +45,12 @@ const EVENT_LABEL: Partial<Record<string, MsgKey>> = {
   addsign: 'detail.event.addsign',
   comment: 'detail.event.comment',
   archive: 'detail.event.archive',
+  void: 'adminInst.voidEvent',
 }
 
 // 参与人处理状态标签 + 配色（不同状态用不同颜色区分）。
 const ACTION_META: Partial<Record<string, { labelKey: MsgKey; cls: string }>> = {
+  voided: { labelKey: 'adminInst.voided', cls: 'bg-muted text-muted-foreground' },
   pending: {
     labelKey: 'detail.action.pending',
     cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300',
@@ -96,6 +99,7 @@ const END_NOTE: Partial<Record<number, MsgKey>> = {
   2: 'detail.end.approved',
   3: 'detail.end.rejected',
   4: 'detail.end.withdrawn',
+  5: 'adminInst.voided',
 }
 
 export function InstDetailView({
@@ -343,6 +347,9 @@ export function InstDetailView({
         />
         <CommentImageInput images={images} onChange={setImages} disabled={busy} />
         <div className="mt-3 flex flex-wrap gap-2">
+          {data.can_void ? (
+            <VoidApproval instId={instId} title={inst.title} onVoided={load} />
+          ) : null}
           {can_act ? (
             <>
               <Button onClick={() => runAct('approve')} disabled={busy}>
@@ -485,7 +492,7 @@ function FlowProgress({
   const t = useT()
   const { flow, cur_node_seq_idx, actors, tasks, inst } = data
   const instClosed =
-    inst.state === 2 || inst.state === 3 || inst.state === 4
+    inst.state === 2 || inst.state === 3 || inst.state === 4 || inst.state === 5
   // 同一节点可能因「退回→重新提交」多轮重开（多条 proc_task）；进度只取最新一轮，
   // 否则历史轮次的参与人会与当前轮叠加，呈现重复 + 过期状态。
   const latestTaskAt = (i: number) => {
@@ -549,7 +556,10 @@ function FlowProgress({
           role: a.role,
           comment: a.comment,
         }))
-      : node.approverIds.map((uid) => ({ uid, action: 'pending' }))
+      : node.approverIds.map((uid) => ({
+          uid,
+          action: inst.state === 5 ? 'skipped' : 'pending',
+        }))
     steps.push({
       key: `a${i}`,
       title: node.name || t('detail.node.approve'),
@@ -563,7 +573,11 @@ function FlowProgress({
     key: 'end',
     title: t('detail.node.end'),
     status:
-      inst.state === 2 ? 'done' : inst.state === 3 || inst.state === 4 ? 'rejected' : 'future',
+      inst.state === 2
+        ? 'done'
+        : inst.state === 3 || inst.state === 4 || inst.state === 5
+          ? 'rejected'
+          : 'future',
     note: ((k) => (k ? t(k) : undefined))(END_NOTE[inst.state]),
     people: [],
   })
@@ -799,4 +813,3 @@ function CommentImageInput({
     </div>
   )
 }
-

@@ -26,6 +26,7 @@ const CRUMB_LABEL: Partial<Record<string, MsgKey>> = {
   '/stats': 'ui.crumb.stats',
   '/admin': 'ui.crumb.admin',
   '/admin/backup': 'ui.crumb.backup',
+  '/admin/insts': 'adminInst.title',
 }
 
 /** 三级子页（详情 / 发起 / 模板编辑）统一面包屑：来源列表（可点返回）> 当前页。 */
@@ -94,6 +95,7 @@ export function ErrorBar({ message }: { message: string }) {
 // ───────────────────────── 状态标签 ─────────────────────────
 
 const STATUS_META: Partial<Record<string, { labelKey: MsgKey; cls: string }>> = {
+  voided: { labelKey: 'adminInst.voided', cls: 'bg-muted text-muted-foreground' },
   draft: { labelKey: 'ui.status.draft', cls: 'bg-muted text-muted-foreground' },
   running: {
     labelKey: 'ui.status.running',

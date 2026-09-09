@@ -88,7 +88,7 @@ export function listDoneForUser(userid: number): Array<ProcActorRow> {
     .prepare(
       `SELECT * FROM proc_actor
          WHERE userid = ? AND role = 'approver'
-           AND action != 'pending' AND is_system = 0
+           AND action NOT IN ('pending', 'voided') AND is_system = 0
          ORDER BY id DESC`,
     )
     .all(userid) as Array<ProcActorRow>

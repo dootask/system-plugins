@@ -5,6 +5,7 @@ import type { MsgKey } from '#/lib/i18n/messages'
 
 // 「管理」三页签：移动端在内容顶部以分段控件切换（同「我审批的」）；桌面端由左侧边栏切换，故隐藏。
 const ADMIN_TABS: Array<{ path: string; labelKey: MsgKey }> = [
+  { path: '/admin/insts', labelKey: 'adminInst.title' },
   { path: '/stats', labelKey: 'nav.stats' },
   { path: '/admin', labelKey: 'nav.templates' },
   { path: '/admin/backup', labelKey: 'nav.backup' },

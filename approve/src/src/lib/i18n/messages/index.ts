@@ -9,6 +9,7 @@ import { backup } from '#/lib/i18n/messages/backup'
 import { uiMisc } from '#/lib/i18n/messages/uiMisc'
 import { server } from '#/lib/i18n/messages/server'
 import { engine } from '#/lib/i18n/messages/engine'
+import { adminInst } from '#/lib/i18n/messages/adminInst'
 import type { MsgEntry } from '#/lib/i18n/messages/entry'
 
 // 全量词条目录：各域模块在此汇总。新增模块时 import 后并入下方对象即可。
@@ -25,6 +26,7 @@ export const messages = {
   ...uiMisc,
   ...server,
   ...engine,
+  ...adminInst,
 } satisfies Record<string, MsgEntry>
 
 export type MsgKey = keyof typeof messages

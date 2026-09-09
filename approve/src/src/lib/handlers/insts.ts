@@ -34,7 +34,7 @@ import type { ProcInstRow } from '#/lib/types'
 import { lastId, query } from './util'
 
 /** 列表项摘要（列表页用）。 */
-function instSummary(row: ProcInstRow) {
+export function instSummary(row: ProcInstRow) {
   return {
     id: row.id,
     def_id: row.def_id,
@@ -230,6 +230,10 @@ export async function getInstDetail(request: Request): Promise<Response> {
     flow,
     cur_node_seq_idx: row.cur_node_seq_idx,
     can_act: canAct,
+    can_void:
+      auth.isAdmin &&
+      row.status === 'running' &&
+      (row.state === 0 || row.state === 1),
     is_initiator: row.initiator_id === auth.userId,
   })
 }

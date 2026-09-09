@@ -109,7 +109,7 @@ export function migrate(db: Database.Database) {
       dept_id          INTEGER,
       status           TEXT NOT NULL DEFAULT 'running',-- draft/running/approved/rejected/withdrawn/archived
       -- 运行时引擎字段（同构旧 Go 引擎）：
-      state            INTEGER NOT NULL DEFAULT 0,     -- 0待审/1审批中/2通过/3拒绝/4撤回
+      state            INTEGER NOT NULL DEFAULT 0,     -- 0待审/1审批中/2通过/3拒绝/4撤回/5作废
       node_sequence    TEXT NOT NULL DEFAULT '[]',     -- JSON: 展开后的 NodeInfo[]
       cur_node_seq_idx INTEGER NOT NULL DEFAULT 0,     -- 指针=node_sequence 数组索引(旧引擎 Step)
       cur_node_id      TEXT,                           -- 冗余：当前节点 nodeId（便于查询/兼容 §4）
