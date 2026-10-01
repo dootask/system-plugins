@@ -1,6 +1,6 @@
 # search — Manticore 智能搜索插件
 
-引擎（官方 manticoresearch 镜像）+ 管理员状态仪表盘（`src/`，TanStack Start 单镜像全栈）双服务。appid `search`，**版本号 = Manticore 引擎版本**（如 `28.4.4`），仪表盘镜像 `dootask/search:<版本>` 随版本目录走。
+引擎（官方 manticoresearch 镜像）+ 管理员状态仪表盘（`src/`，TanStack Start 单镜像全栈）双服务。appid `search`，**版本号 = Manticore 引擎版本**（如 `29.9.0`），仪表盘镜像 `dootask/search:<版本>` 随版本目录走。
 
 ## 本地参考：先读本地，别联网
 
@@ -24,7 +24,8 @@
 - compose 服务名 `search` 是引擎（主程序按此名连 9306），仪表盘叫 `search-dashboard`——共享 docker 网络里别起泛名（如 `dashboard`）防别的应用撞名。
 - 所有仪表盘接口过 `requireAdmin`（token 反查主程序 + identity 含 admin），**不要**改成信任前端 user-id 的轻量模型——这里有清索引/重建这类破坏性操作。
 - `@dootask/tools` 两侧别混用：前端侧依赖 window（SSR 下动态 `import()`），后端侧 `DooTaskClient` 连 `http://nginx`。
-- 引擎升级 = 新建版本目录 + 改镜像 tag + init.sh 清卷逻辑；仪表盘代码改动也要**升版本号**才能发布（AppStore 拒绝同版本重发）。
+- **引擎非正常停机后「表缺失」≠ 表坏**：binlog 元数据登记了已不存在的日志文件会让 searchd 每次启动 FATAL 退出（表本身完好），compose 靠 `--replay-flags=ignore-open-errors` 跳过、`stop_grace_period: 120s` 给大索引落盘时间，init.sh 再兜底把其他类 binlog 损坏改名备份。别一上来就删/挪 binlog 目录——会丢掉里面尚未落盘的写入，那只是兜底。仪表盘用 `engineTables()` 区分 引擎离线/表未加载/表缺失，别再把所有查询失败都当「缺失」。
+- 引擎升级 = 新建版本目录 + 改镜像 tag + init.sh 清卷逻辑（`COMPATIBLE_PREV` 里是已实测可沿用数据的旧版本，升级到它不清库；新增前先用现网数据拷贝在隔离容器里实测加载/查询/建表写入）；仪表盘代码改动也要**升版本号**才能发布（AppStore 拒绝同版本重发）。
 
 ## 命令
 
