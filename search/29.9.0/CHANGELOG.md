@@ -12,6 +12,8 @@
 
 - The coverage table now tells the causes apart: "Engine offline", "Table not loaded" (engine up but the table fails to serve) and "Table missing" (the table really does not exist), instead of showing "Table missing" for every failure.
 - Administrators now also get the red-dot alert when a table is not loaded.
+- The failure queue gets a "Clear…" dropdown to clear everything or a single type, with a confirmation. Clearing gives up on those records: the data will not be written to the search index automatically again and can only be recovered by refilling the index, which is very costly for messages. Use it to cut losses when the backlog is huge.
+- The failure queue header now shows an estimated time to drain at the default retry pace (100 per 2 minutes); records that keep failing back off, so the real time can only be longer.
 
 ## Notes
 

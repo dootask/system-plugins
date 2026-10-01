@@ -16,6 +16,8 @@ import {
   lockRedisKey,
   sourceCountSql,
   failuresTable,
+  RETRY_BATCH_SIZE,
+  RETRY_INTERVAL_SEC,
   type DataType,
 } from '#/lib/conventions'
 import { engineInfo, engineTables, kvGetAll, tableCount, tableDiskBytes } from '#/lib/engine'
@@ -75,6 +77,9 @@ export interface DashboardStatus {
     total: number
     byType: Record<string, number>
     oldestAgeSec: number | null
+    // 按默认重试节奏（每轮 RETRY_BATCH_SIZE 条 / RETRY_INTERVAL_SEC 秒）估算清完所需时间；
+    // 反复失败的记录会退避，实际只会更久，所以是下限
+    etaSec: number
   }
 }
 
@@ -314,12 +319,14 @@ async function failureSummary(): Promise<DashboardStatus['failures']> {
       ),
     ])
     const byType = Object.fromEntries(totals.map((t) => [t.data_type, Number(t.c)]))
+    const total = totals.reduce((acc, t) => acc + Number(t.c), 0)
     return {
-      total: totals.reduce((acc, t) => acc + Number(t.c), 0),
+      total,
       byType,
       oldestAgeSec: oldest[0]?.age != null ? Number(oldest[0].age) : null,
+      etaSec: Math.ceil(total / RETRY_BATCH_SIZE) * RETRY_INTERVAL_SEC,
     }
   } catch {
-    return { total: 0, byType: {}, oldestAgeSec: null }
+    return { total: 0, byType: {}, oldestAgeSec: null, etaSec: 0 }
   }
 }

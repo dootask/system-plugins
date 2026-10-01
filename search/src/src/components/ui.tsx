@@ -30,8 +30,8 @@ export function CardHeader({
   right?: React.ReactNode
 }) {
   return (
-    <div className="px-4 sm:px-5 py-3.5 border-b border-slate-100 dark:border-neutral-800 flex items-center justify-between gap-2 flex-wrap">
-      <h2 className="text-sm font-semibold">
+    <div className="px-4 sm:px-5 h-14 shrink-0 border-b border-slate-100 dark:border-neutral-800 flex items-center justify-between gap-2">
+      <h2 className="text-sm font-semibold min-w-0 truncate">
         {title}
         {hint ? (
           <span className="text-xs font-normal text-slate-400 dark:text-neutral-500 ml-2 hidden sm:inline">

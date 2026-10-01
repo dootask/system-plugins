@@ -156,3 +156,7 @@ export function nextRetryDelayMinutes(retryCount: number): number {
   if (retryCount === 3) return 15
   return 30
 }
+
+// 失败重试的默认节奏（RetryManticoreSync 的 --limit 默认值 / ManticoreSyncTask 的调度间隔），仅用于估算清空耗时
+export const RETRY_BATCH_SIZE = 100
+export const RETRY_INTERVAL_SEC = 120

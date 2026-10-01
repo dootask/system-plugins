@@ -48,6 +48,8 @@ interface TestHit {
 }
 
 const REFRESH_SECONDS = 10
+// 预计清完时间不足 10 分钟时不展示（积压很小，没有参考价值）
+const ETA_SHOW_MIN_SEC = 600
 
 const TYPE_ICONS: Record<string, string> = {
   msg: '💬',
@@ -147,6 +149,7 @@ function Dashboard() {
         <SyncTasks t={t} locale={locale} status={status} refresh={refresh} showToast={showToast} />
         <FailureQueue
           t={t}
+          locale={locale}
           status={status}
           failures={failures}
           refresh={refresh}
@@ -481,12 +484,14 @@ function SyncTasks({
 
 function FailureQueue({
   t,
+  locale,
   status,
   failures,
   refresh,
   showToast,
 }: {
   t: T
+  locale: Locale
   status: DashboardStatus | null
   failures: Array<FailureItem>
   refresh: () => Promise<void>
@@ -494,6 +499,40 @@ function FailureQueue({
 }) {
   const [busy, setBusy] = useState(false)
   const total = status?.failures.total ?? 0
+  const etaSec = status?.failures.etaSec ?? 0
+  const byTypeEntries = Object.entries(status?.failures.byType ?? {}).filter(([, n]) => n > 0)
+
+  // 清空 = 放弃补齐，数据之后不会再被自动写入索引；type 缺省为全部类型
+  const askClear = async (type?: string) => {
+    const n = type ? (status?.failures.byType[type] ?? 0) : total
+    const okd = await confirmDialog({
+      title: t('clearConfirmTitle'),
+      content: t('clearConfirmDesc', {
+        scope: type ? makeTypeLabel(t, type) : t('clearScopeAll'),
+        n: fmtNum(n),
+      }),
+      okText: t('confirm'),
+      cancelText: t('cancel'),
+    })
+    if (!okd) return
+    await act(async () => {
+      const r = await api<{ deleted: number }>(`/failures${type ? `?type=${type}` : ''}`, {
+        method: 'DELETE',
+      })
+      void notifySuccess(t('clearDone', { n: fmtNum(r.deleted) }), showToast)
+    })
+  }
+
+  const askRetryAll = async () => {
+    const okd = await confirmDialog({
+      title: t('retryConfirmTitle'),
+      content: t('retryConfirmDesc', { n: fmtNum(total) }),
+      okText: t('confirm'),
+      cancelText: t('cancel'),
+    })
+    if (!okd) return
+    await act(() => api('/failures', { method: 'POST' }), t('retryAllDone'))
+  }
 
   const act = async (fn: () => Promise<unknown>, okMsg?: string) => {
     setBusy(true)
@@ -519,23 +558,55 @@ function FailureQueue({
         }
         right={
           total > 0 ? (
-            <Btn
-              tone="blue"
-              busy={busy}
-              className='-m-1'
-              onClick={() => void act(() => api('/failures', { method: 'POST' }), t('retryAllDone'))}
-            >
-              {t('retryAll')}
-            </Btn>
+            <div className="flex items-center gap-2 shrink-0">
+              <Btn
+                tone="blue"
+                busy={busy}
+                className="h-8"
+                onClick={() => void askRetryAll()}
+              >
+                {t('retryAll')}
+              </Btn>
+              {/* 清空是破坏性操作：收进下拉里选范围，选中后再弹确认框，避免与「重试」并排被误点 */}
+              <Select
+                value=""
+                disabled={busy}
+                onValueChange={(v) => void askClear(v === 'all' ? undefined : v)}
+              >
+                <SelectTrigger size="sm" className="px-2.5 text-xs">
+                  <SelectValue placeholder={t('clearQueue')} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t('clearScopeAll')}</SelectItem>
+                  {byTypeEntries.map(([type, n]) => (
+                    <SelectItem key={type} value={type}>
+                      {makeTypeLabel(t, type)} · {fmtNum(n)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           ) : undefined
         }
       />
+      {total > 0 ? (
+        <div className="px-4 sm:px-5 py-2 border-b border-slate-100 dark:border-neutral-800 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-xs text-slate-400 dark:text-neutral-500">
+          <span>
+            {byTypeEntries
+              .map(([type, n]) => `${TYPE_ICONS[type] ?? ''} ${makeTypeLabel(t, type)} ${fmtNum(n)}`)
+              .join('  ·  ')}
+          </span>
+          {etaSec >= ETA_SHOW_MIN_SEC ? (
+            <span>{t('drainEta', { t: fmtDuration(locale, etaSec) })}</span>
+          ) : null}
+        </div>
+      ) : null}
       {failures.length === 0 ? (
         <div className="flex flex-1 items-center justify-center px-5 py-8 text-xs text-slate-400 dark:text-neutral-500">
           {t('emptyQueue')} 🎉
         </div>
       ) : (
-        <div className="divide-y divide-slate-50 dark:divide-neutral-800/60 text-sm">
+        <div className="divide-y divide-slate-50 dark:divide-neutral-800/60 text-sm max-h-96 overflow-y-auto overscroll-contain">
           {failures.map((f) => (
             <div key={f.id} className="px-4 sm:px-5 py-2.5">
               <div className="flex items-center justify-between gap-2">
