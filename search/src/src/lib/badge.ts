@@ -6,6 +6,7 @@
  * - 任一同步锁疑似卡死（进程被杀留下的残锁）
  * - 同步调度心跳超时（cron 没在跑）
  * - 引擎或向量服务不可达
+ * - 引擎在线但表未加载（查询失败）
  *
  * 异常 → 给所有管理员在本应用菜单（key=status）推红点；恢复 → 清除。
  * 菜单 badge_clear_on_open: true（未读语义）：管理员点开即清，若未恢复下轮再推。
@@ -27,6 +28,7 @@ type DTClient = {
 export function healthIssues(status: DashboardStatus): Array<string> {
   const issues: Array<string> = []
   if (!status.engine.online) issues.push('engine_offline')
+  if (status.coverage.some((c) => c.state === 'unloaded')) issues.push('table_unloaded')
   if (!status.vectorService.reachable) issues.push('ai_unreachable')
   if (status.syncTasks.some((t) => t.stuck)) issues.push('lock_stuck')
   if (!status.cron.healthy) issues.push('cron_stale')

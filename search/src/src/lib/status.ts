@@ -11,13 +11,14 @@ import {
   KV_SCHEMA_KEY,
   MODEL_REDIS_KEY,
   SYNC_COMMANDS,
+  VECTOR_TABLES,
   embeddingsApiKey,
   lockRedisKey,
   sourceCountSql,
   failuresTable,
   type DataType,
 } from '#/lib/conventions'
-import { engineInfo, kvGetAll, tableCount, tableDiskBytes } from '#/lib/engine'
+import { engineInfo, engineTables, kvGetAll, tableCount, tableDiskBytes } from '#/lib/engine'
 
 export interface CoverageRow {
   type: DataType
@@ -26,7 +27,12 @@ export interface CoverageRow {
   pointer: number
   maxId: number
   percent: number
-  state: 'synced' | 'syncing' | 'missing'
+  /**
+   * offline  引擎连不上（容器重启中/起不来），此时所有表都查不了
+   * unloaded 引擎在线、表已登记但查询失败（如向量服务不可用导致未加载）
+   * missing  引擎在线且根本没有这张表（重建窗口）
+   */
+  state: 'synced' | 'syncing' | 'offline' | 'unloaded' | 'missing'
   ratePerMin: number | null
   etaMinutes: number | null
 }
@@ -195,7 +201,7 @@ async function syncTaskRows(): Promise<Array<SyncTaskRow>> {
 export async function getStatus(): Promise<DashboardStatus> {
   const r = redis()
 
-  const [engine, kv, aiProbe, cachedModel, checkTimeRaw, sync, failures, ...perType] =
+  const [engine, kv, aiProbe, cachedModel, checkTimeRaw, sync, failures, tables, ...perType] =
     await Promise.all([
       engineInfo().then(
         (info) => ({ online: true, ...info }),
@@ -215,6 +221,7 @@ export async function getStatus(): Promise<DashboardStatus> {
         })),
       ),
       failureSummary(),
+      engineTables(),
       ...DATA_TYPES.map(async (type) => {
         const [indexed, src, disk] = await Promise.all([
           tableCount(type),
@@ -239,7 +246,9 @@ export async function getStatus(): Promise<DashboardStatus> {
 
   const coverage: Array<CoverageRow> = typeRows.map((t) => {
     const pointer = parseInt(kv[KV_POINTER_KEYS[t.type]] || '0', 10)
-    const missing = t.indexed < 0
+    const unavailable = t.indexed < 0
+    const unavailableState: CoverageRow['state'] =
+      tables === null ? 'offline' : tables.has(VECTOR_TABLES[t.type]) ? 'unloaded' : 'missing'
     const gap = Math.max(0, t.maxId - pointer)
     const syncing = gap > 200
     const rate = ratePerMin(t.type)
@@ -251,7 +260,7 @@ export async function getStatus(): Promise<DashboardStatus> {
       pointer,
       maxId: t.maxId,
       percent: t.source > 0 ? Math.min(100, Math.round((Math.max(0, t.indexed) / t.source) * 100)) : 100,
-      state: missing ? 'missing' : syncing ? 'syncing' : 'synced',
+      state: unavailable ? unavailableState : syncing ? 'syncing' : 'synced',
       ratePerMin: rate,
       etaMinutes: syncing && rate && rate > 0 ? Math.round(remaining / rate) : null,
     }

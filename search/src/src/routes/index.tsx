@@ -351,6 +351,10 @@ function Coverage({
                 <td className="px-3 py-3 whitespace-nowrap">
                   {row.state === 'synced' ? (
                     <Chip tone="green">{t('synced')}</Chip>
+                  ) : row.state === 'offline' ? (
+                    <Chip tone="red">{t('stateOffline')}</Chip>
+                  ) : row.state === 'unloaded' ? (
+                    <Chip tone="amber">{t('stateUnloaded')}</Chip>
                   ) : row.state === 'missing' ? (
                     <Chip tone="red">{t('missing')}</Chip>
                   ) : (
@@ -518,6 +522,7 @@ function FailureQueue({
             <Btn
               tone="blue"
               busy={busy}
+              className='-m-1'
               onClick={() => void act(() => api('/failures', { method: 'POST' }), t('retryAllDone'))}
             >
               {t('retryAll')}

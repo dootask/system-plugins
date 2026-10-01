@@ -37,6 +37,17 @@ export async function kvDel(key: string): Promise<void> {
 
 // ---- 表统计 ----
 
+/** 引擎里当前登记的表名集合；引擎连不上返回 null */
+export async function engineTables(): Promise<Set<string> | null> {
+  try {
+    const rows = await mq<{ Table: string }>('SHOW TABLES')
+    return new Set(rows.map((r) => r.Table))
+  } catch {
+    return null
+  }
+}
+
+/** 返回行数；查询失败返回 -1（原因由调用方结合 engineTables() 判定：离线 / 未加载 / 缺失） */
 export async function tableCount(type: DataType): Promise<number> {
   try {
     const rows = await mq<{ c: number }>(
@@ -44,7 +55,7 @@ export async function tableCount(type: DataType): Promise<number> {
     )
     return Number(rows[0]?.c ?? 0)
   } catch {
-    return -1 // 表不存在（重建窗口）
+    return -1
   }
 }
 
