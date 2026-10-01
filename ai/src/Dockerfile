@@ -14,8 +14,8 @@ RUN DOO_TAG="$(curl -fsSL https://api.github.com/repos/dootask/tools/releases/la
         -o /out/doo . && \
     /out/doo --version
 
-# UI 构建阶段
-FROM node:20-alpine AS ui-builder
+# UI 构建阶段（产物为静态文件，与架构无关：固定在构建机原生架构执行，避免 arm64 经 QEMU 跑 npm ci 卡死）
+FROM --platform=$BUILDPLATFORM node:20-alpine AS ui-builder
 WORKDIR /ui
 COPY ui/package.json ui/package-lock.json ./
 RUN npm ci
