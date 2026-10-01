@@ -2,7 +2,8 @@ dashscope
 fastapi
 Pillow
 fastmcp
-langchain-mcp-adapters 
+langchain-mcp-adapters
+mcp<2   # mcp 2.x 移除了 mcp.shared.context.RequestContext，langchain-mcp-adapters 导入会 ImportError
 langgraph
 httpx[socks]
 langchain
