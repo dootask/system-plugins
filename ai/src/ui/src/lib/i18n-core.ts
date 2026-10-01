@@ -197,6 +197,13 @@ const TRANSLATIONS: Record<Language, TranslationTree> = {
       save: "保存",
       imageLimit: "图片限制",
     },
+    preferences: {
+      title: "个人偏好",
+      description: "仅对当前账号、当前设备生效",
+      floatButton: "显示悬浮按钮",
+      floatButtonTip: "关闭后仅隐藏页面侧边的 AI 助手悬浮球，不影响 Cmd/Ctrl + I 快捷键和顶部「+」菜单入口。",
+      saveFailed: "保存失败",
+    },
   },
   en: {
     app: {
@@ -384,6 +391,13 @@ const TRANSLATIONS: Record<Language, TranslationTree> = {
       cancel: "Cancel",
       save: "Save",
       imageLimit: "Image Limits",
+    },
+    preferences: {
+      title: "Preferences",
+      description: "Applies to the current account on this device only",
+      floatButton: "Show floating button",
+      floatButtonTip: "Hiding it only removes the floating AI assistant ball from the page edge. The Cmd/Ctrl + I shortcut and the top \"+\" menu entry keep working.",
+      saveFailed: "Failed to save",
     },
   },
 }

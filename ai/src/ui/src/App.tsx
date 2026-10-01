@@ -17,6 +17,7 @@ import {
 import { BotCard } from "@/components/aibot/BotCard"
 import { BotSettingsSheet } from "@/components/aibot/BotSettingsSheet"
 import { MCPListCard } from "@/components/aibot/MCPListCard"
+import { PreferencesCard } from "@/components/aibot/PreferencesCard"
 import { MCPEditorSheet } from "@/components/aibot/MCPEditorSheet"
 import { VisionConfigCard } from "@/components/aibot/VisionConfigCard"
 import { VisionEditorSheet } from "@/components/aibot/VisionEditorSheet"
@@ -25,6 +26,7 @@ import { createLocalizedAIBotList } from "@/data/aibots"
 import { getAISystemConfig, type SystemConfig } from "@/data/aibot-config"
 import type { MCPConfig } from "@/data/mcp-config"
 import { type VisionConfig, DEFAULT_VISION_CONFIG } from "@/data/vision-config"
+import { loadFloatButtonVisible, saveFloatButtonVisible } from "@/lib/float-button"
 import { mergeFields, parseModelNames, serializeModels, THINKING_EFFORTS } from "@/lib/aibot"
 import type { GeneratedField, ThinkingEffort } from "@/lib/aibot"
 import { useI18n } from "@/lib/i18n-context"
@@ -98,6 +100,9 @@ function App() {
 
   const [visionConfig, setVisionConfig] = useState<VisionConfig>(DEFAULT_VISION_CONFIG)
   const [visionEditorOpen, setVisionEditorOpen] = useState(false)
+
+  const [floatButtonVisible, setFloatButtonVisible] = useState(true)
+  const [floatButtonLoading, setFloatButtonLoading] = useState(true)
 
   const settingsOpenRef = useRef(settingsOpen)
   const mcpEditorOpenRef = useRef(mcpEditorOpen)
@@ -184,6 +189,7 @@ function App() {
         // cannot determine admin state, keep default false
       }
 
+      void loadFloatButton()
       await refreshBotTags()
       await loadMcps()
       await loadVision()
@@ -200,6 +206,28 @@ function App() {
     // 仅挂载时初始化一次
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const loadFloatButton = async () => {
+    try {
+      setFloatButtonVisible(await loadFloatButtonVisible())
+    } finally {
+      setFloatButtonLoading(false)
+    }
+  }
+
+  const handleFloatButtonChange = async (visible: boolean) => {
+    const previous = floatButtonVisible
+    setFloatButtonVisible(visible)
+    setFloatButtonLoading(true)
+    try {
+      await saveFloatButtonVisible(visible)
+    } catch (error) {
+      setFloatButtonVisible(previous)
+      messageError(resolveErrorMessage(error, t("preferences.saveFailed")))
+    } finally {
+      setFloatButtonLoading(false)
+    }
+  }
 
   const loadMcps = async () => {
     try {
@@ -860,23 +888,31 @@ function App() {
             </div>
           )}
         </section>
-        {isAdmin && (
-          <section className="space-y-6">
-            <MCPListCard
-              mcps={mcps}
-              bots={bots}
-              onAdd={handleAddMcp}
-              onEdit={handleEditMcp}
-              onDelete={handleDeleteMcp}
-            />
-            <VisionConfigCard
-              config={visionConfig}
-              bots={bots}
-              onEdit={handleEditVision}
-              t={t}
-            />
-          </section>
-        )}
+        <section className="space-y-6">
+          <PreferencesCard
+            floatButtonVisible={floatButtonVisible}
+            loading={floatButtonLoading}
+            onFloatButtonChange={handleFloatButtonChange}
+            t={t}
+          />
+          {isAdmin && (
+            <>
+              <MCPListCard
+                mcps={mcps}
+                bots={bots}
+                onAdd={handleAddMcp}
+                onEdit={handleEditMcp}
+                onDelete={handleDeleteMcp}
+              />
+              <VisionConfigCard
+                config={visionConfig}
+                bots={bots}
+                onEdit={handleEditVision}
+                t={t}
+              />
+            </>
+          )}
+        </section>
       </div>
       {isAdmin && (
         <>
