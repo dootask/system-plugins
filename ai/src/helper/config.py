@@ -50,6 +50,9 @@ TOOL_CALL_PATTERN = re.compile(r'\n?> <tool-use>Tool: [^<]+</tool-use>\n*')
 # 默认模型列表
 DEFAULT_MODELS = {
     "openai": [
+        {"id": "gpt-6-astra", "name": "GPT-6 Astra", "support_mcp": True, "support_vision": True},
+        {"id": "gpt-6.1-sol", "name": "GPT-6.1 Sol", "support_mcp": True, "support_vision": True},
+        {"id": "gpt-6-luna", "name": "GPT-6 Luna", "support_mcp": True, "support_vision": True},
         {"id": "gpt-5.6-sol", "name": "GPT-5.6 Sol", "support_mcp": True, "support_vision": True},
         {"id": "gpt-5.6-terra", "name": "GPT-5.6 Terra", "support_mcp": True, "support_vision": True},
         {"id": "gpt-5.6-luna", "name": "GPT-5.6 Luna", "support_mcp": True, "support_vision": True},
@@ -59,6 +62,9 @@ DEFAULT_MODELS = {
         {"id": "o4-mini", "name": "o4 Mini", "support_mcp": True, "support_vision": True},
     ],
     "claude": [
+        {"id": "claude-fable-5-1", "name": "Claude Fable 5.1", "support_mcp": True, "support_vision": True, "thinking": "off"},
+        {"id": "claude-opus-5-5", "name": "Claude Opus 5.5", "support_mcp": True, "support_vision": True, "thinking": "off"},
+        {"id": "claude-sonnet-5-5", "name": "Claude Sonnet 5.5", "support_mcp": True, "support_vision": True, "thinking": "off"},
         {"id": "claude-fable-5", "name": "Claude Fable 5", "support_mcp": True, "support_vision": True, "thinking": "off"},
         {"id": "claude-opus-4-8", "name": "Claude Opus 4.8", "support_mcp": True, "support_vision": True, "thinking": "off"},
         {"id": "claude-sonnet-5", "name": "Claude Sonnet 5", "support_mcp": True, "support_vision": True, "thinking": "off"},
@@ -68,20 +74,31 @@ DEFAULT_MODELS = {
     ],
     "deepseek": [
         {"id": "deepseek-v4-pro", "name": "DeepSeek V4 Pro", "support_mcp": True, "support_vision": False},
-        {"id": "deepseek-v4-flash", "name": "DeepSeek V4 Flash", "support_mcp": True, "support_vision": False},
+        {"id": "deepseek-flash", "name": "DeepSeek V4.1 Flash", "support_mcp": True, "support_vision": True},
+        # 旧名已下线，官方仍兼容并路由到 V4.1 Flash；保留以便已配置此 ID 的用户沿用能力标记
+        {"id": "deepseek-v4-flash", "name": "DeepSeek V4 Flash", "support_mcp": True, "support_vision": True},
     ],
     "gemini": [
+        {"id": "gemini-3.8-flash", "name": "Gemini 3.8 Flash", "support_mcp": True, "support_vision": True},
+        {"id": "gemini-3.7-flash", "name": "Gemini 3.7 Flash", "support_mcp": True, "support_vision": True},
+        {"id": "gemini-3.6-flash", "name": "Gemini 3.6 Flash", "support_mcp": True, "support_vision": True},
         {"id": "gemini-3.5-flash", "name": "Gemini 3.5 Flash", "support_mcp": True, "support_vision": True},
+        {"id": "gemini-3.5-flash-lite", "name": "Gemini 3.5 Flash Lite", "support_mcp": True, "support_vision": True},
         {"id": "gemini-3.1-pro-preview", "name": "Gemini 3.1 Pro", "support_mcp": True, "support_vision": True},
         {"id": "gemini-3.1-flash-lite", "name": "Gemini 3.1 Flash Lite", "support_mcp": True, "support_vision": True},
         {"id": "gemini-2.5-pro", "name": "Gemini 2.5 Pro", "support_mcp": True, "support_vision": True},
         {"id": "gemini-2.5-flash", "name": "Gemini 2.5 Flash", "support_mcp": True, "support_vision": True},
     ],
     "grok": [
+        {"id": "grok-4.7", "name": "Grok 4.7", "support_mcp": True, "support_vision": True},
+        {"id": "grok-4.6", "name": "Grok 4.6", "support_mcp": True, "support_vision": True},
         {"id": "grok-4.5", "name": "Grok 4.5", "support_mcp": True, "support_vision": True},
         {"id": "grok-4.3", "name": "Grok 4.3", "support_mcp": True, "support_vision": True},
     ],
     "zhipu": [
+        {"id": "glm-5.3", "name": "GLM-5.3", "support_mcp": True, "support_vision": False},
+        {"id": "glm-5.3-flash", "name": "GLM-5.3 Flash", "support_mcp": True, "support_vision": True},
+        {"id": "glm-5.3-flashx", "name": "GLM-5.3 FlashX", "support_mcp": True, "support_vision": True},
         {"id": "glm-5.2", "name": "GLM-5.2", "support_mcp": True, "support_vision": False},
         {"id": "glm-5.1", "name": "GLM-5.1", "support_mcp": True, "support_vision": False},
         {"id": "glm-5", "name": "GLM-5", "support_mcp": True, "support_vision": False},
@@ -90,13 +107,15 @@ DEFAULT_MODELS = {
         {"id": "glm-4.7", "name": "GLM-4.7", "support_mcp": True, "support_vision": False},
     ],
     "qianwen": [
+        {"id": "qwen3.8-max", "name": "Qwen3.8 Max", "support_mcp": True, "support_vision": True},
+        {"id": "qwen3.8-flash", "name": "Qwen3.8 Flash", "support_mcp": True, "support_vision": True},
         {"id": "qwen3.7-max", "name": "Qwen3.7 Max", "support_mcp": True, "support_vision": False},
         {"id": "qwen3.7-plus", "name": "Qwen3.7 Plus", "support_mcp": True, "support_vision": True},
         {"id": "qwen3.6-plus", "name": "Qwen3.6 Plus", "support_mcp": True, "support_vision": True},
         {"id": "qwen3.6-flash", "name": "Qwen3.6 Flash", "support_mcp": True, "support_vision": False},
     ],
     "wenxin": [
-        {"id": "ernie-5.1", "name": "ERNIE 5.1", "support_mcp": False, "support_vision": False},
+        {"id": "ernie-5.1", "name": "ERNIE 5.1", "support_mcp": False, "support_vision": True},
         {"id": "ernie-5.0", "name": "ERNIE 5.0", "support_mcp": False, "support_vision": True},
         {"id": "ernie-5.0-thinking-latest", "name": "ERNIE 5.0 Thinking", "support_mcp": False, "support_vision": True},
         {"id": "ernie-x1.1", "name": "ERNIE X1.1", "support_mcp": False, "support_vision": False},
@@ -109,7 +128,10 @@ DEFAULT_MODELS = {
 # 数值为官方文档的原始值
 CONTEXT_LIMITS = {
     "openai": {
-        # GPT-5.6: 1.05M context
+        # GPT-6 / GPT-5.6: 1.05M context
+        "gpt-6-astra": 1050000,
+        "gpt-6.1-sol": 1050000,
+        "gpt-6-luna": 1050000,
         "gpt-5.6-sol": 1050000,
         "gpt-5.6-terra": 1050000,
         "gpt-5.6-luna": 1050000,
@@ -120,6 +142,9 @@ CONTEXT_LIMITS = {
         "default": 128000,
     },
     "claude": {
+        "claude-fable-5-1": 1000000,
+        "claude-opus-5-5": 1000000,
+        "claude-sonnet-5-5": 1000000,
         "claude-fable-5": 1000000,
         "claude-opus-4-8": 1000000,
         "claude-sonnet-5": 1000000,
@@ -131,11 +156,16 @@ CONTEXT_LIMITS = {
     "deepseek": {
         # DeepSeek V4: 1M context
         "deepseek-v4-pro": 1000000,
+        "deepseek-flash": 1000000,
         "deepseek-v4-flash": 1000000,
         "default": 128000,
     },
     "gemini": {
         # Gemini 3.x/2.5: 1,048,576 context
+        "gemini-3.8-flash": 1048576,
+        "gemini-3.7-flash": 1048576,
+        "gemini-3.6-flash": 1048576,
+        "gemini-3.5-flash-lite": 1048576,
         "gemini-3.5-flash": 1048576,
         "gemini-3.1-pro-preview": 1048576,
         "gemini-3.1-flash-lite": 1048576,
@@ -144,11 +174,16 @@ CONTEXT_LIMITS = {
         "default": 1048576,
     },
     "grok": {
+        "grok-4.7": 500000,
+        "grok-4.6": 500000,
         "grok-4.5": 500000,
         "grok-4.3": 1000000,
         "default": 500000,
     },
     "zhipu": {
+        "glm-5.3": 1000000,
+        "glm-5.3-flash": 1000000,
+        "glm-5.3-flashx": 1000000,
         "glm-5.2": 1000000,
         "glm-5.1": 200000,
         "glm-5": 200000,
@@ -158,6 +193,8 @@ CONTEXT_LIMITS = {
         "default": 128000,
     },
     "qianwen": {
+        "qwen3.8-max": 1000000,
+        "qwen3.8-flash": 1000000,
         "qwen3.7-max": 1000000,
         "qwen3.7-plus": 1000000,
         "qwen3.6-plus": 1000000,
